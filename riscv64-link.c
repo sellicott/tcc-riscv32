@@ -305,7 +305,7 @@ void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
                 qrel->r_info = ELFW(R_INFO)(esym_index, R_RISCV_64);
 #if PTR_SIZE == 8
             /* Use sign extension! (if 64-bit) */
-            qrel->r_addend = (int)read32le(ptr) + val;
+            qrel->r_addend = rel->r_addend;
 #endif
                 qrel++;
                 break;
