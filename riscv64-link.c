@@ -289,8 +289,10 @@ void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
                now TCC uses R_RISCV_RELATIVE even for a 64bit pointer */
             qrel->r_offset = rel->r_offset;
             qrel->r_info = ELFW(R_INFO)(0, R_RISCV_RELATIVE);
-            /* Use sign extension! */
+#if PTR_SIZE == 8
+            /* Use sign extension! (if 64-bit) */
             qrel->r_addend = (int)read32le(ptr) + val;
+#endif
             qrel++;
         }
         add32le(ptr, val);
@@ -301,12 +303,18 @@ void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
             qrel->r_offset = rel->r_offset;
             if (esym_index) {
                 qrel->r_info = ELFW(R_INFO)(esym_index, R_RISCV_64);
-                qrel->r_addend = rel->r_addend;
+#if PTR_SIZE == 8
+            /* Use sign extension! (if 64-bit) */
+            qrel->r_addend = (int)read32le(ptr) + val;
+#endif
                 qrel++;
                 break;
             } else {
                 qrel->r_info = ELFW(R_INFO)(0, R_RISCV_RELATIVE);
-                qrel->r_addend = read64le(ptr) + val;
+#if PTR_SIZE == 8
+            /* Use sign extension! (if 64-bit) */
+            qrel->r_addend = (int)read32le(ptr) + val;
+#endif
                 qrel++;
             }
         }
