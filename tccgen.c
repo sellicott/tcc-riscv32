@@ -876,7 +876,7 @@ static void tcc_tcov_block_begin(void)
         sv.sym = &label;
 #if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64 || \
     defined TCC_TARGET_ARM || defined TCC_TARGET_ARM64 || \
-    defined TCC_TARGET_RISCV64
+    defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
         gen_increment_tcov (&sv);
 #else
         vpushv(&sv);
@@ -3590,7 +3590,7 @@ static void gen_cvt_itof1(int t)
 }
 #endif
 
-#if defined TCC_TARGET_ARM64 || defined TCC_TARGET_RISCV64
+#if defined TCC_TARGET_ARM64 || defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
 #define gen_cvt_ftoi1 gen_cvt_ftoi
 #else
 /* generic ftoi for unsigned long long case */
@@ -6131,7 +6131,7 @@ ST_FUNC void unary(void)
 #ifdef TCC_TARGET_ARM
                 vpushi(2*PTR_SIZE);
                 gen_op('+');
-#elif defined TCC_TARGET_RISCV64
+#elif defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
                 vpushi(PTR_SIZE);
                 gen_op('-');
 #else
@@ -6143,7 +6143,7 @@ ST_FUNC void unary(void)
             }
         }
         break;
-#ifdef TCC_TARGET_RISCV64
+#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
     case TOK_builtin_va_start:
         parse_builtin_params(0, "ee");
         r = vtop->r & VT_VALMASK;
@@ -6518,7 +6518,7 @@ special_math_val:
 
             if (ret_nregs < 0) {
                 vsetc(&ret.type, ret.r, &ret.c);
-#ifdef TCC_TARGET_RISCV64
+#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
                 arch_transfer_ret_regs(1);
 #endif
             } else {
@@ -6997,7 +6997,7 @@ static void gfunc_return(CType *func_type)
         ret_nregs = gfunc_sret(func_type, func_var, &ret_type,
                                &ret_align, &regsize);
         if (ret_nregs < 0) {
-#ifdef TCC_TARGET_RISCV64
+#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
             arch_transfer_ret_regs(0);
 #endif
         } else if (0 == ret_nregs) {
