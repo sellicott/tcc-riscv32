@@ -1,7 +1,12 @@
 #ifdef TARGET_DEFS_ONLY
 
 // Number of registers available to allocator:
-#define NB_REGS 19 // x10-x17 aka a0-a7, f10-f17 aka fa0-fa7, xxx, ra, sp
+#ifdef TCC_TARGET_RISCV32_ilp32
+// TODO add temporary and saved registers here once I figure out how TCC works
+#define NB_REGS 11 // a0-a7, sp (?), ra, sp
+#else
+#define NB_REGS 19 // a0-a7, fa0-fa7, xxx, ra, sp
+#endif
 #define NB_ASM_REGS 32
 #define CONFIG_TCC_ASM
 
@@ -22,8 +27,7 @@
 #define REG_IRE2 (TREG_R(1)) // int 2nd return register number
 #define REG_FRET (TREG_F(0)) // float return register number
 
-// #define PTR_SIZE 8
-#define PTR_SIZE 4 // for riscv32
+#define PTR_SIZE 4 
 
 #define LDOUBLE_SIZE 16
 #define LDOUBLE_ALIGN 16
@@ -39,8 +43,8 @@
 
 ST_DATA const char * const target_machine_defs =
     "__riscv\0"
-    "__riscv_xlen 64\0"
-    "__riscv_flen 64\0"
+    "__riscv_xlen 32\0"
+    "__riscv_flen 32\0"
     "__riscv_div\0"
     "__riscv_mul\0"
     "__riscv_fdiv\0"
@@ -54,6 +58,7 @@ ST_DATA const char * const target_machine_defs =
 #define TREG_SP 18
 
 ST_DATA const int reg_classes[NB_REGS] = {
+  // Integer Function Arguments
   RC_INT | RC_R(0),
   RC_INT | RC_R(1),
   RC_INT | RC_R(2),
@@ -62,6 +67,8 @@ ST_DATA const int reg_classes[NB_REGS] = {
   RC_INT | RC_R(5),
   RC_INT | RC_R(6),
   RC_INT | RC_R(7),
+#ifndef TCC_TARGET_RISCV32_ilp32
+  // Floating point function arguments
   RC_FLOAT | RC_F(0),
   RC_FLOAT | RC_F(1),
   RC_FLOAT | RC_F(2),
@@ -70,6 +77,7 @@ ST_DATA const int reg_classes[NB_REGS] = {
   RC_FLOAT | RC_F(5),
   RC_FLOAT | RC_F(6),
   RC_FLOAT | RC_F(7),
+#endif
   0,
   1 << TREG_RA,
   1 << TREG_SP
@@ -104,7 +112,12 @@ static int freg(int r)
 
 static int is_freg(int r)
 {
+#ifndef TCC_TARGET_RISCV32_ilp32
     return r >= 8 && r < 16;
+#else
+    // there are no floating point registers in rv32imc isa
+    return 0;
+#endif
 }
 
 ST_FUNC void o(unsigned int c)
