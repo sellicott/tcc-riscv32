@@ -313,24 +313,6 @@ static void asm_shift_opcode(TCCState *s1, int token)
     case TOK_ASM_srai:
         asm_emit_i(token, (0x4 << 2) | 3 | (5 << 12) | (16 << 26), &ops[0], &ops[1], &ops[2]);
         return;
-    case TOK_ASM_sllw:
-        asm_emit_r(token, (0xE << 2) | 3 | (1 << 12), &ops[0], &ops[1], &ops[2]);
-        return;
-    case TOK_ASM_slliw:
-        asm_emit_i(token, (6 << 2) | 3 | (1 << 12), &ops[0], &ops[1], &ops[2]);
-        return;
-    case TOK_ASM_srlw:
-        asm_emit_r(token, (0xE << 2) | 3 | (5 << 12), &ops[0], &ops[1], &ops[2]);
-        return;
-    case TOK_ASM_srliw:
-        asm_emit_i(token, (0x6 << 2) | 3 | (5 << 12), &ops[0], &ops[1], &ops[2]);
-        return;
-    case TOK_ASM_sraw:
-        asm_emit_r(token, (0xE << 2) | 3 | (5 << 12), &ops[0], &ops[1], &ops[2]);
-        return;
-    case TOK_ASM_sraiw:
-        asm_emit_i(token, (0x6 << 2) | 3 | (5 << 12), &ops[0], &ops[1], &ops[2]);
-        return;
     default:
         expect("shift instruction");
     }
@@ -352,8 +334,8 @@ static void asm_data_processing_opcode(TCCState* s1, int token)
     parse_operand(s1, &ops[2]);
 
     switch (token) {
-    // Arithmetic (RD,RS1,(RS2|IMM)); R-format, I-format or U-format
 
+    // Arithmetic (RD,RS1,(RS2|IMM)); R-format, I-format or U-format
     case TOK_ASM_add:
          asm_emit_r(token, (0xC << 2) | 3, &ops[0], &ops[1], &ops[2]);
          return;
@@ -363,18 +345,8 @@ static void asm_data_processing_opcode(TCCState* s1, int token)
     case TOK_ASM_sub:
          asm_emit_r(token, (0xC << 2) | 3 | (32 << 25), &ops[0], &ops[1], &ops[2]);
          return;
-    case TOK_ASM_addw:
-         asm_emit_r(token, (0xE << 2) | 3 | (0 << 12), &ops[0], &ops[1], &ops[2]);
-         return;
-    case TOK_ASM_addiw: // 64 bit
-         asm_emit_i(token, (0x6 << 2) | 3 | (0 << 12), &ops[0], &ops[1], &ops[2]);
-         return;
-    case TOK_ASM_subw:
-         asm_emit_r(token, (0xE << 2) | 3 | (0 << 12) | (32 << 25), &ops[0], &ops[1], &ops[2]);
-         return;
 
     // Logical (RD,RS1,(RS2|IMM)); R-format or I-format
-
     case TOK_ASM_xor:
          asm_emit_r(token, (0xC << 2) | 3 | (4 << 12), &ops[0], &ops[1], &ops[2]);
          return;
@@ -395,7 +367,6 @@ static void asm_data_processing_opcode(TCCState* s1, int token)
          return;
 
     // Compare (RD,RS1,(RS2|IMM)); R-format or I-format
-
     case TOK_ASM_slt:
          asm_emit_r(token, (0xC << 2) | 3 | (2 << 12), &ops[0], &ops[1], &ops[2]);
          return;
@@ -483,16 +454,8 @@ static void asm_data_transfer_opcode(TCCState* s1, int token)
     case TOK_ASM_lhu:
          asm_emit_i(token, (0x0 << 2) | 3 | (5 << 12), &ops[0], &ops[1], &ops[2]);
          return;
-    // 64 bit
-    case TOK_ASM_ld:
-         asm_emit_i(token, (0x0 << 2) | 3 | (3 << 12), &ops[0], &ops[1], &ops[2]);
-         return;
-    case TOK_ASM_lwu:
-         asm_emit_i(token, (0x0 << 2) | 3 | (6 << 12), &ops[0], &ops[1], &ops[2]);
-         return;
 
     // Stores (RS1,RS2,I); S-format
-
     case TOK_ASM_sb:
          asm_emit_s(token, (0x8 << 2) | 3 | (0 << 12), &ops[0], &ops[1], &ops[2]);
          return;
@@ -501,9 +464,6 @@ static void asm_data_transfer_opcode(TCCState* s1, int token)
          return;
     case TOK_ASM_sw:
          asm_emit_s(token, (0x8 << 2) | 3 | (2 << 12), &ops[0], &ops[1], &ops[2]);
-         return;
-    case TOK_ASM_sd:
-         asm_emit_s(token, (0x8 << 2) | 3 | (3 << 12), &ops[0], &ops[1], &ops[2]);
          return;
 
     default:
@@ -608,30 +568,12 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
     case TOK_ASM_srli:
     case TOK_ASM_sra:
     case TOK_ASM_srai:
-    case TOK_ASM_sllw:
-    case TOK_ASM_slld:
-    case TOK_ASM_slliw:
-    case TOK_ASM_sllid:
-    case TOK_ASM_srlw:
-    case TOK_ASM_srld:
-    case TOK_ASM_srliw:
-    case TOK_ASM_srlid:
-    case TOK_ASM_sraw:
-    case TOK_ASM_srad:
-    case TOK_ASM_sraiw:
-    case TOK_ASM_sraid:
         asm_shift_opcode(s1, token);
         return;
 
     case TOK_ASM_add:
     case TOK_ASM_addi:
     case TOK_ASM_sub:
-    case TOK_ASM_addw:
-    case TOK_ASM_addd:
-    case TOK_ASM_addiw:
-    case TOK_ASM_addid:
-    case TOK_ASM_subw:
-    case TOK_ASM_subd:
     case TOK_ASM_xor:
     case TOK_ASM_xori:
     case TOK_ASM_or:
@@ -649,12 +591,9 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
     case TOK_ASM_lw:
     case TOK_ASM_lbu:
     case TOK_ASM_lhu:
-    case TOK_ASM_ld:
-    case TOK_ASM_lwu:
     case TOK_ASM_sb:
     case TOK_ASM_sh:
     case TOK_ASM_sw:
-    case TOK_ASM_sd:
         asm_data_transfer_opcode(s1, token);
         return;
 
@@ -711,12 +650,12 @@ ST_FUNC void asm_clobber(uint8_t *clobber_regs, const char *str)
 
 ST_FUNC int asm_parse_regvar (int t)
 {
-    if (t >= TOK_ASM_x0 && t <= TOK_ASM_pc) { /* register name */
+    if (t >= TOK_ASM_zero && t <= TOK_ASM_pc) { /* register name */
         switch (t) {
             case TOK_ASM_pc:
                 return -1; // TODO: Figure out where it can be used after all
             default:
-                return t - TOK_ASM_x0;
+                return t - TOK_ASM_zero;
         }
     } else
         return -1;
