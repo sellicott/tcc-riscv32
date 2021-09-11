@@ -44,10 +44,14 @@
 #include "x86_64-gen.c"
 #include "x86_64-link.c"
 #include "i386-asm.c"
-#elif defined(TCC_TARGET_RISCV64)
+#elif defined(TCC_TARGET_RISCV64) 
 #include "riscv64-gen.c"
 #include "riscv64-link.c"
 #include "riscv64-asm.c"
+#elif defined(TCC_TARGET_RISCV32)
+#include "riscv32-gen.c"
+#include "riscv32-link.c"
+#include "riscv32-asm.c"
 #else
 #error unknown target
 #endif
