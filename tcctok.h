@@ -403,6 +403,10 @@
 #include "arm-tok.h"
 #endif
 
-#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
+#if defined TCC_TARGET_RISCV64 
 #include "riscv64-tok.h"
+#endif
+
+#if defined TCC_TARGET_RISCV32
+#include "riscv32-tok.h"
 #endif
