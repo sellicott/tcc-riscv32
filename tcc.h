@@ -421,10 +421,14 @@ extern long double strtold (const char *__nptr, char **__endptr);
 # include "coff.h"
 # include "c67-gen.c"
 # include "c67-link.c"
-#elif defined(TCC_TARGET_RISCV64) || defined(TCC_TARGET_RISCV32)
+#elif defined(TCC_TARGET_RISCV64)
 # include "riscv64-gen.c"
 # include "riscv64-link.c"
 # include "riscv64-asm.c"
+#elif defined(TCC_TARGET_RISCV32)
+# include "riscv32-gen.c"
+# include "riscv32-link.c"
+# include "riscv32-asm.c"
 #else
 #error unknown target
 #endif
