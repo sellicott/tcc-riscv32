@@ -78,6 +78,7 @@
  DEF_ASM(sub)
  DEF_ASM(lui)
  DEF_ASM(auipc)
+ DEF_ASM(nop)
 
 /* Logical */
 
