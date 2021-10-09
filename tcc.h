@@ -818,6 +818,7 @@ struct TCCState {
 
     unsigned char has_text_addr;
     addr_t text_addr; /* address of text section */
+    addr_t data_addr; /* address of data section */
     unsigned section_align; /* section alignment */
 #ifdef TCC_TARGET_I386
     int seg_size; /* 32. Can be 16 with i386 assembler (.code16) */
@@ -993,6 +994,10 @@ struct TCCState {
 
     /* for warnings/errors for object files */
     const char *current_filename;
+
+    /* for keeping --Wl,--defsym=xxx */
+    char **defsyms;
+    int nb_defsyms;
 
     /* used by main and tcc_parse_args only */
     struct filespec **files; /* files seen on command line */
