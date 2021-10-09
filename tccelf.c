@@ -897,6 +897,23 @@ static void sort_syms(TCCState *s1, Section *s)
     tcc_free(old_to_new_syms);
 }
 
+ST_FUNC int find_defsym(TCCState *s1, const char *name, ElfW(Sym) *sym)
+{
+    int i, n = strlen(name);
+    // printf("LOOKING FOR DEFSYM %s\n", name);
+    for (i = 0; i < s1->nb_defsyms; i++) {
+        const char *s = s1->defsyms[i], *end = NULL;
+        int len = strlen(s);
+        // printf("LOOKING DEFSYM %s\n", s1->defsyms);
+        if (len > n + 1 && s[n] == '=' && strncmp(name, s, n) == 0) {
+            //sym->st_info = ELFW(ST_INFO)(STB_GLOBAL,STT_FUNC);
+            sym->st_value = strtoull(s + n + 1, &end, 0);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* relocate symbol table, resolve undefined symbols if do_resolve is
    true and output error if undefined symbol. */
 ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
@@ -937,6 +954,10 @@ ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
                it */
             if (!strcmp(name, "_fp_hw"))
                 goto found;
+
+            if (find_defsym(s1, name, sym))
+                goto found;
+
             /* only weak symbols are accepted to be undefined. Their
                value is zero */
             sym_bind = ELFW(ST_BIND)(sym->st_info);
@@ -1773,6 +1794,8 @@ static void bind_exe_dynsyms(TCCState *s1)
                 /* XXX: _fp_hw seems to be part of the ABI, so we ignore it */
                 if (ELFW(ST_BIND)(sym->st_info) == STB_WEAK ||
                     !strcmp(name, "_fp_hw")) {
+                } else if (find_defsym(s1, name, sym)) {
+                    /* Exists in -Wl,--defsym=NAME=ADDR */
                 } else {
                     tcc_error_noabort("undefined symbol '%s'", name);
                 }
@@ -1959,12 +1982,17 @@ static int layout_sections(TCCState *s1, ElfW(Phdr) *phdr,
 	roinf->sh_offset = roinf->sh_addr = roinf->sh_size = 0;
 
         for(j = 0; j < phfill; j++) {
+
+            // If -Wl,-data-base=xxxx is specified, put data segment to a given address
+            if (j == 1 &&s1->data_addr) addr = ph->p_vaddr = ph->p_vaddr = s1->data_addr;
+
             ph->p_type = j == 2 ? PT_TLS : PT_LOAD;
             if (j == 0)
                 ph->p_flags = PF_R | PF_X;
             else
                 ph->p_flags = PF_R | PF_W;
             ph->p_align = j == 2 ? 4 : s_align;
+
 
             /* Decide the layout of sections loaded in memory. This must
                be done before program headers are filled since they contain
@@ -2056,6 +2084,8 @@ static int layout_sections(TCCState *s1, ElfW(Phdr) *phdr,
                         file_offset += s->sh_size;
                 }
             }
+
+#ifndef TCC_TARGET_RISCV32  // On ESP32C3, don't do that. Start code section from the _start symbol
 	    if (j == 0) {
 		/* Make the first PT_LOAD segment include the program
 		   headers itself (and the ELF header as well), it'll
@@ -2065,6 +2095,8 @@ static int layout_sections(TCCState *s1, ElfW(Phdr) *phdr,
 		ph->p_vaddr &= ~(ph->p_align - 1);
 		ph->p_paddr &= ~(ph->p_align - 1);
 	    }
+#endif
+
             ph->p_filesz = file_offset - ph->p_offset;
             ph->p_memsz = addr - ph->p_vaddr;
             ph++;
@@ -2081,6 +2113,7 @@ static int layout_sections(TCCState *s1, ElfW(Phdr) *phdr,
             }
         }
     }
+
 
     /* all other sections come after */
     return layout_any_sections(s1, file_offset, sec_order, 0);
