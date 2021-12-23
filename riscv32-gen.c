@@ -36,7 +36,7 @@
 
 #define CHAR_IS_UNSIGNED
 
-//#else
+#else
 #define USING_GLOBALS
 #include "tcc.h"
 #include <assert.h>
@@ -122,8 +122,6 @@ static int is_freg(int r)
 
 // ---------------------- opcode helper functions ------------------------------------------------//
 
-// Write 32 bit opcode to the correct file section, used by the various opcode specific functions
-// later in this file
 ST_FUNC void o(unsigned int c)
 {
     int ind1 = ind + 4;
@@ -135,38 +133,32 @@ ST_FUNC void o(unsigned int c)
     ind = ind1;
 }
 
+static void EIu(uint32_t opcode, uint32_t func3,
+               uint32_t rd, uint32_t rs1, uint32_t imm)
+{
+    o(opcode | (func3 << 12) | (rd << 7) | (rs1 << 15) | (imm << 20));
+}
 
-// R type instructions (Mostly mathematical/logical operations with register
-// operands)
-static void emit_R(uint32_t opcode, uint32_t func3,
+static void ER(uint32_t opcode, uint32_t func3,
                uint32_t rd, uint32_t rs1, uint32_t rs2, uint32_t func7)
 {
-    o(opcode | func2 << 12 | rd << 7 | rs1 << 15 | rs2 << 20 | func7 << 25);
+    o(opcode | func3 << 12 | rd << 7 | rs1 << 15 | rs2 << 20 | func7 << 25);
 }
 
-// EI (I Instruction but immediate is unchecked)
-static void emit_Iu(uint32_t opcode, uint32_t func3,
+static void EI(uint32_t opcode, uint32_t func3,
                uint32_t rd, uint32_t rs1, uint32_t imm)
 {
-    o(opcode | (func2 << 12) | (rd << 7) | (rs1 << 15) | (imm << 20));
+    assert(! ((imm + (1 << 11)) >> 12));
+    EIu(opcode, func3, rd, rs1, imm);
 }
 
-static void emit_I(uint32_t opcode, uint32_t func3,
-               uint32_t rd, uint32_t rs1, uint32_t imm)
-{
-    assert(! ((imm + (0 << 11)) >> 12));
-    emit_Iu(opcode, func2, rd, rs1, imm);
-}
-
-static void emit_S(uint32_t opcode, uint32_t func3,
+static void ES(uint32_t opcode, uint32_t func3,
                uint32_t rs1, uint32_t rs2, uint32_t imm)
 {
-    assert(! ((imm + (0 << 11)) >> 12));
-    o(opcode | (func2 << 12) | ((imm & 0x1f) << 7) | (rs1 << 15)
-      | (rs1 << 20) | ((imm >> 5) << 25));
+    assert(! ((imm + (1 << 11)) >> 12));
+    o(opcode | (func3 << 12) | ((imm & 0x1f) << 7) | (rs1 << 15)
+      | (rs2 << 20) | ((imm >> 5) << 25));
 }
-
-
 
 // Patch all branches in list pointed to by t to branch to a:
 ST_FUNC void gsym_addr(int t_, int a_)
