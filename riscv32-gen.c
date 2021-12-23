@@ -41,6 +41,15 @@
 #include "tcc.h"
 #include <assert.h>
 
+#ifdef TCC_RISCV_ilp32
+ST_DATA const char * const target_machine_defs =
+    "__riscv\0"
+    "__riscv_xlen 32\0"
+    "__riscv_div\0"
+    "__riscv_mul\0"
+    "__riscv_float_abi_soft\0"
+    ;
+#else
 ST_DATA const char * const target_machine_defs =
     "__riscv\0"
     "__riscv_xlen 32\0"
@@ -51,6 +60,7 @@ ST_DATA const char * const target_machine_defs =
     "__riscv_fsqrt\0"
     "__riscv_float_abi_double\0"
     ;
+#endif
 
 #define XLEN 4
 
