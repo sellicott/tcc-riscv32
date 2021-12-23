@@ -40,6 +40,7 @@
 #define USING_GLOBALS
 #include "tcc.h"
 #include <assert.h>
+#include "riscv_utils.h"
 
 #ifdef TCC_RISCV_ilp32
 ST_DATA const char * const target_machine_defs =
@@ -175,19 +176,40 @@ ST_FUNC void gsym_addr(int t_, int a_)
 {
     uint32_t t = t_;
     uint32_t a = a_;
+    
+    // save the current location so that we can go back to it at the end of the function.
+    unsigned char* base_ptr = cur_text_section->data;
+    int original_ind = ind;
+
     while (t) {
-        unsigned char *ptr = cur_text_section->data + t;
-        uint32_t next = read32le(ptr);
-        uint32_t r = a - t, imm;
-        if ((r + (1 << 21)) & ~((1U << 22) - 2))
-          tcc_error("out-of-range branch chain");
-        imm =   (((r >> 12) &  0xff) << 12)
-            | (((r >> 11) &     1) << 20)
-            | (((r >>  1) & 0x3ff) << 21)
-            | (((r >> 20) &     1) << 31);
-        write32le(ptr, r == 4 ? 0x33 : 0x6f | imm); // nop || j imm
-        t = next;
+        // get the location that we need to write our next value to.
+        unsigned char *ptr = base_ptr + t;
+        // update the offset from the data section, so that we can use our instruction writing macros
+        ind = t;
+        // get the offset for the next iteration
+        t = read32le(ptr);
+
+        // rel_jmp can have up to a +-1MiB range (20bits 0 to 0x1fffff)
+        int32_t rel_jmp = a - t;
+        if ((int) rel_jmp > 0xfffff || (int) rel_jmp < -0xfffff) {
+          tcc_error("out-of-range branch chain (> +-1MiB): %d", rel_jmp);
+          goto cleanup;
+        }
+
+        // generate the jmp table
+        if (rel_jmp == 4) {
+            // we just need a nop as PC will increment by 4 for us (this will need to be updated once
+            // compressed instructions are added)
+            emit_NOP();
+        }
+        else {
+            emit_J_inst(rel_jmp);
+        }
     }
+
+cleanup:
+    // get back to where we once belonged
+    ind = original_ind;
 }
 
 static int load_symofs(int r, SValue *sv, int forstore)
@@ -211,12 +233,14 @@ static int load_symofs(int r, SValue *sv, int forstore)
         label.type.t = VT_VOID | VT_STATIC;
         put_extern_sym(&label, cur_text_section, ind, 0);
         rr = is_ireg(r) ? ireg(r) : 5;
-        o(0x17 | (rr << 7));   // auipc RR, 0 %pcrel_hi(sym)+addend
+        //o(0x17 | (rr << 7));   // auipc RR, 0 %pcrel_hi(sym)+addend
+        emit_AUIPC(rr, 0);// it seems like this needs a different offset value
         greloca(cur_text_section, &label, ind,
                 doload || !forstore
                   ? R_RISCV_PCREL_LO12_I : R_RISCV_PCREL_LO12_S, 0);
         if (doload) {
             EI(0x03, 2, rr, rr, 0); // lw RR, 0(RR)
+            //emit_LW(rr, rr, 0);
         }
     } else if (v == VT_LOCAL || v == VT_LLOCAL) {
         rr = 8; // s0
@@ -224,7 +248,7 @@ static int load_symofs(int r, SValue *sv, int forstore)
           tcc_error("unimp: store(giant local off) (0x%lx)", (long)sv->c.i);
         if (((unsigned)fc + (1 << 11)) >> 12) {
             rr = is_ireg(r) ? ireg(r) : 5; // t0
-            o(0x37 | (rr << 7) | ((0x800 + fc) & 0xfffff000)); //lui RR, upper(fc)
+            //o(0x37 | (rr << 7) | ((0x800 + fc) & 0xfffff000)); //lui RR, upper(fc)
             ER(0x33, 0, rr, rr, 8, 0); // add RR, RR, s0
             sv->c.i = fc << 20 >> 20;
         }
