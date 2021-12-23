@@ -1984,7 +1984,7 @@ static int layout_sections(TCCState *s1, ElfW(Phdr) *phdr,
         for(j = 0; j < phfill; j++) {
 
             // If -Wl,-data-base=xxxx is specified, put data segment to a given address
-            if (j == 1 &&s1->data_addr) addr = ph->p_vaddr = ph->p_vaddr = s1->data_addr;
+            if (j == 1 &&s1->data_addr) addr = ph->p_vaddr = s1->data_addr;
 
             ph->p_type = j == 2 ? PT_TLS : PT_LOAD;
             if (j == 0)
