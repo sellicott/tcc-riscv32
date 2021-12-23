@@ -97,14 +97,18 @@
  DEF_ASM(sltiu)
 
 /* Branch */
-
  DEF_ASM(beq)
  DEF_ASM(bne)
  DEF_ASM(blt)
  DEF_ASM(bge)
  DEF_ASM(bltu)
  DEF_ASM(bgeu)
+
+/* Jump and Link */
  DEF_ASM(j)
+ DEF_ASM(jal)
+ DEF_ASM(jalr)
+ DEF_ASM(jr)
 
 /* Sync */
 
@@ -129,9 +133,16 @@
 
  DEF_ASM(ecall)
  DEF_ASM(ebreak)
-
  DEF_ASM(mrts)
  DEF_ASM(mrth)
  DEF_ASM(hrts)
  DEF_ASM(wfi)
 
+ /* Multiply/Divide */
+ DEF_ASM(mul)
+ DEF_ASM(mulh)
+ DEF_ASM(mulhsu)
+ DEF_ASM(div)
+ DEF_ASM(divu)
+ DEF_ASM(rem)
+ DEF_ASM(remu)
