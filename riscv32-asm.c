@@ -84,9 +84,6 @@ ST_FUNC void gen_expr32(ExprValue *pe)
 // ---------------------- end boilerplate tcc requirements ----------------- //
 
 
-static void asm_emit_opcode(uint32_t opcode) {
-    gen_le32(opcode);
-}
 typedef struct Operand {
     uint32_t type;
     union {
@@ -152,6 +149,10 @@ static int check_immediate(const Operand *op)
     return 1;
 }
 
+static void asm_emit_opcode(uint32_t opcode) {
+    gen_le32(opcode);
+}
+
 // implement helper functions from riscv_utils.h
 // Register instructions (math and stuff)
 void emit_R(uint32_t funct7, uint32_t rs2, uint32_t rs1,
@@ -195,7 +196,7 @@ void emit_B(uint32_t imm, uint32_t rs2, uint32_t rs1,
 {
     // we have to break up the immediate value into two sections (12,10:5, 4:1,11)
     const uint32_t imm_h = 0x7f & ((0x800 & imm >> 1) | imm ) >> 5 ;
-    const uint32_t imm_l = 0x1e & imm | 0x1 & (imm >> 11);
+    const uint32_t imm_l = (0x1e & imm) | (0x1 & (imm >> 11));
     const uint32_t instruction = 
         (imm_h << 25) | (rs2 << 20) | (rs1 << 15) | 
         (funct3 << 12) | (imm_l << 7) | opcode;
