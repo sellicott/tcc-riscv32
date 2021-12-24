@@ -171,46 +171,6 @@ static void ES(uint32_t opcode, uint32_t func3,
       | (rs2 << 20) | ((imm >> 5) << 25));
 }
 
-// Patch all branches in list pointed to by t to branch to a:
-ST_FUNC void gsym_addr(int t_, int a_)
-{
-    uint32_t t = t_;
-    uint32_t a = a_;
-    
-    // save the current location so that we can go back to it at the end of the function.
-    unsigned char* base_ptr = cur_text_section->data;
-    int original_ind = ind;
-
-    while (t) {
-        // get the location that we need to write our next value to.
-        unsigned char *ptr = base_ptr + t;
-        // update the offset from the data section, so that we can use our instruction writing macros
-        ind = t;
-        // get the offset for the next iteration
-        t = read32le(ptr);
-
-        // rel_jmp can have up to a +-1MiB range (20bits 0 to 0x1fffff)
-        int32_t rel_jmp = a - t;
-        if ((int) rel_jmp > 0xfffff || (int) rel_jmp < -0xfffff) {
-          tcc_error("out-of-range branch chain (> +-1MiB): %d", rel_jmp);
-          goto cleanup;
-        }
-
-        // generate the jmp table
-        if (rel_jmp == 4) {
-            // we just need a nop as PC will increment by 4 for us (this will need to be updated once
-            // compressed instructions are added)
-            emit_NOP();
-        }
-        else {
-            emit_J_inst(rel_jmp);
-        }
-    }
-
-cleanup:
-    // get back to where we once belonged
-    ind = original_ind;
-}
 
 static int load_symofs(int r, SValue *sv, int forstore)
 {
@@ -1070,11 +1030,57 @@ ST_FUNC void gen_fill_nops(int bytes)
     }
 }
 
+// Patch all branches in list pointed to by t to branch to a:
+ST_FUNC void gsym_addr(int t_, int a_)
+{
+    uint32_t t = t_;
+    uint32_t a = a_;
+    
+    // save the current location so that we can go back to it at the end of the function.
+    unsigned char* base_ptr = cur_text_section->data;
+    int original_ind = ind;
+
+    while (t) {
+        // get the location that we need to write our next value to.
+        unsigned char *ptr = base_ptr + t;
+        // update the offset from the data section, so that we can use our instruction writing macros
+        ind = t;
+
+        // rel_jmp can have up to a +-1MiB range (20bits 0 to 0x1fffff)
+        int32_t rel_jmp = a - t;
+        if ((rel_jmp + (1 << 21)) & ~((1U << 22) - 2))
+          tcc_error("out-of-range branch chain: %#03x", rel_jmp);
+        //if ((int) rel_jmp > 0xfffff || (int) rel_jmp < -0xfffff) {
+        //  tcc_error("out-of-range branch chain (> +-1MiB): %d", rel_jmp);
+        //  goto cleanup;
+        //}
+
+        // get the offset for the next iteration
+        t = read32le(ptr);
+
+
+        // generate the jmp table
+        if (rel_jmp == 4) {
+            // we just need a nop as PC will increment by 4 for us (this will need to be updated once
+            // compressed instructions are added)
+            emit_NOP();
+        }
+        else {
+            emit_J_inst(rel_jmp);
+        }
+    }
+
+cleanup:
+    // get back to where we once belonged
+    ind = original_ind;
+}
+
 // Generate forward branch to label:
 ST_FUNC int gjmp(int t)
 {
     if (nocode_wanted)
       return t;
+    // write zeros to the location to fill in later?
     o(t);
     return ind - 4;
 }
