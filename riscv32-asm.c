@@ -224,17 +224,17 @@ void emit_U(uint32_t imm, uint32_t rd, uint32_t opcode)
 void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode)
 {
     // immediate value 20|10:1|11|19:12
-    // sequence is 20 bits long top bit is bit 20
-    // next 10 bits from 18:9 (mask off 10:1 and shift over 8)
-    // bit 8 is bit 11 in imm (mask off 11 shift right 3)
-    // bits 19 through 12 are bits bits 7:0 here (mask off 19:12 shift right 12)
-    // we actually want this 12 bits over so shift it here 
-    // this helps the compiler (https://godbolt.org/z/nYd55PGEW)
-    const uint32_t immediate =
-        (0x100000 & imm >> 1) | (0x7fe & imm << 8) | 
-        (0x800 & imm >> 3) | (0xff000 & imm >> 12);
+    // mask off bits 19:12 then shift them back
+    // mask off bit 11 then shift it over to bit 20
+    // mask off bits 10:1, then shift over 21
+    // mask off bit 21, then shift over 31
+    const uint32_t immediate =  
+              (((imm >> 12) &  0xff) << 12)
+            | (((imm >> 11) &     1) << 20)
+            | (((imm >>  1) & 0x3ff) << 21)
+            | (((imm >> 20) &     1) << 31);
 
-    const uint32_t instruction = (immediate) | (rd << 7) | opcode;
+    const uint32_t instruction = immediate | (rd << 7) | opcode;
     asm_emit_opcode(instruction);
 }
 
