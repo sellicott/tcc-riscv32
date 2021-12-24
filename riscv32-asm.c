@@ -150,7 +150,15 @@ static int check_immediate(const Operand *op)
 }
 
 static void asm_emit_opcode(uint32_t opcode) {
-    gen_le32(opcode);
+    int ind1 = ind + 4;
+    if (nocode_wanted) {
+        return;
+    }
+    if (ind1 > cur_text_section->data_allocated) {
+        section_realloc(cur_text_section, ind1);
+    }
+    write32le(cur_text_section->data + ind, opcode);
+    ind = ind1;
 }
 
 // implement helper functions from riscv_utils.h
