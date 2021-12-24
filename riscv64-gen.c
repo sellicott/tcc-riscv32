@@ -22,8 +22,7 @@
 #define REG_IRE2 (TREG_R(1)) // int 2nd return register number
 #define REG_FRET (TREG_F(0)) // float return register number
 
-// #define PTR_SIZE 8
-#define PTR_SIZE 4 // for riscv32
+#define PTR_SIZE 8
 
 #define LDOUBLE_SIZE 16
 #define LDOUBLE_ALIGN 16
@@ -1145,12 +1144,10 @@ ST_FUNC void gen_opi(int op)
     gen_opil(op, 0);
 }
 
-#if PTR_SIZE == 8
 ST_FUNC void gen_opl(int op)
 {
     gen_opil(op, 1);
 }
-#endif
 
 ST_FUNC void gen_opf(int op)
 {
