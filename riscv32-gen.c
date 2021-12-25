@@ -332,6 +332,7 @@ ST_FUNC void load(int r, SValue *sv)
 
         if (((unsigned)lvar_offset + (1 << 11)) >> 12) {
             //o(0x37 | (rd << 7) | ((0x800 + lvar_offset) & 0xfffff000)), rs1 = rd; //lui Rd, upper(lvar_offset)
+            rs1 = rd;
             emit_LUI(rd, lvar_offset);
         }
         if (lvar_offset || (rd != rs1) || do32bit || (stack_reg & VT_SYM)) {
@@ -1052,8 +1053,9 @@ ST_FUNC void gsym_addr(int t_, int a_)
 
         // rel_jmp can have up to a +-1MiB range (20bits 0 to 0x1fffff)
         int32_t rel_jmp = a - t;
-        if ((rel_jmp + (1 << 21)) & ~((1U << 22) - 2))
+        if ((rel_jmp + (1 << 21)) & ~((1U << 22) - 2)) {
           tcc_error("out-of-range branch chain: %#03x", rel_jmp);
+        }
         //if ((int) rel_jmp > 0xfffff || (int) rel_jmp < -0xfffff) {
         //  tcc_error("out-of-range branch chain (> +-1MiB): %d", rel_jmp);
         //  goto cleanup;
@@ -1074,7 +1076,6 @@ ST_FUNC void gsym_addr(int t_, int a_)
         }
     }
 
-cleanup:
     //reset the nocode_wanted variable back to its previous state
     nocode_wanted = nocode_wanted_old;
 
