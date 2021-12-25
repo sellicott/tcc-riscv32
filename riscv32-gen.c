@@ -1040,6 +1040,10 @@ ST_FUNC void gsym_addr(int t_, int a_)
     unsigned char* base_ptr = cur_text_section->data;
     int original_ind = ind;
 
+    // turn on code generation, but save the state so we can turn it off again if necessary
+    int nocode_wanted_old = nocode_wanted;
+    CODE_ON();
+
     while (t) {
         // get the location that we need to write our next value to.
         unsigned char *ptr = base_ptr + t;
@@ -1071,6 +1075,9 @@ ST_FUNC void gsym_addr(int t_, int a_)
     }
 
 cleanup:
+    //reset the nocode_wanted variable back to its previous state
+    nocode_wanted = nocode_wanted_old;
+
     // get back to where we once belonged
     ind = original_ind;
 }
@@ -1080,7 +1087,7 @@ ST_FUNC int gjmp(int t)
 {
     if (nocode_wanted)
       return t;
-    // write zeros to the location to fill in later?
+    // write zeros to the location to fill in later
     o(t);
     return ind - 4;
 }
