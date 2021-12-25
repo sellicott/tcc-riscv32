@@ -1145,74 +1145,21 @@ ST_FUNC int gjmp_append(int n, int t)
     return t;
 }
 
+static int gen_opi_immediate(int op, int fc, int ll);
+
+// ll is set to 1 when generating 'long' code (64-bit stuff)
 static void gen_opil(int op, int ll)
 {
     int a, b, d;
-    int func3 = 0;
-    ll = ll ? 0 : 8;
+
+    // handle the case where one of the values is a constant, use an immediate value if we can
     if ((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) == VT_CONST) {
         int fc = vtop->c.i;
         if (fc == vtop->c.i && !(((unsigned)fc + (1 << 11)) >> 12)) {
-            int cll = 0;
-            int m = ll ? 31 : 63;
-            vswap();
-            gv(RC_INT);
-            a = ireg(vtop[0].r);
-            --vtop;
-            d = get_reg(RC_INT);
-            ++vtop;
-            vswap();
-            switch (op) {
-                case '-':
-                    if (fc <= -(1 << 11))
-                      break;
-                    fc = -fc;
-                case '+':
-                    func3 = 0; // addi d, a, fc
-                    cll = ll;
-                do_cop:
-                    EI(0x13 | cll, func3, ireg(d), a, fc);
-                    --vtop;
-                    if (op >= TOK_ULT && op <= TOK_GT) {
-                      vset_VT_CMP(TOK_NE);
-                      vtop->cmp_r = ireg(d) | 0 << 8;
-                    } else
-                      vtop[0].r = d;
-                    return;
-                case TOK_LE:
-                    if (fc >= (1 << 11) - 1)
-                      break;
-                    ++fc;
-                case TOK_LT:  func3 = 2; goto do_cop; // slti d, a, fc
-                case TOK_ULE:
-                    if (fc >= (1 << 11) - 1 || fc == -1)
-                      break;
-                    ++fc;
-                case TOK_ULT: func3 = 3; goto do_cop; // sltiu d, a, fc
-                case '^':     func3 = 4; goto do_cop; // xori d, a, fc
-                case '|':     func3 = 6; goto do_cop; // ori  d, a, fc
-                case '&':     func3 = 7; goto do_cop; // andi d, a, fc
-                case TOK_SHL: func3 = 1; cll = ll; fc &= m; goto do_cop; // slli d, a, fc
-                case TOK_SHR: func3 = 5; cll = ll; fc &= m; goto do_cop; // srli d, a, fc
-                case TOK_SAR: func3 = 5; cll = ll; fc = 1024 | (fc & m); goto do_cop;
+            int use_register = gen_opi_immediate(op, fc, ll);
 
-                case TOK_UGE: /* -> TOK_ULT */
-                case TOK_UGT: /* -> TOK_ULE */
-                case TOK_GE:  /* -> TOK_LT */
-                case TOK_GT:  /* -> TOK_LE */
-                    gen_opil(op - 1, !ll);
-                    vtop->cmp_op ^= 1;
-                    return;
-
-                case TOK_NE:
-                case TOK_EQ:
-                    if (fc)
-                      gen_opil('-', !ll), a = ireg(vtop++->r);
-                    --vtop;
-                    vset_VT_CMP(op);
-                    vtop->cmp_r = a | 0 << 8;
-                    return;
-            }
+            // check if we were able to finish everything, or if more work is required
+            if (!use_register) { return; }
         }
     }
     gv2(RC_INT, RC_INT);
@@ -1234,59 +1181,123 @@ static void gen_opil(int op, int ll)
         break;
 
     case '+':
-        //ER(0x33 | ll, 0, d, a, b, 0); // add d, a, b
-        emit_ADD(d, a, b);
-        break;
+        emit_ADD(d, a, b); break;
     case '-':
-        //ER(0x33 | ll, 0, d, a, b, 0x20); // sub d, a, b
-        emit_SUB(d, a, b);
-        break;
+        emit_SUB(d, a, b); break;
     case TOK_SAR:
-        //ER(0x33 | ll | ll, 5, d, a, b, 0x20); // sra d, a, b
-        emit_SRA(d, a, b);
-        break;
+        emit_SRA(d, a, b); break;
     case TOK_SHR:
-        //ER(0x33 | ll | ll, 5, d, a, b, 0); // srl d, a, b
-        emit_SRL(d, a, b);
-        break;
+        emit_SRL(d, a, b); break;
     case TOK_SHL:
-        //ER(0x33 | ll, 1, d, a, b, 0); // sll d, a, b
-        emit_SLL(d, a, b);
-        break;
+        emit_SLL(d, a, b); break;
     case '*':
-        //ER(0x33 | ll, 0, d, a, b, 1); // mul d, a, b
-        emit_MUL(d, a, b);
-        break;
+        emit_MUL(d, a, b); break;
     case '/':
-        //ER(0x33 | ll, 4, d, a, b, 1); // div d, a, b
-        emit_DIV(d, a, b);
-        break;
+        emit_DIV(d, a, b); break;
     case '&':
-        //ER(0x33, 7, d, a, b, 0); // and d, a, b
-        emit_AND(d, a, b);
-        break;
+        emit_AND(d, a, b); break;
     case '^':
-        //ER(0x33, 4, d, a, b, 0); // xor d, a, b
-        emit_XOR(d, a, b);
-        break;
+        emit_XOR(d, a, b); break;
     case '|':
-        //ER(0x33, 6, d, a, b, 0); // or d, a, b
-        emit_OR(d, a, b);
-        break;
+        emit_OR(d, a, b); break;
     case '%':
-        //ER(ll ? 0x3b:  0x33, 6, d, a, b, 1); // rem d, a, b
-        emit_REM(d, a, b);
-        break;
+        emit_REM(d, a, b); break;
     case TOK_UMOD:
-        //ER(0x33 | ll, 7, d, a, b, 1); // remu d, a, b
-        emit_REMU(d, a, b);
-        break;
+        emit_REMU(d, a, b); break;
     case TOK_PDIV:
     case TOK_UDIV:
-        //ER(0x33 | ll, 5, d, a, b, 1); // divu d, a, b
-        emit_DIVU(d, a, b);
-        break;
+        emit_DIVU(d, a, b); break;
     }
+}
+
+// generate instructions for binary operations where one of the values is a constant
+// fc is the immediate constant
+// returns 1 if we need to "fall through" and use the register generating code instead
+// otherwise returns 0
+static int gen_opi_immediate(int op, int fc, int ll)
+{
+    if (ll) {
+        tcc_error("trying to emit 64bit instruction, gonna have a bad time");
+    }
+
+    // get values from the main stack
+    int a, d;
+    int cll = 0;
+    int m = ll ? 31 : 63;
+    vswap();
+    gv(RC_INT);
+    a = ireg(vtop[0].r);
+    --vtop;
+    d = get_reg(RC_INT);
+    ++vtop;
+    vswap();
+
+    // TODO switch between 64bit and 32bit operations
+    switch (op) {
+        case '-':
+            // check if the immediate value is too big and use the registers instead
+            if (fc <= -(1 << 11)){ return 1; } 
+            fc = -fc;
+        case '+':
+            emit_ADDI(d, a, fc); break;
+        case TOK_LE:
+            if (fc >= (1 << 11) - 1) { return 1; }
+            ++fc;
+        case TOK_LT:
+            emit_SLTI(d, a, fc); break;
+        case TOK_ULE:
+            if (fc >= (1 << 11) - 1 || fc == -1) { return 1; }
+            ++fc;
+        case TOK_ULT:
+            emit_SLTIU(d, a, fc); break;
+        case '^':
+            emit_XORI(d, a, fc); break;
+        case '|':
+            emit_ORI(d, a, fc); break;
+        case '&':
+            emit_ANDI(d, a, fc); break;
+        case TOK_SHL:
+            fc &= m;
+            emit_SLLI(d, a, fc); break;
+        case TOK_SHR:
+            fc &= m;
+            emit_SRLI(d, a, fc); break;
+        case TOK_SAR:
+            fc = 1024 | (fc & m);
+            emit_SRA(d, a, fc); break;
+
+
+        case TOK_UGE: /* -> TOK_ULT */
+        case TOK_UGT: /* -> TOK_ULE */
+        case TOK_GE:  /* -> TOK_LT */
+        case TOK_GT:  /* -> TOK_LE */
+            //gen_opil(op - 1, !ll);
+            gen_opil(op - 1, 0);
+            vtop->cmp_op ^= 1;
+            return;
+
+        case TOK_NE:
+        case TOK_EQ:
+            if (fc) {
+                //gen_opil('-', !ll); 
+                gen_opil('-', 0); 
+                a = ireg(vtop++->r);
+            }
+            --vtop;
+            vset_VT_CMP(op);
+            vtop->cmp_r = a | 0 << 8;
+            return 0;
+    }
+
+    // push the value to the stack (general case)
+    --vtop;
+    if (op >= TOK_ULT && op <= TOK_GT) {
+        vset_VT_CMP(TOK_NE);
+        vtop->cmp_r = ireg(d) | 0 << 8;
+    } else {
+        vtop[0].r = d;
+    }
+    return 0;
 }
 
 ST_FUNC void gen_opi(int op)
