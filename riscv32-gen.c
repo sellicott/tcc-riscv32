@@ -1222,14 +1222,16 @@ static int gen_opi_immediate(int op, int fc, int ll)
     }
 
     // get values from the main stack
-    int a, d;
-    int cll = 0;
-    int m = ll ? 31 : 63;
+    int a, d, rd;
+    int m = 31;
     vswap();
     gv(RC_INT);
     a = ireg(vtop[0].r);
     --vtop;
+    // d is tcc style register
     d = get_reg(RC_INT);
+    // convert to riscv register
+    rd = ireg(d);
     ++vtop;
     vswap();
 
@@ -1240,32 +1242,32 @@ static int gen_opi_immediate(int op, int fc, int ll)
             if (fc <= -(1 << 11)){ return 1; } 
             fc = -fc;
         case '+':
-            emit_ADDI(d, a, fc); break;
+            emit_ADDI(rd, a, fc); break;
         case TOK_LE:
             if (fc >= (1 << 11) - 1) { return 1; }
             ++fc;
         case TOK_LT:
-            emit_SLTI(d, a, fc); break;
+            emit_SLTI(rd, a, fc); break;
         case TOK_ULE:
             if (fc >= (1 << 11) - 1 || fc == -1) { return 1; }
             ++fc;
         case TOK_ULT:
-            emit_SLTIU(d, a, fc); break;
+            emit_SLTIU(rd, a, fc); break;
         case '^':
-            emit_XORI(d, a, fc); break;
+            emit_XORI(rd, a, fc); break;
         case '|':
-            emit_ORI(d, a, fc); break;
+            emit_ORI(rd, a, fc); break;
         case '&':
-            emit_ANDI(d, a, fc); break;
+            emit_ANDI(rd, a, fc); break;
         case TOK_SHL:
             fc &= m;
-            emit_SLLI(d, a, fc); break;
+            emit_SLLI(rd, a, fc); break;
         case TOK_SHR:
             fc &= m;
-            emit_SRLI(d, a, fc); break;
+            emit_SRLI(rd, a, fc); break;
         case TOK_SAR:
             fc = 1024 | (fc & m);
-            emit_SRA(d, a, fc); break;
+            emit_SRA(rd, a, fc); break;
 
 
         case TOK_UGE: /* -> TOK_ULT */
@@ -1275,7 +1277,7 @@ static int gen_opi_immediate(int op, int fc, int ll)
             //gen_opil(op - 1, !ll);
             gen_opil(op - 1, 0);
             vtop->cmp_op ^= 1;
-            return;
+            return 0;
 
         case TOK_NE:
         case TOK_EQ:
