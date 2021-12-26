@@ -49,7 +49,8 @@
   DEF(TOK_ASM_ ## x ## _ ## y, #x #y)
 
 /*   Loads */
-
+ DEF_ASM(la)
+ DEF_ASM(li)
  DEF_ASM(lb)
  DEF_ASM(lh)
  DEF_ASM(lw)
@@ -128,6 +129,23 @@
  DEF_ASM(rdtimeh)
  DEF_ASM(rdinstret)
  DEF_ASM(rdinstreth)
+
+ /* control and status */
+ DEF_ASM(csrrw)
+ DEF_ASM(csrrs)
+ DEF_ASM(csrrc)
+ DEF_ASM(csrrwi)
+ DEF_ASM(csrrsi)
+ DEF_ASM(csrrci)
+
+ /* control and status pseudoinstructions */
+ DEF_ASM(csrr)
+ DEF_ASM(csrw)
+ DEF_ASM(csrs)
+ DEF_ASM(csrc)
+ DEF_ASM(csrwi)
+ DEF_ASM(csrsi)
+ DEF_ASM(csrci)
 
 /* Privileged Instructions */
 
