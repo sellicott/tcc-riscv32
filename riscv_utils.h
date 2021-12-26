@@ -93,15 +93,15 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 // Pseudo instructions (from https://risc-v.guru/instructions/)
 
 // note that this will not produce PIC code
-#define emit_LA(rd, symbol) ( \
+#define emit_LA(rd, symbol) \
     emit_AUIPC(rd, symbol >> 12); \
-    emit_ADDI(rd, rd, symbol))
+    emit_ADDI(rd, rd, symbol);
 
 #define emit_NOP() (emit_ADDI(0, 0, 0))
 
 #define emit_LI(rd, imm)\
     emit_LUI(rd, imm >> 12); \
-    emit_JALR(rd, rd, imm))
+    emit_JALR(rd, rd, imm);
 
 #define emit_MV(rd, rs)     (emit_ADDI(rd, rs, 0))
 //#define emit_SEXT_W(rd, rs) (emit_ADDIW(rd, rs, 0))
@@ -133,13 +133,13 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 #define emit_JALR_x1(rs)    (emit_JALR(1, rs, 0))
 #define emit_RET()          (emit_JALR(0, 1, 0))
 
-#define emit_CALL(offset) (\
+#define emit_CALL(offset) \
     emit_AUIPC(6, offset >> 12); \
-    emit_JALR(1, 6, offset))
+    emit_JALR(1, 6, offset);
 
-#define emit_TAIL(offset) (\
+#define emit_TAIL(offset) \
     emit_AUIPC(6, offset >> 12); \
-    emit_JALR(0, 6, offset))
+    emit_JALR(0, 6, offset);
 
 // Logical
 #define emit_NOT(rd, rs)    (emit_XORI(rd, rs, -1))
@@ -149,5 +149,31 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 // Sync
 #define emit_FENCE_ALL()        (emit_FENCE(0xf, 0xf, 0x0))
 #define emit_FENCE_DEFAULT()    (emit_FENCE(0x0, 0x0, 0x0))
+
+
+// Zicsr (Control and Status) extension
+#define emit_CSRRW(rd, csr, rs1)    (emit_I(csr, rs1, 0x1, rd, 0x73))
+#define emit_CSRRS(rd, csr, rs1)    (emit_I(csr, rs1, 0x2, rd, 0x73))
+#define emit_CSRRC(rd, csr, rs1)    (emit_I(csr, rs1, 0x3, rd, 0x73))
+#define emit_CSRRWI(rd, csr, uimm)  (emit_I(csr, uimm, 0x5, rd, 0x73))
+#define emit_CSRRSI(rd, csr, uimm)  (emit_I(csr, uimm, 0x6, rd, 0x73))
+#define emit_CSRRCI(rd, csr, uimm)  (emit_I(csr, uimm, 0x7, rd, 0x73))
+
+// control and status pseudoinstructions
+#define emit_CSRR(rd, csr)      (emit_CSRRS(rd, csr, 0))
+#define emit_CSRW(csr, rs)      (emit_CSRRW(0, csr, rs))
+#define emit_CSRS(csr, rs)      (emit_CSRRS(0, csr, rs))
+#define emit_CSRC(csr, rs)      (emit_CSRRC(0, csr, rs))
+#define emit_CSRWI(csr, imm)    (emit_CSRRWI(0, csr, imm))
+#define emit_CSRSI(csr, imm)    (emit_CSRRSI(0, csr, imm))
+#define emit_CSRCI(csr, imm)    (emit_CSRRCI(0, csr, imm))
+
+// counters
+#define emit_RDCYCLE(rd)    (emit_CSRRS(rd, 0xc00, 0))
+#define emit_RDCYCLEH(rd)   (emit_CSRRS(rd, 0xc80, 0))
+#define emit_RDTIME(rd)     (emit_CSRRS(rd, 0xc01, 0))
+#define emit_RDTIMEH(rd)    (emit_CSRRS(rd, 0xc81, 0))
+#define emit_RDINSTRET(rd)  (emit_CSRRS(rd, 0xc02, 0))
+#define emit_RDINSTRETH(rd) (emit_CSRRS(rd, 0xc82, 0))
 
 #endif
