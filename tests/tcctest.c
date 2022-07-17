@@ -2915,7 +2915,6 @@ typedef int constant_negative_array_size_as_compile_time_assertion_idiom[(1 ? 2 
 
 void c99_vla_test_1(int size1, int size2)
 {
-#if defined __i386__ || defined __x86_64__
     int size = size1 * size2;
     int tab1[size][2], tab2[10][2];
     void *tab1_ptr, *tab2_ptr, *bad_ptr;
@@ -2961,12 +2960,82 @@ void c99_vla_test_1(int size1, int size2)
         printf("PASSED PASSED PASSED PASSED PASSED PASSED PASSED PASSED ");
     }
     printf("\n");
+}
+
+void c99_vla_test_2(int d, int h, int w)
+{
+    int x, y, z;
+    int (*arr)[h][w] = malloc(sizeof(int) * d*h*w);
+    int c = 1;
+
+    printf("Test C99 VLA 6 (pointer)\n");
+
+    for (z=0; z<d; z++) {
+        for (y=0; y<h; y++) {
+            for (x=0; x<w; x++) {
+                arr[z][y][x] = c++;
+            }
+        }
+    }
+    for (z=0; z<d; z++) {
+        for (y=0; y<h; y++) {
+            for (x=0; x<w; x++) {
+                printf(" %2d", arr[z][y][x]);
+            }
+            puts("");
+        }
+        puts("");
+    }
+    printf(" sizes : %d %d %d\n"
+           " pdiff : %d %d\n"
+           " tests : %d %d\n",
+        sizeof (*arr), sizeof (*arr)[0], sizeof (*arr)[0][0],
+        arr + 2 - arr, *arr + 3 - *arr,
+        0 == sizeof (*arr + 1) - sizeof arr,
+        0 == sizeof sizeof *arr - sizeof arr
+        );
+    free (arr);
+}
+
+void c99_vla_test_3a (int arr[2][3][4])
+{
+    printf ("%d\n", arr[1][2][3]);
+}
+
+void c99_vla_test_3b(int s, int arr[s][3][4])
+{
+    printf ("%d\n", arr[1][2][3]);
+}
+
+void c99_vla_test_3c(int s, int arr[2][s][4])
+{
+    printf ("%d\n", arr[1][2][3]);
+}
+
+void c99_vla_test_3d(int s, int arr[2][3][s])
+{
+    printf ("%d\n", arr[1][2][3]);
+}
+
+void c99_vla_test_3(void)
+{
+    int a[2][3][4];
+
+    memset (a, 0, sizeof(a));
+    a[1][2][3] = 2;
+    c99_vla_test_3a(a);
+    c99_vla_test_3b(2, a);
+#if 0 // FIXME
+    c99_vla_test_3c(3, a);
+    c99_vla_test_3d(4, a);
 #endif
 }
 
 void c99_vla_test(void)
 {
     c99_vla_test_1(5, 2);
+    c99_vla_test_2(3, 4, 5);
+    c99_vla_test_3();
 }
 
 
@@ -3209,7 +3278,7 @@ return dest;
 
 static inline void * memcpy1(void * to, const void * from, size_t n)
 {
-long d0, d1, d2;
+size_t d0, d1, d2;
 __asm__ __volatile__(
 	"rep ; movsl\n\t"
 	"testb $2,%b4\n\t"
@@ -3220,14 +3289,14 @@ __asm__ __volatile__(
 	"movsb\n"
 	"2:"
 	: "=&c" (d0), "=&D" (d1), "=&S" (d2)
-	:"0" (n/4), "q" (n),"1" ((long) to),"2" ((long) from)
+	:"0" (n/4), "q" (n),"1" ((size_t) to),"2" ((size_t) from)
 	: "memory");
 return (to);
 }
 
 static inline void * memcpy2(void * to, const void * from, size_t n)
 {
-long d0, d1, d2;
+size_t d0, d1, d2;
 __asm__ __volatile__(
 	"rep movsl\n\t"  /* one-line rep prefix + string op */
 	"testb $2,%b4\n\t"
@@ -3238,7 +3307,7 @@ __asm__ __volatile__(
 	"movsb\n"
 	"2:"
 	: "=&c" (d0), "=&D" (d1), "=&S" (d2)
-	:"0" (n/4), "q" (n),"1" ((long) to),"2" ((long) from)
+	:"0" (n/4), "q" (n),"1" ((size_t) to),"2" ((size_t) from)
 	: "memory");
 return (to);
 }

@@ -88,9 +88,15 @@
     #define __GNUC_PATCHLEVEL__ 0
     #define __GNUC_STDC_INLINE__ 1
     #define __NO_TLS 1
+    #define __RUNETYPE_INTERNAL 1
 # if __SIZEOF_POINTER__ == 8
     /* FIXME, __int128_t is used by setjump */
     #define __int128_t struct { unsigned char _dummy[16] __attribute((aligned(16))); }
+    #define __SIZEOF_SIZE_T__ 8
+    #define __SIZEOF_PTRDIFF_T__ 8
+#else
+    #define __SIZEOF_SIZE_T__ 4
+    #define __SIZEOF_PTRDIFF_T__ 4
 # endif
 
 #elif defined __FreeBSD_kernel__
@@ -113,6 +119,7 @@
     /* emulate APPLE-GCC to make libc's headerfiles compile: */
     #define __GNUC__ 4   /* darwin emits warning on GCC<4 */
     #define __APPLE_CC__ 1 /* for <TargetConditionals.h> */
+    #define __LITTLE_ENDIAN__ 1
     #define _DONT_USE_CTYPE_INLINE_ 1
     /* avoids usage of GCC/clang specific builtins in libc-headerfiles: */
     #define __FINITE_MATH_ONLY__ 1
