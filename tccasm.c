@@ -98,9 +98,9 @@ ST_FUNC Sym* get_asm_sym(int name, Sym *csym)
 {
     Sym *sym = asm_label_find(name);
     if (!sym) {
-	sym = asm_label_push(name);
-	if (csym)
-	  sym->c = csym->c;
+        sym = asm_label_push(name);
+        if (csym)
+            sym->c = csym->c;
     }
     return sym;
 }
@@ -142,16 +142,16 @@ static void asm_expr_unary(TCCState *s1, ExprValue *pe)
                 /* forward */
                 if (!sym || (sym->c && elfsym(sym)->st_shndx != SHN_UNDEF)) {
                     /* if the last label is defined, then define a new one */
-		    sym = asm_label_push(label);
+                    sym = asm_label_push(label);
                 }
             }
-	    pe->v = 0;
-	    pe->sym = sym;
-	    pe->pcrel = 0;
+            pe->v = 0;
+            pe->sym = sym;
+            pe->pcrel = 0;
         } else if (*p == '\0') {
             pe->v = n;
             pe->sym = NULL;
-	    pe->pcrel = 0;
+            pe->pcrel = 0;
         } else {
             tcc_error("invalid number syntax");
         }
@@ -193,19 +193,19 @@ static void asm_expr_unary(TCCState *s1, ExprValue *pe)
         break;
     default:
         if (tok >= TOK_IDENT) {
-	    ElfSym *esym;
+            ElfSym *esym;
             /* label case : if the label was not found, add one */
-	    sym = get_asm_sym(tok, NULL);
-	    esym = elfsym(sym);
+            sym = get_asm_sym(tok, NULL);
+            esym = elfsym(sym);
             if (esym && esym->st_shndx == SHN_ABS) {
                 /* if absolute symbol, no need to put a symbol value */
                 pe->v = esym->st_value;
                 pe->sym = NULL;
-		pe->pcrel = 0;
+                pe->pcrel = 0;
             } else {
                 pe->v = 0;
                 pe->sym = sym;
-		pe->pcrel = 0;
+                pe->pcrel = 0;
             }
             next();
         } else {
