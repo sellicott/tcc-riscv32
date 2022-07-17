@@ -103,6 +103,20 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
     emit_LUI(rd, imm >> 12); \
     emit_JALR(rd, rd, imm);
 
+// call -> auipc(x6, symbol[31:12]), jalr(x1, x6, symbol[11:0])
+#define emit_CALL(symbol)\
+    emit_AUIPC(6, symbol >> 12);\
+    emit_JALR(1, 6, symbol);
+
+// tail -> auipc(x6, symbol[31:12]), jalr(x0, x6, symbol[11:0])
+#define emit_TAIL(symbol)\
+    emit_AUIPC(6, symbol >> 12);\
+    emit_JALR(0, 6, symbol);
+
+// ret pseudo instruction
+// ret -> jalr x0, x1, 0
+#define emit_RET() (emit_JALR(0, 1, 0))
+
 #define emit_MV(rd, rs)     (emit_ADDI(rd, rs, 0))
 //#define emit_SEXT_W(rd, rs) (emit_ADDIW(rd, rs, 0))
 
@@ -114,6 +128,7 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 #define emit_BLTZ(rs, offset)   (emit_BLT(rs, 0, offset))
 #define emit_BGTZ(rs, offset)   (emit_BLT(0, rs, offset))
 #define emit_BGT(rs, rt, offset)    (emit_BLT(rt, rs, offset))
+#define emit_BLE(rs, rt, offset)    (emit_BGE(rs, rt, offset))
 #define emit_BGTU(rs, rt, offset)   (emit_BLTU(rt, rs, offset))
 #define emit_BLEU(rs, rt, offset)   (emit_BGEU(rt, rs, offset))
 

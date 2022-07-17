@@ -21,6 +21,7 @@
 
 //#define DEBUG_RELOC
 #include "tcc.h"
+#include "riscv_utils.h"
 
 /* Returns 1 for a code relocation, 0 for a data relocation. For unknown
    relocations, returns -1. */
@@ -128,30 +129,69 @@ ST_FUNC void relocate_plt(TCCState *s1)
         uint64_t off = (got - plt + 0x800) >> 12;
         if ((off + ((uint32_t)1 << 20)) >> 21)
             tcc_error("Failed relocating PLT (off=0x%lx, got=0x%lx, plt=0x%lx)", (long)off, (long)got, (long)plt);
-        write32le(p, 0x397 | (off << 12)); // auipc t2, %pcrel_hi(got)
-        write32le(p + 4, 0x41c30333); // sub t1, t1, t3
-        write32le(p + 8, 0x0003be03   // ld t3, %pcrel_lo(got)(t2)
-                         | (((got - plt) & 0xfff) << 20));
-        write32le(p + 12, 0xfd430313); // addi t1, t1, -(32+12)
-        write32le(p + 16, 0x00038293   // addi t0, t2, %pcrel_lo(got)
-                          | (((got - plt) & 0xfff) << 20));
-        write32le(p + 20, 0x00135313); // srli t1, t1, log2(16/PTRSIZE)
-        write32le(p + 24, 0x0082b283); // ld t0, PTRSIZE(t0)
-        write32le(p + 28, 0x000e0067); // jr t3
-        p += 32;
+        // write32le(p, 0x397 | (off << 12)); // auipc t2, %pcrel_hi(got)
+        // write32le(p + 4, 0x41c30333); // sub t1, t1, t3
+        // write32le(p + 8, 0x0003be03   // ld t3, %pcrel_lo(got)(t2)
+        //                  | (((got - plt) & 0xfff) << 20));
+        // write32le(p + 12, 0xfd430313); // addi t1, t1, -(32+12)
+        // write32le(p + 16, 0x00038293   // addi t0, t2, %pcrel_lo(got)
+        //                   | (((got - plt) & 0xfff) << 20));
+        // write32le(p + 20, 0x00135313); // srli t1, t1, log2(16/PTRSIZE)
+        // write32le(p + 24, 0x0082b283); // ld t0, PTRSIZE(t0)
+        // write32le(p + 28, 0x000e0067); // jr t3
+        // p += 32;
+
+        // Define constants for the register values (see the riscv assembly manual for values)
+        const uint32_t t0 = 5;
+        const uint32_t t1 = 6;
+        const uint32_t t2 = 7;
+        const uint32_t t3 = 28;
+
+        printf("in the relocate_plt function\n");
+
+        // for our general opcode generation functions to work we need to make the section we are
+        // writing to into current_text_section->data and set the ind variable to 0 offset
+        // using these functions will increment ind
+        // To avoid messing things up for other people we need to save the current value of 
+        // current_text_section->data and ind, then replace them with p and 0 respectively
+
+        // save the current section and offset
+        unsigned char old_section = cur_text_section->data;
+        int old_ind = ind;
+
+        cur_text_section->data = p;
+        ind = 0;
+        emit_AUIPC(t2, off); // auipc, t2 %pcrelhi(got)
+        emit_SUB(t1, t1, t3);
+        emit_LW(t3, t2, (got - plt)); 
+        emit_ADDI(t1, t1, -(32+12));
+        emit_ADDI(t0, t2, (got - plt));
+        emit_SRLI(t1, t1, 4 - 2); // srli t1, t1, log2(16/PTRSIZE) -> log2(16) - log2(PTRSIZE)
+        emit_LW(t0, t0, PTR_SIZE);
+        emit_JR(t3);
+        
         while (p < p_end) {
             uint64_t pc = plt + (p - s1->plt->data);
-            uint64_t addr = got + read64le(p);
+            //uint64_t addr = got + read64le(p);
+            uint64_t addr = got + read32le(p);
             uint64_t off = (addr - pc + 0x800) >> 12;
             if ((off + ((uint32_t)1 << 20)) >> 21)
                 tcc_error("Failed relocating PLT (off=0x%lx, addr=0x%lx, pc=0x%lx)", (long)off, (long)addr, (long)pc);
-            write32le(p, 0xe17 | (off << 12)); // auipc t3, %pcrel_hi(func@got)
-            write32le(p + 4, 0x000e3e03 // ld t3, %pcrel_lo(func@got)(t3)
-                             | (((addr - pc) & 0xfff) << 20));
-            write32le(p + 8, 0x000e0367); // jalr t1, t3
-            write32le(p + 12, 0x00000013); // nop
-            p += 16;
+            // write32le(p, 0xe17 | (off << 12)); // auipc t3, %pcrel_hi(func@got)
+            // write32le(p + 4, 0x000e3e03 // ld t3, %pcrel_lo(func@got)(t3)
+            //                  | (((addr - pc) & 0xfff) << 20));
+            // write32le(p + 8, 0x000e0367); // jalr t1, t3
+            // write32le(p + 12, 0x00000013); // nop
+            // p += 16;
+
+            emit_AUIPC(t3, off);
+            emit_LW(t3, t3, (addr-pc));
+            emit_JAL(t1, t3); // this should perhaps be JALR
+            emit_NOP();
         }
+        // clean up after ourselves and reset current_text_section to its old position
+        cur_text_section->data = old_section;
+        ind = old_ind;
     }
 
     if (s1->plt->reloc) {
@@ -159,7 +199,7 @@ ST_FUNC void relocate_plt(TCCState *s1)
         p = s1->got->data;
         for_each_elem(s1->plt->reloc, 0, rel, ElfW_Rel) {
             write64le(p + rel->r_offset, s1->plt->sh_addr);
-	}
+        }
     }
 }
 
