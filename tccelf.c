@@ -840,6 +840,23 @@ static void sort_syms(TCCState *s1, Section *s)
     tcc_free(old_to_new_syms);
 }
 
+ST_FUNC int find_defsym(TCCState *s1, const char *name, ElfW(Sym) *sym)
+{
+    int i, n = strlen(name);
+    // printf("LOOKING FOR DEFSYM %s\n", name);
+    for (i = 0; i < s1->nb_defsyms; i++) {
+        const char *s = s1->defsyms[i], *end = NULL;
+        int len = strlen(s);
+        // printf("LOOKING DEFSYM %s\n", s1->defsyms);
+        if (len > n + 1 && s[n] == '=' && strncmp(name, s, n) == 0) {
+            //sym->st_info = ELFW(ST_INFO)(STB_GLOBAL,STT_FUNC);
+            sym->st_value = strtoull(s + n + 1, &end, 0);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* relocate symbol table, resolve undefined symbols if do_resolve is
    true and output error if undefined symbol. */
 ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
@@ -880,6 +897,10 @@ ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
                it */
             if (!strcmp(name, "_fp_hw"))
                 goto found;
+
+            if (find_defsym(s1, name, sym))
+                goto found;
+
             /* only weak symbols are accepted to be undefined. Their
                value is zero */
             sym_bind = ELFW(ST_BIND)(sym->st_info);
@@ -983,7 +1004,7 @@ static int prepare_dynamic_rel(TCCState *s1, Section *sr)
     int count = 0;
 #if defined(TCC_TARGET_I386) || defined(TCC_TARGET_X86_64) || \
     defined(TCC_TARGET_ARM) || defined(TCC_TARGET_ARM64) || \
-    defined(TCC_TARGET_RISCV64)
+    defined(TCC_TARGET_RISCV64) || defined(TCC_TARGET_RISCV32)
     ElfW_Rel *rel;
     for_each_elem(sr, 0, rel, ElfW_Rel) {
         int sym_index = ELFW(R_SYM)(rel->r_info);
@@ -1010,6 +1031,8 @@ static int prepare_dynamic_rel(TCCState *s1, Section *sr)
 #elif defined(TCC_TARGET_RISCV64)
         case R_RISCV_32:
         case R_RISCV_64:
+#elif defined(TCC_TARGET_RISCV32)
+        case R_RISCV_32:
 #endif
             count++;
             break;
@@ -1554,7 +1577,7 @@ static void tcc_add_linker_symbols(TCCState *s1)
 #if TARGETOS_OpenBSD
     set_global_sym(s1, "__executable_start", NULL, ELF_START_ADDR);
 #endif
-#ifdef TCC_TARGET_RISCV64
+#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
     /* XXX should be .sdata+0x800, not .data+0x800 */
     set_global_sym(s1, "__global_pointer$", data_section, 0x800);
 #endif
@@ -1749,6 +1772,8 @@ static void bind_exe_dynsyms(TCCState *s1)
                 /* XXX: _fp_hw seems to be part of the ABI, so we ignore it */
                 if (ELFW(ST_BIND)(sym->st_info) == STB_WEAK ||
                     !strcmp(name, "_fp_hw")) {
+                } else if (find_defsym(s1, name, sym)) {
+                    /* Exists in -Wl,--defsym=NAME=ADDR */
                 } else {
                     tcc_error_noabort("undefined symbol '%s'", name);
                 }
@@ -2292,8 +2317,12 @@ static void tcc_output_elf(TCCState *s1, FILE *f, int phnum, ElfW(Phdr) *phdr,
         ? EF_ARM_VFP_FLOAT : EF_ARM_SOFT_FLOAT;
 #elif defined TCC_TARGET_ARM
     ehdr.e_ident[EI_OSABI] = ELFOSABI_ARM;
-#elif defined TCC_TARGET_RISCV64
+#elif defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
+#ifdef TCC_RISCV_ilp32
+    ehdr.e_flags = EF_RISCV_RVC;
+#else
     ehdr.e_flags = EF_RISCV_FLOAT_ABI_DOUBLE;
+#endif
 #endif
 
     if (file_type == TCC_OUTPUT_OBJ) {
@@ -3051,7 +3080,7 @@ ST_FUNC int tcc_load_object_file(TCCState *s1,
                 if (!sym_index && !sm_table[sh->sh_info].link_once
 #ifdef TCC_TARGET_ARM
                     && type != R_ARM_V4BX
-#elif defined TCC_TARGET_RISCV64
+#elif defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
                     && type != R_RISCV_ALIGN
                     && type != R_RISCV_RELAX
 #endif

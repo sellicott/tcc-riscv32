@@ -3612,6 +3612,7 @@ static void next_nomacro(void)
     int t;
     if (macro_ptr) {
  redo:
+        // Push a constant value into tokc
         t = *macro_ptr;
         if (TOK_HAS_VALUE(t)) {
             tok_get(&tok, &macro_ptr, &tokc);
@@ -3619,6 +3620,7 @@ static void next_nomacro(void)
                 file->line_num = tokc.i;
                 goto redo;
             }
+        // remove spaces before token
         } else {
             macro_ptr++;
             if (t < TOK_IDENT) {

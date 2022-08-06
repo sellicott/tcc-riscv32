@@ -160,11 +160,13 @@ extern long double strtold (const char *__nptr, char **__endptr);
 /* #define TCC_TARGET_ARM64  *//* ARMv8 code generator */
 /* #define TCC_TARGET_C67    *//* TMS320C67xx code generator */
 /* #define TCC_TARGET_RISCV64 *//* risc-v code generator */
+/* #define TCC_TARGET_RISCV32 *//* risc-v code generator */
 
 /* default target is I386 */
 #if !defined(TCC_TARGET_I386) && !defined(TCC_TARGET_ARM) && \
     !defined(TCC_TARGET_ARM64) && !defined(TCC_TARGET_C67) && \
-    !defined(TCC_TARGET_X86_64) && !defined(TCC_TARGET_RISCV64)
+    !defined(TCC_TARGET_X86_64) && !defined(TCC_TARGET_RISCV64) && \
+    !defined(TCC_TARGET_RISCV32)
 # if defined __x86_64__
 #  define TCC_TARGET_X86_64
 # elif defined __arm__
@@ -176,6 +178,7 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #  define TCC_TARGET_ARM64
 # elif defined __riscv
 #  define TCC_TARGET_RISCV64
+# warning "This needs updated for riscv32"
 # else
 #  define TCC_TARGET_I386
 # endif
@@ -329,8 +332,11 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #  else
 #   define CONFIG_TCC_ELFINTERP "/lib64/ld-linux-x86-64.so.2"
 #  endif
-# elif defined(TCC_TARGET_RISCV64)
+# elif defined(TCC_TARGET_RISCV64) || defined(TCC_TARGET_RISCV32)
 #  define CONFIG_TCC_ELFINTERP "/lib/ld-linux-riscv64-lp64d.so.1"
+#  if defined(TCC_TARGET_RISCV32)
+#   warning "using riscv64 interperter"
+#  endif
 # elif !defined(TCC_ARM_EABI)
 #  if defined(TCC_MUSL)
 #   if defined(TCC_TARGET_I386)
@@ -424,6 +430,10 @@ extern long double strtold (const char *__nptr, char **__endptr);
 # include "riscv64-gen.c"
 # include "riscv64-link.c"
 # include "riscv64-asm.c"
+#elif defined(TCC_TARGET_RISCV32)
+# include "riscv32-gen.c"
+# include "riscv32-link.c"
+# include "riscv32-asm.c"
 #else
 #error unknown target
 #endif
@@ -817,6 +827,7 @@ struct TCCState {
 
     unsigned char has_text_addr;
     addr_t text_addr; /* address of text section */
+    addr_t data_addr; /* address of data section */
     unsigned section_align; /* section alignment */
 #ifdef TCC_TARGET_I386
     int seg_size; /* 32. Can be 16 with i386 assembler (.code16) */
@@ -947,7 +958,7 @@ struct TCCState {
     ElfW_Rel *qrel;
     #define qrel s1->qrel
 
-#ifdef TCC_TARGET_RISCV64
+#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
     struct pcrel_hi { addr_t addr, val; } last_hi;
     #define last_hi s1->last_hi
 #endif
@@ -1000,6 +1011,10 @@ struct TCCState {
 
     /* for warnings/errors for object files */
     const char *current_filename;
+
+    /* for keeping --Wl,--defsym=xxx */
+    char **defsyms;
+    int nb_defsyms;
 
     /* used by main and tcc_parse_args only */
     struct filespec **files; /* files seen on command line */
@@ -1620,6 +1635,7 @@ static inline uint32_t read32le(unsigned char *p) {
   return read16le(p) | (uint32_t)read16le(p + 2) << 16;
 }
 static inline void write32le(unsigned char *p, uint32_t x) {
+    printf("%#010x: %#010x\n", ind, x); 
     write16le(p, x);  write16le(p + 2, x >> 16);
 }
 static inline void add32le(unsigned char *p, int32_t x) {
@@ -1681,7 +1697,7 @@ ST_FUNC void gen_increment_tcov (SValue *sv);
 #endif
 
 /* ------------ riscv64-gen.c ------------ */
-#ifdef TCC_TARGET_RISCV64
+#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
 ST_FUNC void gen_opl(int op);
 //ST_FUNC void gfunc_return(CType *func_type);
 ST_FUNC void gen_va_start(void);

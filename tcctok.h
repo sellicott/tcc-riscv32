@@ -171,7 +171,7 @@
 #elif defined TCC_TARGET_ARM64
      DEF(TOK_builtin_va_start, "__builtin_va_start")
      DEF(TOK_builtin_va_arg, "__builtin_va_arg")
-#elif defined TCC_TARGET_RISCV64
+#elif defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
      DEF(TOK_builtin_va_start, "__builtin_va_start")
 #endif
 
@@ -403,6 +403,10 @@
 #include "arm-tok.h"
 #endif
 
-#if defined TCC_TARGET_RISCV64
+#if defined TCC_TARGET_RISCV64 
 #include "riscv64-tok.h"
+#endif
+
+#if defined TCC_TARGET_RISCV32
+#include "riscv32-tok.h"
 #endif
