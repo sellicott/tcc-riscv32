@@ -1,0 +1,71 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ASM compile ecall_funcs.S",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/riscv32-tcc",
+            "args": ["-Og", "-g", "-c", "ecall_funcs.S", "-o", "ecall_funcs.o"],
+            "stopAtEntry": false,
+            "cwd": "/home/nebk/Documents/programs/risc-v/espwebc3/docs/dev/qemu-metal",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+             //   {
+             //       "description": "Enable pretty-printing for gdb",
+             //       "text": "-enable-pretty-printing",
+             //       "ignoreFailures": true
+             //   }
+            ],
+            "miDebuggerPath": "/usr/bin/gdb"
+        },
+        {
+            "name": "ASM compile",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/riscv32-tcc",
+            "args": ["-Og", "-g", "-c", "boot.S", "-o", "boot.o"],
+            "stopAtEntry": false,
+            "cwd": "/home/nebk/Documents/programs/risc-v/espwebc3/docs/dev/qemu-metal",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+             //   {
+             //       "description": "Enable pretty-printing for gdb",
+             //       "text": "-enable-pretty-printing",
+             //       "ignoreFailures": true
+             //   }
+            ],
+            "miDebuggerPath": "/usr/bin/gdb"
+        },
+        {
+            "name": "tcc compile simple",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/riscv32-tcc",
+            "args": [
+                "-nostdlib",
+                "build/test.c"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                //{
+                //    "description": "Enable pretty-printing for gdb",
+                //    "text": "-enable-pretty-printing",
+                //    "ignoreFailures": true
+                //}
+            ],
+            "miDebuggerPath": "/usr/bin/gdb"
+        }
+    ]
+}

@@ -1,0 +1,18 @@
+{
+    "files.associations": {
+        "array": "cpp",
+        "chrono": "cpp",
+        "compare": "cpp",
+        "functional": "cpp",
+        "istream": "cpp",
+        "ostream": "cpp",
+        "ratio": "cpp",
+        "tuple": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp",
+        "variant": "cpp",
+        "numbers": "c",
+        "string": "c",
+        "string_view": "c"
+    }
+}
