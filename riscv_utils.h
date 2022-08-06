@@ -103,16 +103,6 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
     emit_LUI(rd, imm >> 12); \
     emit_JALR(rd, rd, imm);
 
-// call -> auipc(x6, symbol[31:12]), jalr(x1, x6, symbol[11:0])
-#define emit_CALL(symbol)\
-    emit_AUIPC(6, symbol >> 12);\
-    emit_JALR(1, 6, symbol);
-
-// tail -> auipc(x6, symbol[31:12]), jalr(x0, x6, symbol[11:0])
-#define emit_TAIL(symbol)\
-    emit_AUIPC(6, symbol >> 12);\
-    emit_JALR(0, 6, symbol);
-
 // ret pseudo instruction
 // ret -> jalr x0, x1, 0
 #define emit_RET() (emit_JALR(0, 1, 0))
