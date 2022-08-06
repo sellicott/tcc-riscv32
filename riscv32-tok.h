@@ -65,6 +65,10 @@
  DEF_ASM(sw)
 
 /* Shifts */
+ DEF_ASM(sll)
+ DEF_ASM(slli)
+ DEF_ASM(srl)
+ DEF_ASM(srli)
  DEF_ASM(sra)
  DEF_ASM(srai)
 
@@ -77,10 +81,18 @@
  DEF_ASM(nop)
 
 /* Logical */
+ DEF_ASM(xor)
+ DEF_ASM(xori)
+ DEF_ASM(or)
+ DEF_ASM(ori)
  DEF_ASM(and)
  DEF_ASM(andi)
 
 /* Compare */
+ DEF_ASM(slt)
+ DEF_ASM(slti)
+ DEF_ASM(sltu)
+ DEF_ASM(sltiu)
 
 /* Branch */
  DEF_ASM(beq)
@@ -91,9 +103,12 @@
  DEF_ASM(bgeu)
  DEF_ASM(bgt)
  DEF_ASM(ble)
+ DEF_ASM(bgtu)
+ DEF_ASM(bleu)
 
 /* Jump and Link */
  DEF_ASM(j)
+ DEF_ASM(jal)
  DEF_ASM(jalr)
  DEF_ASM(jr)
  DEF_ASM(call)
@@ -109,6 +124,14 @@
  DEF_ASM(sbreak)
 
 /* Counters */
+ DEF_ASM(rdcycle)
+ DEF_ASM(rdcycleh)
+ DEF_ASM(rdtime)
+ DEF_ASM(rdtimeh)
+ DEF_ASM(rdinstret)
+ DEF_ASM(rdinstreth)
+
+ /* control and status */
  DEF_ASM(csrrw)
  DEF_ASM(csrrs)
  DEF_ASM(csrrc)
@@ -141,6 +164,12 @@
  DEF_ASM(divu)
  DEF_ASM(rem)
  DEF_ASM(remu)
+
+ /* two register pseudoinstructions */
+ DEF_ASM(mv)
+ DEF_ASM(seqz)
+ DEF_ASM(snez)
+ DEF_ASM(sltz)
  DEF_ASM(sgtz)
 
 
