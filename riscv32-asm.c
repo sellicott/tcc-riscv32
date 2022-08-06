@@ -706,6 +706,7 @@ static void asm_load_store_opcode(TCCState *s1, int token)
     // store src -> [loc_reg + imm]
     // this formats to the opcode
     // s? loc_reg, src, imm
+    Operand src_dst, imm, loc_reg;
     parse_operand(s1, &src_dst);
     if(!check_register(&src_dst)){
         tcc_error(
@@ -786,6 +787,7 @@ static void asm_control_status_pseudo_opcode(TCCState *s1, int token)
     int rd = 64;
     int rs = 64;
     uint32_t csr = 0xffffffff;
+    uint32_t imm = 0;
     Operand temp;
 
     // start by getting the next two operands
