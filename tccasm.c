@@ -401,10 +401,10 @@ static Sym* asm_new_label1(TCCState *s1, int label, int is_local,
 
     sym = asm_label_find(label);
     if (sym) {
-	esym = elfsym(sym);
-	/* A VT_EXTERN symbol, even if it has a section is considered
-	   overridable.  This is how we "define" .set targets.  Real
-	   definitions won't have VT_EXTERN set.  */
+        esym = elfsym(sym);
+        /* A VT_EXTERN symbol, even if it has a section is considered
+           overridable.  This is how we "define" .set targets.  Real
+           definitions won't have VT_EXTERN set.  */
         if (esym && esym->st_shndx != SHN_UNDEF) {
             /* the label is already defined */
             if (IS_ASM_SYM(sym)
@@ -418,8 +418,10 @@ static Sym* asm_new_label1(TCCState *s1, int label, int is_local,
     new_label:
         sym = asm_label_push(label);
     }
-    if (!sym->c)
-      put_extern_sym2(sym, SHN_UNDEF, 0, 0, 1);
+    /* If we see a new label and there is no symbol, add one to elf symbol table */
+    if (!sym->c) {
+        put_extern_sym2(sym, SHN_UNDEF, 0, 0, 1);
+    }
     esym = elfsym(sym);
     esym->st_shndx = sh_num;
     esym->st_value = value;

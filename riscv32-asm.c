@@ -140,10 +140,11 @@ static void parse_operand(TCCState *s1, Operand *op)
         // Deal with the case of a symbol.
         // If we have a symbol we will let the linker handle it and just put in a zero for the 
         // immediate value, we also need to put an entry into the reallocation table, this should 
-        // handled for us in tccasm somewhere
+        // however, the entry will be different depending on the instruction, so ignore it for now.
         
         // get the type and value information from the included symbol
         Sym* sym = op->e.sym;
+
         if(reg = asm_parse_regvar(sym->v) != -1){
             op->type = OP_REG;
             op->reg = reg;
@@ -152,13 +153,13 @@ static void parse_operand(TCCState *s1, Operand *op)
         
         // immediate value? do type size checking
         op->type = imm_op_type_from_size(sym->c);
-        op->e.v = sym->c;
 
-
+        //char* tok_str = get_tok_str(sym->v, NULL);
+        //printf("got symbol: %s\n", tok_str);
         //if (op->e.sym && op->e.sym->r == VT_CONST | VT_SYM) {
         //    printf("symbol type: %#x\n", e.sym->type.t);
         //    printf("symbol value: %#x\n", e.sym->c);
-        //    //printf("asm label: %d\n", e.sym->asm_label);
+        //    printf("asm label: %d\n", e.sym->asm_label);
         //}
         char type[8];
         int value;
@@ -180,12 +181,17 @@ static void parse_operand(TCCState *s1, Operand *op)
                 value = op->e.v;
                 break;
         }
-        //tcc_error_noabort("Operand type: %s: %d", type, value);
-        //char* token_str = get_tok_str(old_tok, NULL);
-        //if (token_str) {
-        //    tcc_error_noabort("%s", token_str);
-        //}
-        //expect("operand");
+    }
+}
+
+/*
+ * Add an entry to the elf relocation table for the symbol in the operand op.
+ * The type of the relocation table entry needs to match format of immediate value used by the 
+ * instruction.
+ */
+void generate_symbol_reallocation(const Operand *op, int type) {
+    if (op && op->e.sym) {
+        greloc(cur_text_section, op->e.sym, ind, type);
     }
 }
 
@@ -437,6 +443,8 @@ static void asm_branch_zero_opcode(TCCState* s1, int token)
         return;
     }
 
+    generate_symbol_reallocation(&imm, R_RISCV_BRANCH);
+
     switch (token) {
     case TOK_ASM_beqz:
         emit_BEQZ(r1.reg, offset); return;
@@ -488,15 +496,24 @@ static void asm_binary_opcode(TCCState* s1, int token)
 
     switch (token) {
     case TOK_ASM_la:
+        int ind_bak = ind;
+        // both instructions need an entry use hacky method to get it to work
+        generate_symbol_reallocation(&ops[1], R_RISCV_HI20);
+        ind = ind + 4;
+        generate_symbol_reallocation(&ops[1], R_RISCV_LO12_I);
+        ind = ind_bak;
         emit_LA(rd, imm);
         return;
     case TOK_ASM_li:
+        generate_symbol_reallocation(&ops[1], R_RISCV_LO12_I);
         emit_LI(rd, imm);
         return;
     case TOK_ASM_lui:
+        generate_symbol_reallocation(&ops[1], R_RISCV_HI20);
         emit_LUI(rd, imm);
         return;
     case TOK_ASM_auipc:
+        generate_symbol_reallocation(&ops[1], R_RISCV_HI20);
         emit_AUIPC(rd, imm);
         return;
     default:
@@ -506,8 +523,6 @@ static void asm_binary_opcode(TCCState* s1, int token)
 
 static void asm_branch_opcode(TCCState* s1, int token)
 {
-    // Branch (RS1,RS2,IMM); SB-format
-    uint32_t opcode = (0x18 << 2) | 3;
     uint32_t offset = 0;
     Operand ops[2], imm;
     parse_operand(s1, &ops[0]);
@@ -545,6 +560,8 @@ static void asm_branch_opcode(TCCState* s1, int token)
         );
         return;
     }
+
+    generate_symbol_reallocation(&imm, R_RISCV_BRANCH);
 
     switch (token) {
     case TOK_ASM_beq:
@@ -1069,6 +1086,8 @@ static void asm_call_opcode(TCCState *s1, int token)
         );
         return;
     }
+
+    generate_symbol_reallocation(&symbol, R_RISCV_CALL);
 
     switch (token) {
     case TOK_ASM_call:
