@@ -473,12 +473,15 @@ static void asm_binary_opcode(TCCState* s1, int token)
     //printf("hi 2\n");
     parse_operand(s1, &ops[1]);
 
-    if (!(ops[1].type & OP_IM32)) {
-        tcc_error("'%s': Expected second source operand that is an immediate value", get_tok_str(token, NULL));
-        return;
-    } else if (ops[1].e.v >= 0x100000) {
-        tcc_error("'%s': Expected second source operand that is an immediate value between 0 and 0xfffff", get_tok_str(token, NULL));
-        return;
+    // la pseudoinstruction can load a full 32b word
+    if (token != TOK_ASM_la) {
+        if (!(ops[1].type & OP_IM32)) {
+            tcc_error("'%s': Expected second source operand that is an immediate value", get_tok_str(token, NULL));
+            return;
+        } else if (ops[1].e.v >= 0x100000) {
+            tcc_error("'%s': Expected second source operand that is an immediate value between 0 and 0xfffff", get_tok_str(token, NULL));
+            return;
+        }
     }
     uint32_t rd = ops[0].reg;
     uint32_t imm = ops[1].e.v;
@@ -506,7 +509,7 @@ static void asm_branch_opcode(TCCState* s1, int token)
     // Branch (RS1,RS2,IMM); SB-format
     uint32_t opcode = (0x18 << 2) | 3;
     uint32_t offset = 0;
-    Operand ops[3];
+    Operand ops[2], imm;
     parse_operand(s1, &ops[0]);
     if (ops[0].type != OP_REG) {
         expect("register");
@@ -525,30 +528,31 @@ static void asm_branch_opcode(TCCState* s1, int token)
         next();
     else
         expect("','");
-    parse_operand(s1, &ops[2]);
+    parse_operand(s1, &imm);
 
-    offset = ops[2].e.v;
+    offset = imm.e.v;
     if (offset > 0xfff) {
-        tcc_error("'%s': Expected third operand that is an immediate value between 0 and 0xfff\n"
-        "received: %d",
-         get_tok_str(token, NULL), ops[2].e.v);
+        tcc_error(
+            "'%s': Expected third operand that is an immediate value between 0 and 0xfff\n received: %d",
+            get_tok_str(token, NULL), offset
+        );
         return;
     }
     if (offset & 1) {
-        tcc_error("'%s': Expected third operand that is an even immediate value", get_tok_str(token, NULL));
+        tcc_error(
+            "'%s': Expected third operand that is an even immediate value, received: %u",
+            get_tok_str(token, NULL), offset
+        );
         return;
     }
 
     switch (token) {
     case TOK_ASM_beq:
-        opcode |= 0 << 12;
-        break;
+        emit_BEQ(ops[0].reg, ops[1].reg, offset); return;
     case TOK_ASM_bne:
-        opcode |= 1 << 12;
-        break;
+        emit_BNE(ops[0].reg, ops[1].reg, offset); return;
     case TOK_ASM_blt:
-        opcode |= 4 << 12;
-        emit_BGT(ops[0].reg, ops[1].reg, offset); return;
+        emit_BLT(ops[0].reg, ops[1].reg, offset); return;
     case TOK_ASM_ble:
         emit_BLE(ops[0].reg, ops[1].reg, offset); return;
 
@@ -571,6 +575,7 @@ static void asm_binary_register_opcode(TCCState *s1, int token)
 {
     // start by getting the next three operands and check that they are all registers
     Operand rd, r1, r2;
+    parse_operand(s1, &rd);
     if(!check_register(&rd)){
         tcc_error("'%s': Expected destination to be a register", get_tok_str(token, NULL));
     }
@@ -697,7 +702,7 @@ static void asm_immediate_opcode(TCCState *s1, int token)
     }
 }
 
-// make a special case for load/store opcodes since they have a distint syntax from the other commands
+// make a special case for load/store opcodes since they have a distinct syntax from the other commands
 static void asm_load_store_opcode(TCCState *s1, int token)
 {
     // start by getting the next three operands and check that they are all registers
@@ -1172,8 +1177,10 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
     case TOK_ASM_bne:
     case TOK_ASM_blt:
     case TOK_ASM_bge:
-    case TOK_ASM_bltu:
+    case TOK_ASM_bleu:
     case TOK_ASM_bgeu:
+    case TOK_ASM_bltu:
+    case TOK_ASM_bgtu:
         asm_branch_opcode(s1, token);
         return;
 
