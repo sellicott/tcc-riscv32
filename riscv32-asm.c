@@ -258,6 +258,17 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode)
     asm_emit_opcode(instruction);
 }
 
+/*
+ * Add an entry to the elf relocation table for the symbol in the operand op.
+ * The type of the relocation table entry needs to match format of immediate value used by the 
+ * instruction.
+ */
+void generate_symbol_reallocation(const Operand *op, int type) {
+    if (op && op->e.sym) {
+        greloc(cur_text_section, op->e.sym, ind, type);
+    }
+}
+
 // ------------------------- end basic helper functions --------------------- //
 
 static void asm_nullary_opcode(TCCState *s1, int token)
