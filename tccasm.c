@@ -181,11 +181,11 @@ static void asm_expr_unary(TCCState *s1, ExprValue *pe)
         break;
     case TOK_CCHAR:
     case TOK_LCHAR:
-	pe->v = tokc.i;
-	pe->sym = NULL;
-	pe->pcrel = 0;
-	next();
-	break;
+        pe->v = tokc.i;
+        pe->sym = NULL;
+        pe->pcrel = 0;
+        next();
+        break;
     case '(':
         next();
         asm_expr(s1, pe);
@@ -209,6 +209,8 @@ static void asm_expr_unary(TCCState *s1, ExprValue *pe)
                 pe->sym = NULL;
                 pe->pcrel = 0;
             } else {
+                /* otherwise pass on the symbol to the assembler, which will produce a relocation
+                 * entry based on the instruction type */
                 pe->v = 0;
                 pe->sym = sym;
                 pe->pcrel = 0;
@@ -407,10 +409,10 @@ static Sym* asm_new_label1(TCCState *s1, int label, int is_local,
 
     sym = asm_label_find(label);
     if (sym) {
-	esym = elfsym(sym);
-	/* A VT_EXTERN symbol, even if it has a section is considered
-	   overridable.  This is how we "define" .set targets.  Real
-	   definitions won't have VT_EXTERN set.  */
+        esym = elfsym(sym);
+        /* A VT_EXTERN symbol, even if it has a section is considered
+           overridable.  This is how we "define" .set targets.  Real
+           definitions won't have VT_EXTERN set.  */
         if (esym && esym->st_shndx != SHN_UNDEF) {
             /* the label is already defined */
             if (IS_ASM_SYM(sym)
@@ -424,8 +426,10 @@ static Sym* asm_new_label1(TCCState *s1, int label, int is_local,
     new_label:
         sym = asm_label_push(label);
     }
-    if (!sym->c)
-      put_extern_sym2(sym, SHN_UNDEF, 0, 0, 1);
+    /* If we see a new label and there is no symbol, add one to elf symbol table */
+    if (!sym->c) {
+        put_extern_sym2(sym, SHN_UNDEF, 0, 0, 1);
+    }
     esym = elfsym(sym);
     esym->st_shndx = sh_num;
     esym->st_value = value;
@@ -452,7 +456,7 @@ static Sym* set_symbol(TCCState *s1, int label)
     n = e.v;
     esym = elfsym(e.sym);
     if (esym)
-	n += esym->st_value;
+        n += esym->st_value;
     sym = asm_new_label1(s1, label, 2, esym ? esym->st_shndx : SHN_ABS, n);
     elfsym(sym)->st_other |= ST_ASM_SET;
     return sym;
@@ -968,7 +972,7 @@ static int tcc_assemble_internal(TCCState *s1, int do_preprocess, int global)
                 next();
                 goto redo;
             } else if (tok == '=') {
-		set_symbol(s1, opcode);
+                set_symbol(s1, opcode);
                 goto redo;
             } else {
                 asm_opcode(s1, opcode);

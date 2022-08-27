@@ -79,19 +79,19 @@ ST_DATA const int reg_classes[NB_REGS] = {
     RC_INT | RC_R(6),
     RC_INT | RC_R(7),
 #ifndef TCC_TARGET_RISCV32_ilp32
-    // Floating point function arguments
-    RC_FLOAT | RC_F(0),
-    RC_FLOAT | RC_F(1),
-    RC_FLOAT | RC_F(2),
-    RC_FLOAT | RC_F(3),
-    RC_FLOAT | RC_F(4),
-    RC_FLOAT | RC_F(5),
-    RC_FLOAT | RC_F(6),
-    RC_FLOAT | RC_F(7),
+      // Floating point function arguments
+      RC_FLOAT | RC_F(0),
+      RC_FLOAT | RC_F(1),
+      RC_FLOAT | RC_F(2),
+      RC_FLOAT | RC_F(3),
+      RC_FLOAT | RC_F(4),
+      RC_FLOAT | RC_F(5),
+      RC_FLOAT | RC_F(6),
+      RC_FLOAT | RC_F(7),
 #endif
-    0,
-    1 << TREG_RA,
-    1 << TREG_SP
+      0,
+      1 << TREG_RA,
+      1 << TREG_SP
 };
 
 #if defined(CONFIG_TCC_BCHECK)
@@ -159,7 +159,7 @@ static int load_symofs(int r, SValue *sv, int forstore)
             sv->c.i = 0;
         } else {
             if (((unsigned)fc + (1 << 11)) >> 12)
-              tcc_error("unimp: large addend for global address (0x%lx)", (long)sv->c.i);
+                tcc_error("unimp: large addend for global address (0x%lx)", (long)sv->c.i);
             greloca(cur_text_section, sv->sym, ind,
                     R_RISCV_GOT_HI20, 0);
             doload = 1;
@@ -637,23 +637,22 @@ ST_FUNC void gfunc_call(int nb_args)
             byref = 64 | (tempofs << 7);
         }
         reg_pass(&sv->type, prc, fieldofs, sa != 0);
-        if (!sa && align == 2*XLEN && size <= 2*XLEN)
-          areg[0] = (areg[0] + 1) & ~1;
+        if (!sa && align == 2*XLEN && size <= 2*XLEN) {
+            areg[0] = (areg[0] + 1) & ~1;
+        }
         nregs = prc[0];
-        if (size == 0)
+        if (size == 0) {
             info[i] = 0;
-        else if ((prc[1] == RC_INT && areg[0] >= 8)
-            || (prc[1] == RC_FLOAT && areg[1] >= 16)
-            || (nregs == 2 && prc[1] == RC_FLOAT && prc[2] == RC_FLOAT
-                && areg[1] >= 15)
-            || (nregs == 2 && prc[1] != prc[2]
-                && (areg[1] >= 16 || areg[0] >= 8))) {
+        }
+        else if ((prc[1] == RC_INT && areg[0] >= 8)    ||
+                 (prc[1] == RC_FLOAT && areg[1] >= 16) ||
+                 (nregs == 2 && prc[1] == RC_FLOAT && prc[2] == RC_FLOAT && areg[1] >= 15) ||
+                 (nregs == 2 && prc[1] != prc[2] && (areg[1] >= 16 || areg[0] >= 8))) {
             info[i] = 32;
-            if (align < XLEN)
-              align = XLEN;
+            if (align < XLEN) align = XLEN;
             stack_adj += (size + align - 1) & -align;
             if (!sa) /* one vararg on stack forces the rest on stack */
-              areg[0] = 8, areg[1] = 16;
+                areg[0] = 8, areg[1] = 16;
         } else {
             info[i] = areg[prc[1] - 1]++;
             if (!byref)
@@ -673,22 +672,26 @@ ST_FUNC void gfunc_call(int nb_args)
             }
         }
         info[i] |= byref;
-        if (sa)
-          sa = sa->next;
+        if (sa) sa = sa->next;
     }
     stack_adj = (stack_adj + 15) & -16;
     tempspace = (tempspace + 15) & -16;
     stack_add = stack_adj + tempspace;
 
     /* fetch cpu flag before generating any code */
-    if ((vtop->r & VT_VALMASK) == VT_CMP)
-      gv(RC_INT);
+    if ((vtop->r & VT_VALMASK) == VT_CMP) gv(RC_INT);
 
+    const uint32_t t0 = 5;
+    const uint32_t sp = 2;
     if (stack_add) {
         if (stack_add >= 0x1000) {
-            o(0x37 | (5 << 7) | (-stack_add & 0xfffff000)); //lui t0, upper(v)
-            emit_I(0x13, 0, 5, 5, -stack_add << 20 >> 20); // addi t0, t0, lo(v)
-            emit_R(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
+            //o(0x37 | (5 << 7) | (-stack_add & 0xfffff000)); //lui t0, upper(v)
+            //EI(0x13, 0, 5, 5, -stack_add << 20 >> 20); // addi t0, t0, lo(v)
+            //ER(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
+
+            emit_LUI(t0, -stack_add);
+            emit_ADDI(t0, t0, -stack_add);
+            emit_ADD(sp, sp, t0);
         }
         else
             emit_I(0x13, 0, 2, 2, -stack_add);   // addi sp, sp, -adj
@@ -731,7 +734,7 @@ ST_FUNC void gfunc_call(int nb_args)
             } else if (info[i] & 16) {
                 assert(!splitofs);
                 splitofs = ofs;
-                ofs += 8;
+                ofs += 4;
             }
         }
     }
@@ -816,13 +819,21 @@ done:
     gcall_or_jmp(1);
     vtop -= nb_args + 1;
     if (stack_add) {
+        const uint32_t t0 = 5;
+        const uint32_t sp = 2;
         if (stack_add >= 0x1000) {
-            o(0x37 | (5 << 7) | (stack_add & 0xfffff000)); //lui t0, upper(v)
-            emit_I(0x13, 0, 5, 5, stack_add << 20 >> 20); // addi t0, t0, lo(v)
-            emit_R(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
+            //o(0x37 | (5 << 7) | (stack_add & 0xfffff000)); //lui t0, upper(v)
+            //EI(0x13, 0, 5, 5, stack_add << 20 >> 20); // addi t0, t0, lo(v)
+            //ER(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
+
+            emit_LUI(t0, stack_add);
+            emit_ADDI(t0, t0, stack_add);
+            emit_ADD(sp, sp, t0);
         }
-        else
-            emit_I(0x13, 0, 2, 2, stack_add);      // addi sp, sp, adj
+        else {
+            //EI(0x13, 0, 2, 2, stack_add);      // addi sp, sp, adj
+            emit_ADDI(sp, sp, stack_add);
+        }
    }
    tcc_free(info);
 }
@@ -879,18 +890,24 @@ ST_FUNC void gfunc_prolog(Sym *func_sym)
             addr += size;
         } else {
             loc -= regcount * 8; // XXX could reserve only 'size' bytes
+            //loc -= regcount * PTR_SIZE; // XXX could reserve only 'size' bytes
             param_addr = loc;
             for (i = 0; i < regcount; i++) {
+                const uint32_t t0 = 5;
+                const uint32_t s0 = 8;
                 if (areg[prc[1+i] - 1] >= 8) {
                     assert(i == 1 && regcount == 2 && !(addr & 7));
-                    emit_I(0x03, 2, 5, 8, addr); // lw t0, addr(s0)
+                    //EI(0x03, 2, 5, 8, addr); // lw t0, addr(s0)
+                    emit_LW(t0, s0, addr);
                     addr += 8;
-                    emit_S(0x23, 2, 8, 5, loc + i*4); // sw t0, loc(s0)
+                    //emit_S(0x23, 2, 8, 5, loc + i*4); // sw t0, loc(s0)
+                    emit_SW(t0, s0, loc + i*4);
                 } else if (prc[1+i] == RC_FLOAT) {
-                    emit_S(0x22, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc + (fieldofs[i+1] >> 4)); // fs[wd] FAi, loc(s0)
+                    //emit_S(0x22, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc + (fieldofs[i+1] >> 4)); // fs[wd] FAi, loc(s0)
                     tcc_error("unimp: floating point support");
                 } else {
-                    emit_S(0x23, 2, 8, 10 + areg[0]++, loc + i*8); // sw aX, loc(s0) // XXX
+                    //ES(0x23, 2, 8, 10 + areg[0]++, loc + i*8); // sw aX, loc(s0) // XXX
+                    emit_SW(10 + areg[0]++, loc + i*8);
                 }
             }
         }
@@ -903,7 +920,8 @@ ST_FUNC void gfunc_prolog(Sym *func_sym)
     if (func_var) {
         for (; areg[0] < 8; areg[0]++) {
             num_va_regs++;
-            emit_S(0x23, 2, 8, 10 + areg[0], -8 + num_va_regs * 8); // sw aX, loc(s0)
+            ES(0x23, 2, 8, 10 + areg[0], -8 + num_va_regs * 8); // sw aX, loc(s0)
+            emit_SW(10 + areg[0], -8 + num_va_regs * 8);
         }
     }
 #ifdef CONFIG_TCC_BCHECK
@@ -920,7 +938,7 @@ ST_FUNC int gfunc_sret(CType *vt, int variadic, CType *ret,
     *ret_align = 1;
     *regsize = 8;
     if (size > 16)
-      return 0;
+        return 0;
     reg_pass(vt, prc, fieldofs, 1);
     nregs = prc[0];
     if (nregs == 2 && prc[1] != prc[2])
@@ -960,16 +978,30 @@ ST_FUNC void gfunc_epilog(void)
     loc = (loc - num_va_regs * 8);
     d = v = (-loc + 15) & -16;
 
+
+    const uint32_t zero = 0;
+    const uint32_t ra   = 1;
+    const uint32_t sp   = 2;
+    const uint32_t t0   = 5;
     if (v >= (1 << 11)) {
         d = 16;
-        o(0x37 | (5 << 7) | ((0x800 + (v-16)) & 0xfffff000)); //lui t0, upper(v)
-        emit_I(0x13, 0, 5, 5, (v-16) << 20 >> 20); // addi t0, t0, lo(v)
-        emit_R(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
+        //o(0x37 | (5 << 7) | ((0x800 + (v-16)) & 0xfffff000)); //lui t0, upper(v)
+        //EI(0x13, 0, 5, 5, (v-16) << 20 >> 20); // addi t0, t0, lo(v)
+        //ER(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
+
+        emit_LUI(t0, v);
+        emit_ADDI(t0, t0, v);
+        emit_ADD(sp, sp, t0);
     }
-    emit_I(0x03, 2, 1, 2, d - 8 - num_va_regs * 8);  // lw ra, v-8(sp)
-    emit_I(0x03, 2, 8, 2, d - 16 - num_va_regs * 8); // lw s0, v-16(sp)
-    emit_I(0x13, 0, 2, 2, d);      // addi sp, sp, v
-    emit_I(0x67, 0, 0, 1, 0);      // jalr x0, 0(x1), aka ret
+    //EI(0x03, 2, 1, 2, d - 8 - num_va_regs * 8);  // lw ra, v-8(sp)
+    //EI(0x03, 2, 8, 2, d - 16 - num_va_regs * 8); // lw s0, v-16(sp)
+    //EI(0x13, 0, 2, 2, d);      // addi sp, sp, v
+    //EI(0x67, 0, 0, 1, 0);      // jalr x0, 0(x1), aka ret
+
+    emit_LW(ra, sp, d - 8 - (num_va_regs * 8) );
+    emit_LW(s0, sp, d - 16 - (num_va_regs * 8) );
+    emit_ADDI(sp, sp, d);
+    emit_JALR(zero, ra, 0);
     large_ofs_ind = ind;
     if (v >= (1 << 11)) {
         emit_I(0x13, 0, 8, 2, d - num_va_regs * 8);      // addi s0, sp, d
@@ -1451,8 +1483,8 @@ ST_FUNC void gen_vla_alloc(CType *type, int align)
         vpushi(0);
         vtop->r = TREG_R(0);
         //o(0x00010513); /* mv a0,sp */
-        uint32_t a0 = 10;
-        uint32_t sp = 2;
+        const uint32_t a0 = 10;
+        const uint32_t sp = 2;
         emit_MV(a0, sp);
         vswap();
         vpush_helper_func(TOK___bound_new_region);
