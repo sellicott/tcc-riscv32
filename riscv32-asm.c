@@ -139,7 +139,7 @@ static void parse_operand(TCCState *s1, Operand *op)
         // Deal with the case of a symbol.
         // If we have a symbol we will let the linker handle it and just put in a zero for the 
         // immediate value, we also need to put an entry into the reallocation table, this should 
-        // handled for us in tccasm somewhere
+        // however, the entry will be different depending on the instruction, so ignore it for now.
         
         // get the type and value information from the included symbol
         Sym* sym = op->e.sym;
@@ -376,6 +376,8 @@ static void asm_branch_zero_opcode(TCCState* s1, int token)
         return;
     }
 
+    generate_symbol_reallocation(&imm, R_RISCV_BRANCH);
+
     switch (token) {
     case TOK_ASM_beqz:
         emit_BEQZ(r1.reg, offset); return;
@@ -412,27 +414,39 @@ static void asm_binary_opcode(TCCState* s1, int token)
     //printf("hi 2\n");
     parse_operand(s1, &ops[1]);
 
-    if (!(ops[1].type & OP_IM32)) {
-        tcc_error("'%s': Expected second source operand that is an immediate value", get_tok_str(token, NULL));
-        return;
-    } else if (ops[1].e.v >= 0x100000) {
-        tcc_error("'%s': Expected second source operand that is an immediate value between 0 and 0xfffff", get_tok_str(token, NULL));
-        return;
+    // la pseudoinstruction can load a full 32b word
+    if (token != TOK_ASM_la) {
+        if (!(ops[1].type & OP_IM32)) {
+            tcc_error("'%s': Expected second source operand that is an immediate value", get_tok_str(token, NULL));
+            return;
+        } else if (ops[1].e.v >= 0x100000) {
+            tcc_error("'%s': Expected second source operand that is an immediate value between 0 and 0xfffff", get_tok_str(token, NULL));
+            return;
+        }
     }
     uint32_t rd = ops[0].reg;
     uint32_t imm = ops[1].e.v;
 
     switch (token) {
     case TOK_ASM_la:
+        int ind_bak = ind;
+        // both instructions need an entry use hacky method to get it to work
+        generate_symbol_reallocation(&ops[1], R_RISCV_HI20);
+        ind = ind + 4;
+        generate_symbol_reallocation(&ops[1], R_RISCV_LO12_I);
+        ind = ind_bak;
         emit_LA(rd, imm);
         return;
     case TOK_ASM_li:
+        generate_symbol_reallocation(&ops[1], R_RISCV_LO12_I);
         emit_LI(rd, imm);
         return;
     case TOK_ASM_lui:
+        generate_symbol_reallocation(&ops[1], R_RISCV_HI20);
         emit_LUI(rd, imm);
         return;
     case TOK_ASM_auipc:
+        generate_symbol_reallocation(&ops[1], R_RISCV_HI20);
         emit_AUIPC(rd, imm);
         return;
     default:
@@ -442,10 +456,8 @@ static void asm_binary_opcode(TCCState* s1, int token)
 
 static void asm_branch_opcode(TCCState* s1, int token)
 {
-    // Branch (RS1,RS2,IMM); SB-format
-    uint32_t opcode = (0x18 << 2) | 3;
     uint32_t offset = 0;
-    Operand ops[3];
+    Operand ops[2], imm;
     parse_operand(s1, &ops[0]);
     if (ops[0].type != OP_REG) {
         expect("register");
@@ -464,9 +476,9 @@ static void asm_branch_opcode(TCCState* s1, int token)
         next();
     else
         expect("','");
-    parse_operand(s1, &ops[2]);
+    parse_operand(s1, &imm);
 
-    offset = ops[2].e.v;
+    offset = imm.e.v;
     if (offset > 0xfff) {
         tcc_error("'%s': Expected third operand that is an immediate value between 0 and 0xfff\n"
                   "received: %ld",
@@ -474,20 +486,22 @@ static void asm_branch_opcode(TCCState* s1, int token)
         return;
     }
     if (offset & 1) {
-        tcc_error("'%s': Expected third operand that is an even immediate value", get_tok_str(token, NULL));
+        tcc_error(
+            "'%s': Expected third operand that is an even immediate value, received: %u",
+            get_tok_str(token, NULL), offset
+        );
         return;
     }
 
+    generate_symbol_reallocation(&imm, R_RISCV_BRANCH);
+
     switch (token) {
     case TOK_ASM_beq:
-        opcode |= 0 << 12;
-        break;
+        emit_BEQ(ops[0].reg, ops[1].reg, offset); return;
     case TOK_ASM_bne:
-        opcode |= 1 << 12;
-        break;
+        emit_BNE(ops[0].reg, ops[1].reg, offset); return;
     case TOK_ASM_blt:
-        opcode |= 4 << 12;
-        emit_BGT(ops[0].reg, ops[1].reg, offset); return;
+        emit_BLT(ops[0].reg, ops[1].reg, offset); return;
     case TOK_ASM_ble:
         emit_BLE(ops[0].reg, ops[1].reg, offset); return;
 
@@ -637,7 +651,7 @@ static void asm_immediate_opcode(TCCState *s1, int token)
     }
 }
 
-// make a special case for load/store opcodes since they have a distint syntax from the other commands
+// make a special case for load/store opcodes since they have a distinct syntax from the other commands
 static void asm_load_store_opcode(TCCState *s1, int token)
 {
     // start by getting the next three operands and check that they are all registers
@@ -1005,6 +1019,8 @@ static void asm_call_opcode(TCCState *s1, int token)
         return;
     }
 
+    generate_symbol_reallocation(&symbol, R_RISCV_CALL);
+
     switch (token) {
     case TOK_ASM_call:
         emit_CALL(symbol.e.v); return;
@@ -1112,8 +1128,10 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
     case TOK_ASM_bne:
     case TOK_ASM_blt:
     case TOK_ASM_bge:
-    case TOK_ASM_bltu:
+    case TOK_ASM_bleu:
     case TOK_ASM_bgeu:
+    case TOK_ASM_bltu:
+    case TOK_ASM_bgtu:
         asm_branch_opcode(s1, token);
         return;
 
