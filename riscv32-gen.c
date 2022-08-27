@@ -906,8 +906,8 @@ ST_FUNC void gfunc_prolog(Sym *func_sym)
                     //emit_S(0x22, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc + (fieldofs[i+1] >> 4)); // fs[wd] FAi, loc(s0)
                     tcc_error("unimp: floating point support");
                 } else {
-                    //ES(0x23, 2, 8, 10 + areg[0]++, loc + i*8); // sw aX, loc(s0) // XXX
-                    emit_SW(10 + areg[0]++, loc + i*8);
+                    emit_S(0x23, 2, 8, 10 + areg[0]++, loc + i*8); // sw aX, loc(s0) // XXX
+                    //emit_SW(10 + areg[0]++, loc + i*8);
                 }
             }
         }
@@ -920,8 +920,8 @@ ST_FUNC void gfunc_prolog(Sym *func_sym)
     if (func_var) {
         for (; areg[0] < 8; areg[0]++) {
             num_va_regs++;
-            ES(0x23, 2, 8, 10 + areg[0], -8 + num_va_regs * 8); // sw aX, loc(s0)
-            emit_SW(10 + areg[0], -8 + num_va_regs * 8);
+            emit_S(0x23, 2, 8, 10 + areg[0], -8 + num_va_regs * 8); // sw aX, loc(s0)
+            //emit_SW(10 + areg[0], -8 + num_va_regs * 8);
         }
     }
 #ifdef CONFIG_TCC_BCHECK
@@ -983,6 +983,7 @@ ST_FUNC void gfunc_epilog(void)
     const uint32_t ra   = 1;
     const uint32_t sp   = 2;
     const uint32_t t0   = 5;
+    const uint32_t s0   = 8;
     if (v >= (1 << 11)) {
         d = 16;
         //o(0x37 | (5 << 7) | ((0x800 + (v-16)) & 0xfffff000)); //lui t0, upper(v)
