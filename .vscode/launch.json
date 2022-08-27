@@ -25,6 +25,26 @@
             "miDebuggerPath": "/usr/bin/gdb"
         },
         {
+            "name": "ASM compile boot.S",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/riscv32-tcc",
+            "args": ["-Og", "-g", "-c", "boot.S", "-o", "boot.o"],
+            "stopAtEntry": false,
+            "cwd": "/home/nebk/Documents/programs/risc-v/espwebc3/docs/dev/qemu-metal",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+             //   {
+             //       "description": "Enable pretty-printing for gdb",
+             //       "text": "-enable-pretty-printing",
+             //       "ignoreFailures": true
+             //   }
+            ],
+            "miDebuggerPath": "/usr/bin/gdb"
+        },
+        {
             "name": "ASM compile",
             "type": "cppdbg",
             "request": "launch",

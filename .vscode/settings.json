@@ -13,6 +13,8 @@
         "variant": "cpp",
         "numbers": "c",
         "string": "c",
-        "string_view": "c"
+        "string_view": "c",
+        "*.inc": "c",
+        "*.h": "c"
     }
 }
