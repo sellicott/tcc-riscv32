@@ -850,7 +850,7 @@ ST_FUNC int find_defsym(TCCState *s1, const char *name, ElfW(Sym) *sym)
         // printf("LOOKING DEFSYM %s\n", s1->defsyms);
         if (len > n + 1 && s[n] == '=' && strncmp(name, s, n) == 0) {
             //sym->st_info = ELFW(ST_INFO)(STB_GLOBAL,STT_FUNC);
-            sym->st_value = strtoull(s + n + 1, &end, 0);
+            sym->st_value = strtoull(s + n + 1, (char** restrict) &end, 0);
             return 1;
         }
     }
