@@ -30,12 +30,20 @@
      DEF_ASM_OP0(int3, 0xcc)
      DEF_ASM_OP0(into, 0xce)
      DEF_ASM_OP0(iret, 0xcf)
+     DEF_ASM_OP0(iretw, 0x66cf)
+     DEF_ASM_OP0(iretl, 0xcf)
+     DEF_ASM_OP0(iretq, 0x48cf)
      DEF_ASM_OP0(rsm, 0x0faa)
      DEF_ASM_OP0(hlt, 0xf4)
      DEF_ASM_OP0(wait, 0x9b)
      DEF_ASM_OP0(nop, 0x90)
      DEF_ASM_OP0(pause, 0xf390)
      DEF_ASM_OP0(xlat, 0xd7)
+
+    DEF_ASM_OP0L(vmcall, 0xc1, 0, OPC_0F01)
+    DEF_ASM_OP0L(vmlaunch, 0xc2, 0, OPC_0F01)
+    DEF_ASM_OP0L(vmresume, 0xc3, 0, OPC_0F01)
+    DEF_ASM_OP0L(vmxoff, 0xc4, 0, OPC_0F01)
 
      /* strings */
 ALT(DEF_ASM_OP0L(cmpsb, 0xa6, 0, OPC_BWLX))
@@ -72,6 +80,8 @@ ALT(DEF_ASM_OP2(btrw, 0x0fba, 6, OPC_MODRM | OPC_WLX, OPT_IM8, OPT_REGW | OPT_EA
 
 ALT(DEF_ASM_OP2(btcw, 0x0fbb, 0, OPC_MODRM | OPC_WLX, OPT_REGW, OPT_REGW | OPT_EA))
 ALT(DEF_ASM_OP2(btcw, 0x0fba, 7, OPC_MODRM | OPC_WLX, OPT_IM8, OPT_REGW | OPT_EA))
+
+ALT(DEF_ASM_OP2(popcntw, 0xf30fb8, 0, OPC_MODRM | OPC_WLX, OPT_REGW | OPT_EA, OPT_REGW))
 
      /* prefixes */
      DEF_ASM_OP0(lock, 0xf0)
@@ -510,6 +520,10 @@ ALT(DEF_ASM_OP2(movhps, 0x0f17, 0, OPC_MODRM, OPT_SSE, OPT_EA | OPT_REG32 ))
     DEF_ASM_OP2(sqrtps, 0x0f51, 0, OPC_MODRM, OPT_EA | OPT_SSE, OPT_SSE )
     DEF_ASM_OP2(subps, 0x0f5c, 0, OPC_MODRM, OPT_EA | OPT_SSE, OPT_SSE )
 
+    /* movnti should only accept REG32 and REG64, we accept more */
+    DEF_ASM_OP2(movnti, 0x0fc3, 0, OPC_MODRM, OPT_REG, OPT_EA)
+    DEF_ASM_OP2(movntil, 0x0fc3, 0, OPC_MODRM, OPT_REG32, OPT_EA)
+    DEF_ASM_OP2(movntiq, 0x0fc3, 0, OPC_MODRM | OPC_48, OPT_REG64, OPT_EA)
     DEF_ASM_OP1(prefetchnta, 0x0f18, 0, OPC_MODRM, OPT_EA)
     DEF_ASM_OP1(prefetcht0, 0x0f18, 1, OPC_MODRM, OPT_EA)
     DEF_ASM_OP1(prefetcht1, 0x0f18, 2, OPC_MODRM, OPT_EA)

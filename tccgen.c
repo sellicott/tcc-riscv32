@@ -44,7 +44,6 @@ static int nb_sym_pools;
 static Sym *all_cleanups, *pending_gotos;
 static int local_scope;
 static int in_sizeof;
-static int in_generic;
 ST_DATA char debug_modes;
 
 ST_DATA SValue *vtop;
@@ -63,7 +62,15 @@ ST_DATA int nocode_wanted; /* no code generation wanted */
 
 /* Clear 'nocode_wanted' at label if it was used */
 ST_FUNC void gsym(int t) { if (t) { gsym_addr(t, ind); CODE_ON(); }}
-static int gind(void) { int t = ind; CODE_ON(); if (debug_modes) tcc_tcov_block_begin(tcc_state); return t; }
+static int gind(int known_unreachable)
+{
+  int t = ind;
+  if (!known_unreachable)
+    CODE_ON();
+  if (debug_modes)
+    tcc_tcov_block_begin(tcc_state);
+  return t;
+}
 
 /* Set 'nocode_wanted' after unconditional jumps */
 static void gjmp_addr_acs(int t) { gjmp_addr(t); CODE_OFF(); }
@@ -100,6 +107,7 @@ static struct switch_t {
 	int sym;
     } **p; int n; /* list of case ranges */
     int def_sym; /* default symbol */
+    int nocode_wanted;
     int *bsym;
     struct scope *scope;
     struct switch_t *prev;
@@ -138,7 +146,7 @@ static void gen_cast(CType *type);
 static void gen_cast_s(int t);
 static inline CType *pointed_type(CType *type);
 static int is_compatible_types(CType *type1, CType *type2);
-static int parse_btype(CType *type, AttributeDef *ad);
+static int parse_btype(CType *type, AttributeDef *ad, int ignore_label);
 static CType *type_decl(CType *type, AttributeDef *ad, int *v, int td);
 static void parse_expr_type(CType *type);
 static void init_putv(init_params *p, CType *type, unsigned long c);
@@ -2179,6 +2187,7 @@ static void gen_opic(int op)
     int t2 = v2->type.t & VT_BTYPE;
     int c1 = (v1->r & (VT_VALMASK | VT_LVAL | VT_SYM)) == VT_CONST;
     int c2 = (v2->r & (VT_VALMASK | VT_LVAL | VT_SYM)) == VT_CONST;
+    int nonconst = (v1->r | v2->r) & VT_NONCONST;
     uint64_t l1 = c1 ? v1->c.i : 0;
     uint64_t l2 = c2 ? v2->c.i : 0;
     int shm = (t1 == VT_LLONG) ? 63 : 31;
@@ -2245,6 +2254,7 @@ static void gen_opic(int op)
         v1->c.i = l1;
         vtop--;
     } else {
+        nonconst = VT_NONCONST;
         /* if commutative ops, put c2 as constant */
         if (c1 && (op == '+' || op == '&' || op == '^' || 
                    op == '|' || op == '*' || op == TOK_EQ || op == TOK_NE)) {
@@ -2318,6 +2328,8 @@ static void gen_opic(int op)
                     gen_opi(op);
         }
     }
+    if (vtop->r == VT_CONST)
+      vtop->r |= nonconst;
 }
 
 #if defined TCC_TARGET_X86_64 || defined TCC_TARGET_I386
@@ -2601,7 +2613,7 @@ static int pointed_size(CType *type)
 
 static inline int is_null_pointer(SValue *p)
 {
-    if ((p->r & (VT_VALMASK | VT_LVAL | VT_SYM)) != VT_CONST)
+    if ((p->r & (VT_VALMASK | VT_LVAL | VT_SYM | VT_NONCONST)) != VT_CONST)
         return 0;
     return ((p->type.t & VT_BTYPE) == VT_INT && (uint32_t)p->c.i == 0) ||
         ((p->type.t & VT_BTYPE) == VT_LLONG && p->c.i == 0) ||
@@ -4282,7 +4294,7 @@ do_decl:
             c = 0;
             flexible = 0;
             while (tok != '}') {
-                if (!parse_btype(&btype, &ad1)) {
+                if (!parse_btype(&btype, &ad1, 0)) {
 		    skip(';');
 		    continue;
 		}
@@ -4415,7 +4427,7 @@ static void parse_btype_qualify(CType *type, int qualifiers)
 /* return 0 if no type declaration. otherwise, return the basic type
    and skip it. 
  */
-static int parse_btype(CType *type, AttributeDef *ad)
+static int parse_btype(CType *type, AttributeDef *ad, int ignore_label)
 {
     int t, u, bt, st, type_found, typespec_found, g, n;
     Sym *s;
@@ -4469,7 +4481,7 @@ static int parse_btype(CType *type, AttributeDef *ad)
               next();
               skip('(');
               memset(&ad1, 0, sizeof(AttributeDef));
-              if (parse_btype(&type1, &ad1)) {
+              if (parse_btype(&type1, &ad1, 0)) {
                   type_decl(&type1, &ad1, &n, TYPE_ABSTRACT);
                   if (ad1.a.aligned)
                     n = 1 << (ad1.a.aligned - 1);
@@ -4639,7 +4651,7 @@ static int parse_btype(CType *type, AttributeDef *ad)
                 goto the_end;
 
             n = tok, next();
-            if (tok == ':' && !in_generic) {
+            if (tok == ':' && ignore_label) {
                 /* ignore if it's a label */
                 unget_tok(n);
                 goto the_end;
@@ -4730,7 +4742,7 @@ static int post_type(CType *type, AttributeDef *ad, int storage, int td)
 	  return 0;
 	if (tok == ')')
 	  l = 0;
-	else if (parse_btype(&pt, &ad1))
+	else if (parse_btype(&pt, &ad1, 0))
 	  l = FUNC_NEW;
 	else if (td & (TYPE_DIRECT|TYPE_ABSTRACT)) {
 	    merge_attr (ad, &ad1);
@@ -4774,7 +4786,7 @@ static int post_type(CType *type, AttributeDef *ad, int storage, int td)
                     next();
                     break;
                 }
-		if (l == FUNC_NEW && !parse_btype(&pt, &ad1))
+		if (l == FUNC_NEW && !parse_btype(&pt, &ad1, 0))
 		    tcc_error("invalid type");
             }
         } else
@@ -5081,7 +5093,7 @@ static void parse_expr_type(CType *type)
     AttributeDef ad;
 
     skip('(');
-    if (parse_btype(type, &ad)) {
+    if (parse_btype(type, &ad, 0)) {
         type_decl(type, &ad, &n, TYPE_ABSTRACT);
     } else {
         expr_type(type, gexpr);
@@ -5094,7 +5106,7 @@ static void parse_type(CType *type)
     AttributeDef ad;
     int n;
 
-    if (!parse_btype(type, &ad)) {
+    if (!parse_btype(type, &ad, 0)) {
         expect("type");
     }
     type_decl(type, &ad, &n, TYPE_ABSTRACT);
@@ -5362,7 +5374,7 @@ ST_FUNC void unary(void)
     case '(':
         next();
         /* cast ? */
-        if (parse_btype(&type, &ad)) {
+        if (parse_btype(&type, &ad, 0)) {
             type_decl(&type, &ad, &n, TYPE_ABSTRACT);
             skip(')');
             /* check ISOC99 compound literal */
@@ -5678,7 +5690,7 @@ ST_FUNC void unary(void)
             if (s->r == LABEL_DECLARED)
                 s->r = LABEL_FORWARD;
         }
-        if (!s->type.t) {
+        if ((s->type.t & VT_BTYPE) != VT_PTR) {
             s->type.t = VT_VOID;
             mk_pointer(&s->type);
             s->type.t |= VT_STATIC;
@@ -5719,10 +5731,7 @@ ST_FUNC void unary(void)
 		int itmp;
 	        CType cur_type;
 
-                in_generic++;
-		parse_btype(&cur_type, &ad_tmp);
-                in_generic--;
-
+		parse_btype(&cur_type, &ad_tmp, 0);
 		type_decl(&cur_type, &ad_tmp, &itmp, TYPE_ABSTRACT);
 		if (compare_types(&controlling_type, &cur_type, 0)) {
 		    if (has_match) {
@@ -6773,7 +6782,7 @@ again:
         }
 
     } else if (t == TOK_WHILE) {
-        d = gind();
+        d = gind(0);
         skip('(');
         gexpr();
         skip(')');
@@ -6873,7 +6882,7 @@ again:
         }
         skip(';');
         a = b = 0;
-        c = d = gind();
+        c = d = gind(0);
         if (tok != ';') {
             gexpr();
             a = gvtst(1, 0);
@@ -6881,7 +6890,7 @@ again:
         skip(';');
         if (tok != ')') {
             e = gjmp(0);
-            d = gind();
+            d = gind(0);
             gexpr();
             vpop();
             gjmp_addr(c);
@@ -6896,7 +6905,7 @@ again:
 
     } else if (t == TOK_DO) {
         a = b = 0;
-        d = gind();
+        d = gind(0);
         lblock(&a, &b);
         gsym(b);
         skip(TOK_WHILE);
@@ -6915,6 +6924,7 @@ again:
         sw->bsym = &a;
         sw->scope = cur_scope;
         sw->prev = cur_switch;
+        sw->nocode_wanted = nocode_wanted;
         cur_switch = sw;
 
         skip('(');
@@ -6969,7 +6979,7 @@ again:
         }
         if (debug_modes)
             tcc_tcov_reset_ind(tcc_state);
-        cr->sym = gind();
+        cr->sym = gind(cur_switch->nocode_wanted);
         dynarray_add(&cur_switch->p, &cur_switch->n, cr);
         skip(':');
         is_expr = 0;
@@ -6982,7 +6992,7 @@ again:
             tcc_error("too many 'default'");
         if (debug_modes)
             tcc_tcov_reset_ind(tcc_state);
-        cur_switch->def_sym = gind();
+        cur_switch->def_sym = gind(cur_switch->nocode_wanted);
         skip(':');
         is_expr = 0;
         goto block_after_label;
@@ -7048,10 +7058,15 @@ again:
             } else {
                 s = label_push(&global_label_stack, t, LABEL_DEFINED);
             }
-            s->jnext = gind();
+            s->jnext = gind(0);
             s->cleanupstate = cur_scope->cl.s;
 
     block_after_label:
+              {
+                /* Accept attributes after labels (e.g. 'unused') */
+                AttributeDef ad_tmp;
+                parse_attribute(&ad_tmp);
+              }
             vla_restore(cur_scope->vla.loc);
             if (tok != '}')
                 goto again;
@@ -7621,7 +7636,7 @@ static void decl_initializer(init_params *p, CType *type, unsigned long c, int f
 
             decl_design_flex(p, s, len);
             if (!(flags & DIF_SIZE_ONLY)) {
-                int nb = n;
+                int nb = n, ch;
                 if (len < nb)
                     nb = len;
                 if (len > nb)
@@ -8206,7 +8221,7 @@ static int decl0(int l, int is_for_loop_init, Sym *func_sym)
 	}
 
         oldint = 0;
-        if (!parse_btype(&btype, &adbase)) {
+        if (!parse_btype(&btype, &adbase, l == VT_LOCAL)) {
             if (is_for_loop_init)
                 return 0;
             /* skip redundant ';' if not in old parameter decl scope */

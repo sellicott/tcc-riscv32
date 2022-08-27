@@ -557,11 +557,17 @@ void goto_test()
 {
     int i;
     static void *label_table[3] = { &&label1, &&label2, &&label3 };
+    struct {
+        int bla;
+        /* This needs to parse as typedef, not as label.  */
+        typedef_and_label : 32;
+    } y = {1};
 
     printf("\ngoto:\n");
     i = 0;
+    /* This is a normal decl.  */
+    typedef_and_label x;
     /* This needs to parse as label, not as start of decl.  */
- typedef_and_label x;
  typedef_and_label:
  s_loop:
     if (i >= 10) 
@@ -1410,6 +1416,13 @@ void optimize_out_test(void)
 		     0;
 		     }) );
       undefined_function();
+  }
+
+  if (0) {
+      switch (defined_function()) {
+          case 0: undefined_function(); break;
+          default: undefined_function(); break;
+      }
   }
 
   /* Leave the "if(1)return; printf()" in this order and last in the function */
@@ -4302,6 +4315,12 @@ ntf("min=%d\n", 4);
 #line 2222 "test"
     printf("__LINE__=%d __FILE__=%s\n", __LINE__, __FILE__);
 #endif
+
+    printf("\\
+"12\\
+063\\
+n 456\"\n");
+
 }
 
 #define RUN(test) puts("---- " #test " ----"), test(), puts("")
