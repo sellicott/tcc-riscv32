@@ -129,7 +129,6 @@ static void parse_operand(TCCState *s1, Operand *op)
         /* constant value */
         next(); // skip '#' or '$'
     }
-    int old_tok = tok;
     asm_expr(s1, &e);
     op->type = OP_IM32;
     op->e = e;
@@ -144,7 +143,7 @@ static void parse_operand(TCCState *s1, Operand *op)
         
         // get the type and value information from the included symbol
         Sym* sym = op->e.sym;
-        if(reg = asm_parse_regvar(sym->v) != -1){
+        if((reg = asm_parse_regvar(sym->v)) != -1){
             op->type = OP_REG;
             op->reg = reg;
             return;
@@ -153,39 +152,6 @@ static void parse_operand(TCCState *s1, Operand *op)
         // immediate value? do type size checking
         op->type = imm_op_type_from_size(sym->c);
         op->e.v = sym->c;
-
-
-        //if (op->e.sym && op->e.sym->r == VT_CONST | VT_SYM) {
-        //    printf("symbol type: %#x\n", e.sym->type.t);
-        //    printf("symbol value: %#x\n", e.sym->c);
-        //    //printf("asm label: %d\n", e.sym->asm_label);
-        //}
-        char type[8];
-        int value;
-        switch(op->type) {
-            case OP_REG:
-                strcpy(type, "REG");
-                value = op->reg;
-                break;
-            case OP_IM12S:
-                strcpy(type, "IM12S");
-                value = op->e.v;
-                break;
-            case OP_IM21:
-                strcpy(type, "IM21");
-                value = op->e.v;
-                break;
-            case OP_IM32:
-                strcpy(type, "IM32");
-                value = op->e.v;
-                break;
-        }
-        //tcc_error_noabort("Operand type: %s: %d", type, value);
-        //char* token_str = get_tok_str(old_tok, NULL);
-        //if (token_str) {
-        //    tcc_error_noabort("%s", token_str);
-        //}
-        //expect("operand");
     }
 }
 
@@ -211,15 +177,8 @@ static int check_immediate(const Operand *op)
 }
 
 static void asm_emit_opcode(uint32_t opcode) {
-    int ind1 = ind + 4;
-    if (nocode_wanted) {
-        return;
-    }
-    if (ind1 > cur_text_section->data_allocated) {
-        section_realloc(cur_text_section, ind1);
-    }
-    write32le(cur_text_section->data + ind, opcode);
-    ind = ind1;
+    // use the opcode generation code from riscv32-gen.c
+    o(opcode);
 }
 
 // implement helper functions from riscv_utils.h
@@ -360,26 +319,6 @@ static void asm_unary_opcode(TCCState *s1, int token)
     }
 }
 
-static void asm_emit_u(int token, uint32_t opcode, const Operand* rd, const Operand* rs2)
-{
-    if (rd->type != OP_REG) {
-        tcc_error("'%s': Expected destination operand that is a register", get_tok_str(token, NULL));
-        return;
-    }
-    if (rs2->type != OP_IM12S && rs2->type != OP_IM32) {
-        tcc_error("'%s': Expected second source operand that is an immediate value", get_tok_str(token, NULL));
-        return;
-    } else if (rs2->e.v >= 0x100000) {
-        tcc_error("'%s': Expected second source operand that is an immediate value between 0 and 0xfffff", get_tok_str(token, NULL));
-        return;
-    }
-    /* U-type instruction:
-	      31...12 imm[31:12]
-	      11...7 rd
-	      6...0 opcode */
-    gen_le32(opcode | ENCODE_RD(rd->reg) | (rs2->e.v << 12));
-}
-
 static void asm_binary_pseudocode(TCCState* s1, int token)
 {
     Operand src, dst;
@@ -428,8 +367,8 @@ static void asm_branch_zero_opcode(TCCState* s1, int token)
     offset = imm.e.v;
     if (offset > 0xfff) {
         tcc_error("'%s': Expected third operand that is an immediate value between 0 and 0xfff\n"
-        "received: %d",
-         get_tok_str(token, NULL), imm.e.v);
+                  "received: %ld",
+                  get_tok_str(token, NULL), imm.e.v);
         return;
     }
     if (offset & 1) {
@@ -530,8 +469,8 @@ static void asm_branch_opcode(TCCState* s1, int token)
     offset = ops[2].e.v;
     if (offset > 0xfff) {
         tcc_error("'%s': Expected third operand that is an immediate value between 0 and 0xfff\n"
-        "received: %d",
-         get_tok_str(token, NULL), ops[2].e.v);
+                  "received: %ld",
+                  get_tok_str(token, NULL), ops[2].e.v);
         return;
     }
     if (offset & 1) {
@@ -571,6 +510,7 @@ static void asm_binary_register_opcode(TCCState *s1, int token)
 {
     // start by getting the next three operands and check that they are all registers
     Operand rd, r1, r2;
+    parse_operand(s1, &rd);
     if(!check_register(&rd)){
         tcc_error("'%s': Expected destination to be a register", get_tok_str(token, NULL));
     }

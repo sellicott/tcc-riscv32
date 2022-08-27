@@ -156,7 +156,7 @@ ST_FUNC void relocate_plt(TCCState *s1)
         // current_text_section->data and ind, then replace them with p and 0 respectively
 
         // save the current section and offset
-        unsigned char old_section = cur_text_section->data;
+        unsigned char* old_section = cur_text_section->data;
         int old_ind = ind;
 
         cur_text_section->data = p;
