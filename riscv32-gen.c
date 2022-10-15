@@ -79,19 +79,19 @@ ST_DATA const int reg_classes[NB_REGS] = {
     RC_INT | RC_R(6),
     RC_INT | RC_R(7),
 #ifndef TCC_TARGET_RISCV32_ilp32
-      // Floating point function arguments
-      RC_FLOAT | RC_F(0),
-      RC_FLOAT | RC_F(1),
-      RC_FLOAT | RC_F(2),
-      RC_FLOAT | RC_F(3),
-      RC_FLOAT | RC_F(4),
-      RC_FLOAT | RC_F(5),
-      RC_FLOAT | RC_F(6),
-      RC_FLOAT | RC_F(7),
+    // Floating point function arguments
+    RC_FLOAT | RC_F(0),
+    RC_FLOAT | RC_F(1),
+    RC_FLOAT | RC_F(2),
+    RC_FLOAT | RC_F(3),
+    RC_FLOAT | RC_F(4),
+    RC_FLOAT | RC_F(5),
+    RC_FLOAT | RC_F(6),
+    RC_FLOAT | RC_F(7),
 #endif
-      0,
-      1 << TREG_RA,
-      1 << TREG_SP
+    0,
+    1 << TREG_RA,
+    1 << TREG_SP
 };
 
 #if defined(CONFIG_TCC_BCHECK)
@@ -154,14 +154,13 @@ static int load_symofs(int r, SValue *sv, int forstore)
         Sym label = {0};
         assert(v == VT_CONST);
         if (sv->sym->type.t & VT_STATIC) { // XXX do this per linker relax
-            greloca(cur_text_section, sv->sym, ind,
-                    R_RISCV_PCREL_HI20, sv->c.i);
+            greloca(cur_text_section, sv->sym, ind, R_RISCV_PCREL_HI20, sv->c.i);
             sv->c.i = 0;
         } else {
-            if (((unsigned)fc + (1 << 11)) >> 12)
+            if (((unsigned)fc + (1 << 11)) >> 12) {
                 tcc_error("unimp: large addend for global address (0x%lx)", (long)sv->c.i);
-            greloca(cur_text_section, sv->sym, ind,
-                    R_RISCV_GOT_HI20, 0);
+            }
+            greloca(cur_text_section, sv->sym, ind, R_RISCV_GOT_HI20, 0);
             doload = 1;
         }
         label.type.t = VT_VOID | VT_STATIC;
@@ -169,10 +168,8 @@ static int load_symofs(int r, SValue *sv, int forstore)
         rr = is_ireg(r) ? ireg(r) : 5;
         //o(0x17 | (rr << 7));   // auipc RR, 0 %pcrel_hi(sym)+addend
         emit_AUIPC(rr, 0);// it seems like this needs a different offset value
-        greloca(cur_text_section, &label, ind,
-                (doload || !forstore) ? R_RISCV_PCREL_LO12_I : R_RISCV_PCREL_LO12_S,
-                0
-        );
+        const int type = (doload || !forstore) ? R_RISCV_PCREL_LO12_I : R_RISCV_PCREL_LO12_S;
+        greloca(cur_text_section, &label, ind, type, 0);
         if (doload) {
             emit_LW(rr, rr, 0); // lw RR, 0(RR)
         }
