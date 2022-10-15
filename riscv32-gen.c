@@ -148,8 +148,10 @@ ST_FUNC void o(unsigned int opcode)
 
 static int load_symofs(int r, SValue *sv, int forstore)
 {
-    int rr, doload = 0;
-    int fc = sv->c.i, v = sv->r & VT_VALMASK;
+    int doload = 0;
+    const int t0 = 5;
+    const int rr = is_ireg(r) ? ireg(r) : t0; // default register is t0
+    const int fc = sv->c.i, v = sv->r & VT_VALMASK;
     if (sv->r & VT_SYM) {
         Sym label = {0};
         assert(v == VT_CONST);
@@ -185,7 +187,7 @@ static int load_symofs(int r, SValue *sv, int forstore)
             //ER(0x33, 0, rr, rr, 8, 0); // add RR, RR, s0
             sv->c.i = fc << 20 >> 20;
             emit_LUI(rr, fc);
-            emit_ADD(rr, rr, 8);
+            emit_ADD(rr, rr, s0);
         }
     } else {
         tcc_error("uhh");
@@ -389,7 +391,7 @@ ST_FUNC void load(int r, SValue *sv)
                 break;
         }
     }
-    else if ((masked_stack_reg & ~1) == VT_JMP) { // TODO: What is jump code doing in the comparison function?
+    else if ((masked_stack_reg & ~1) == VT_JMP) {
         int t = masked_stack_reg & 1;
         assert(is_ireg(r));
         emit_ADDI(rd, 0, t); // addi Rd, x0, t
@@ -625,8 +627,7 @@ ST_FUNC void gfunc_call(int nb_args)
         sv->type.t &= ~VT_ARRAY; // XXX this should be done in tccgen.c
         size = type_size(&sv->type, &align);
         if (size > 16) {
-            if (align < XLEN)
-              align = XLEN;
+            align = (align < XLEN) ? align : XLEN;
             tempspace = (tempspace + align - 1) & -align;
             tempofs = tempspace;
             tempspace += size;
@@ -689,9 +690,10 @@ ST_FUNC void gfunc_call(int nb_args)
             emit_LUI(t0, -stack_add);
             emit_ADDI(t0, t0, -stack_add);
             emit_ADD(sp, sp, t0);
+        } else {
+            //emit_I(0x13, 0, 2, 2, -stack_add);   // addi sp, sp, -adj
+            emit_ADDI(sp, sp, -stack_add);
         }
-        else
-            emit_I(0x13, 0, 2, 2, -stack_add);   // addi sp, sp, -adj
         for (i = ofs = 0; i < nb_args; i++) {
             if (info[i] & (64 | 32)) {
                 vrotb(nb_args - i);
@@ -775,8 +777,9 @@ ST_FUNC void gfunc_call(int nb_args)
                 vtop->type = char_pointer_type;
                 vpushi(ii >> 20);
 #ifdef CONFIG_TCC_BCHECK
-		if ((origtype.t & VT_BTYPE) == VT_STRUCT)
+                if ((origtype.t & VT_BTYPE) == VT_STRUCT) {
                     tcc_state->do_bounds_check = 0;
+                }
 #endif
                 gen_op('+');
 #ifdef CONFIG_TCC_BCHECK
