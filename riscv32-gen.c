@@ -167,7 +167,6 @@ static int load_symofs(int r, SValue *sv, int forstore)
         }
         label.type.t = VT_VOID | VT_STATIC;
         put_extern_sym(&label, cur_text_section, ind, 0);
-        rr = is_ireg(r) ? ireg(r) : 5;
         //o(0x17 | (rr << 7));   // auipc RR, 0 %pcrel_hi(sym)+addend
         emit_AUIPC(rr, 0);// it seems like this needs a different offset value
         const int type = (doload || !forstore) ? R_RISCV_PCREL_LO12_I : R_RISCV_PCREL_LO12_S;
@@ -182,7 +181,7 @@ static int load_symofs(int r, SValue *sv, int forstore)
         }
         // todo clean up check
         if (((unsigned)fc + (1 << 11)) >> 12) {
-            rr = is_ireg(r) ? ireg(r) : 5; // t0
+            const int s0 = 8; // s0
             //o(0x37 | (rr << 7) | ((0x800 + fc) & 0xfffff000)); //lui RR, upper(fc)
             //ER(0x33, 0, rr, rr, 8, 0); // add RR, RR, s0
             sv->c.i = fc << 20 >> 20;
