@@ -146,6 +146,33 @@ ST_FUNC void o(unsigned int opcode)
     ind = ind1;
 }
 
+static void EIu(uint32_t opcode, uint32_t func3,
+               uint32_t rd, uint32_t rs1, uint32_t imm)
+{
+    o(opcode | (func3 << 12) | (rd << 7) | (rs1 << 15) | (imm << 20));
+}
+
+static void ER(uint32_t opcode, uint32_t func3,
+               uint32_t rd, uint32_t rs1, uint32_t rs2, uint32_t func7)
+{
+    o(opcode | func3 << 12 | rd << 7 | rs1 << 15 | rs2 << 20 | func7 << 25);
+}
+
+static void EI(uint32_t opcode, uint32_t func3,
+               uint32_t rd, uint32_t rs1, uint32_t imm)
+{
+    assert(! ((imm + (1 << 11)) >> 12));
+    EIu(opcode, func3, rd, rs1, imm);
+}
+
+static void ES(uint32_t opcode, uint32_t func3,
+               uint32_t rs1, uint32_t rs2, uint32_t imm)
+{
+    assert(! ((imm + (1 << 11)) >> 12));
+    o(opcode | (func3 << 12) | ((imm & 0x1f) << 7) | (rs1 << 15)
+      | (rs2 << 20) | ((imm >> 5) << 25));
+}
+
 static int load_symofs(int r, SValue *sv, int forstore)
 {
     int doload = 0;
@@ -335,7 +362,7 @@ ST_FUNC void load(int r, SValue *sv)
     else if (masked_stack_reg < VT_CONST) { /* reg-reg */
         //assert(!lvar_offset); XXX support offseted regs
         if (is_freg(r) && is_freg(masked_stack_reg)){
-          emit_R(0x53, 0, rd, freg(masked_stack_reg), freg(masked_stack_reg), stack_type == VT_DOUBLE ? 0x11 : 0x10); //fsgnj.[sd] Rd, V, V == fmv.[sd] Rd, V
+          ER(0x53, 0, rd, freg(masked_stack_reg), freg(masked_stack_reg), stack_type == VT_DOUBLE ? 0x11 : 0x10); //fsgnj.[sd] Rd, V, V == fmv.[sd] Rd, V
           tcc_internal_error("things be happening");
         }
         else if (is_ireg(r) && is_ireg(masked_stack_reg)){
@@ -368,7 +395,7 @@ ST_FUNC void load(int r, SValue *sv)
                     int t = a; a = b; b = t;
                     inv ^= 1;
                 }
-                emit_R(0x33, (op > TOK_UGT) ? 2 : 3, rd, a, b, 0); // slt[u] d, a, b
+                ER(0x33, (op > TOK_UGT) ? 2 : 3, rd, a, b, 0); // slt[u] d, a, b
                 if (op > TOK_UGT) {
                     emit_SLT(rd, a, b);
                 } else {
@@ -491,7 +518,7 @@ static void gen_bounds_call(int v)
 
     greloca(cur_text_section, sym, ind, R_RISCV_CALL_PLT, 0);
     o(0x17 | (1 << 7));   // auipc TR, 0 %call(func)
-    emit_I(0x67, 0, 1, 1, 0); // jalr  TR, r(TR)
+    EI(0x67, 0, 1, 1, 0); // jalr  TR, r(TR)
 }
 
 static void gen_bounds_prolog(void)
@@ -536,7 +563,7 @@ static void gen_bounds_epilog(void)
         greloca(cur_text_section, sym_data, ind, R_RISCV_GOT_HI20, 0);
         o(0x17 | (10 << 7));    // auipc a0, 0 %pcrel_hi(sym)+addend
         greloca(cur_text_section, &label, ind, R_RISCV_PCREL_LO12_I, 0);
-        emit_I(0x03, 2, 10, 10, 0); // lw a0, 0(a0)
+        EI(0x03, 2, 10, 10, 0); // lw a0, 0(a0)
         gen_bounds_call(TOK___bound_local_new);
         ind = saved_ind;
         label.c = 0; /* force new local ELF symbol */
@@ -549,7 +576,7 @@ static void gen_bounds_epilog(void)
     greloca(cur_text_section, sym_data, ind, R_RISCV_GOT_HI20, 0);
     o(0x17 | (10 << 7));    // auipc a0, 0 %pcrel_hi(sym)+addend
     greloca(cur_text_section, &label, ind, R_RISCV_PCREL_LO12_I, 0);
-    emit_I(0x03, 2, 10, 10, 0); // lw a0, 0(a0)
+    EI(0x03, 2, 10, 10, 0); // lw a0, 0(a0)
     gen_bounds_call(TOK___bound_local_delete);
     o(0x65a26502); /* ld   a0,0(sp)   ld   a1,8(sp)   */
     o(0x61052542); /* fld  fa0,16(sp) addi sp,sp,32   */
@@ -860,8 +887,8 @@ ST_FUNC void gfunc_prolog(Sym *func_sym)
     if (size > 2 * XLEN) {
         loc -= 8;
         func_vc = loc;
-        //ES(0x23, 2, 8, 10 + areg[0]++, loc); // sd a0, loc(s0)
-        emit_SW(8, 10+areg[0]++, loc);
+        ES(0x23, 2, 8, 10 + areg[0]++, loc); // sd a0, loc(s0)
+        //emit_SW(8, 10+areg[0]++, loc);
         tcc_internal_error("I don't think we are handling this case correctly");
     }
     /* define parameters */
@@ -897,15 +924,15 @@ ST_FUNC void gfunc_prolog(Sym *func_sym)
                     assert(i == 1 && regcount == 2 && !(addr & 7));
                     //EI(0x03, 2, 5, 8, addr); // lw t0, addr(s0)
                     emit_LW(t0, s0, addr);
-                    addr += 8;
+                    addr += XLEN;
                     //emit_S(0x23, 2, 8, 5, loc + i*4); // sw t0, loc(s0)
                     emit_SW(t0, s0, loc + i*4);
                 } else if (prc[1+i] == RC_FLOAT) {
                     //emit_S(0x22, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc + (fieldofs[i+1] >> 4)); // fs[wd] FAi, loc(s0)
                     tcc_error("unimp: floating point support");
                 } else {
-                    emit_S(0x23, 2, 8, 10 + areg[0]++, loc + i*8); // sw aX, loc(s0) // XXX
-                    //emit_SW(10 + areg[0]++, loc + i*8);
+                    //ES(0x23, 2, 8, 10 + areg[0]++, loc + i*8); // sw aX, loc(s0) // XXX
+                    emit_SW(10 + areg[0]++, s0, loc+i*XLEN);
                 }
             }
         }
@@ -916,10 +943,11 @@ ST_FUNC void gfunc_prolog(Sym *func_sym)
     func_va_list_ofs = addr;
     num_va_regs = 0;
     if (func_var) {
+        const uint32_t s0 = 8;
         for (; areg[0] < 8; areg[0]++) {
             num_va_regs++;
-            emit_S(0x23, 2, 8, 10 + areg[0], -8 + num_va_regs * 8); // sw aX, loc(s0)
-            //emit_SW(10 + areg[0], -8 + num_va_regs * 8);
+            //ES(0x23, 2, 8, 10 + areg[0], -8 + num_va_regs * 8); // sw aX, loc(s0)
+            emit_SW(10 + areg[0], s0, -8 + num_va_regs * 8);
         }
     }
 #ifdef CONFIG_TCC_BCHECK
@@ -1003,24 +1031,28 @@ ST_FUNC void gfunc_epilog(void)
     emit_JALR(zero, ra, 0);
     large_ofs_ind = ind;
     if (v >= (1 << 11)) {
-        emit_I(0x13, 0, 8, 2, d - num_va_regs * 8);      // addi s0, sp, d
-        o(0x37 | (5 << 7) | ((0x800 + (v-16)) & 0xfffff000)); //lui t0, upper(v)
-        emit_I(0x13, 0, 5, 5, (v-16) << 20 >> 20); // addi t0, t0, lo(v)
-        emit_R(0x33, 0, 2, 2, 5, 0x20); // sub sp, sp, t0
+        //EI(0x13, 0, 8, 2, d - num_va_regs * 8);      // addi s0, sp, d
+        //o(0x37 | (5 << 7) | ((0x800 + (v-16)) & 0xfffff000)); //lui t0, upper(v)
+        //EI(0x13, 0, 5, 5, (v-16) << 20 >> 20); // addi t0, t0, lo(v)
+        //ER(0x33, 0, 2, 2, 5, 0x20); // sub sp, sp, t0
+        emit_ADDI(s0, sp, d);
+        emit_LUI(t0, v);
+        emit_ADDI(t0, t0, v);
+        emit_SUB(sp, sp, t0);
         gjmp_addr(func_sub_sp_offset + 5*4);
     }
     saved_ind = ind;
 
     ind = func_sub_sp_offset;
-    emit_I(0x13, 0, 2, 2, -d);     // addi sp, sp, -d
-    emit_S(0x23, 2, 2, 1, d - 8 - num_va_regs * 8);  // sw ra, d-8(sp)
-    emit_S(0x23, 2, 2, 8, d - 16 - num_va_regs * 8); // sw s0, d-16(sp)
+    EI(0x13, 0, 2, 2, -d);     // addi sp, sp, -d
+    ES(0x23, 2, 2, 1, d - 8 - num_va_regs * 8);  // sw ra, d-8(sp)
+    ES(0x23, 2, 2, 8, d - 16 - num_va_regs * 8); // sw s0, d-16(sp)
     if (v < (1 << 11))
-        emit_I(0x13, 0, 8, 2, d - num_va_regs * 8);      // addi s0, sp, d
+        EI(0x13, 0, 8, 2, d - num_va_regs * 8);      // addi s0, sp, d
     else
         gjmp_addr(large_ofs_ind);
     if ((ind - func_sub_sp_offset) != 5*4)
-        emit_I(0x13, 0, 0, 0, 0);      // addi x0, x0, 0 == nop
+        EI(0x13, 0, 0, 0, 0);      // addi x0, x0, 0 == nop
     ind = saved_ind;
 }
 
@@ -1375,7 +1407,7 @@ ST_FUNC void gen_cvt_itof(int t)
         vtop++;
         vtop->r = dr;
         dr = freg(dr);
-        emit_I(0x53, 7, dr, rr, ((0x68 | (t == VT_DOUBLE ? 1 : 0)) << 5) | (u ? 1 : 0) | (l ? 2 : 0)); // fcvt.[sd].[wl][u]
+        EI(0x53, 7, dr, rr, ((0x68 | (t == VT_DOUBLE ? 1 : 0)) << 5) | (u ? 1 : 0) | (l ? 2 : 0)); // fcvt.[sd].[wl][u]
     }
 }
 
@@ -1401,7 +1433,7 @@ ST_FUNC void gen_cvt_ftoi(int t)
         vtop++;
         vtop->r = dr;
         dr = ireg(dr);
-        emit_I(0x53, 1, dr, rr, ((0x60 | (ft == VT_DOUBLE ? 1 : 0)) << 5) | (u ? 1 : 0) | (l ? 2 : 0)); // fcvt.[wl][u].[sd] rtz
+        EI(0x53, 1, dr, rr, ((0x60 | (ft == VT_DOUBLE ? 1 : 0)) << 5) | (u ? 1 : 0) | (l ? 2 : 0)); // fcvt.[wl][u].[sd] rtz
     }
 }
 
@@ -1470,12 +1502,12 @@ ST_FUNC void gen_vla_alloc(CType *type, int align)
     rr = ireg(gv(RC_INT));
 #if defined(CONFIG_TCC_BCHECK)
     if (tcc_state->do_bounds_check)
-        emit_I(0x13, 0, rr, rr, 15+1);   // addi RR, RR, 15+1
+        EI(0x13, 0, rr, rr, 15+1);   // addi RR, RR, 15+1
     else
 #endif
-    emit_I(0x13, 0, rr, rr, 15);   // addi RR, RR, 15
-    emit_I(0x13, 7, rr, rr, -16);  // andi, RR, RR, -16
-    emit_R(0x33, 0, 2, 2, rr, 0x20); // sub sp, sp, rr
+    EI(0x13, 0, rr, rr, 15);   // addi RR, RR, 15
+    EI(0x13, 7, rr, rr, -16);  // andi, RR, RR, -16
+    ER(0x33, 0, 2, 2, rr, 0x20); // sub sp, sp, rr
     vpop();
 #if defined(CONFIG_TCC_BCHECK)
     if (tcc_state->do_bounds_check) {
