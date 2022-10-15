@@ -132,7 +132,7 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 // TODO
 
 // Jump and Link
-#define emit_J_inst(offset)      (emit_JAL(0, offset))
+#define emit_J_inst(offset) (emit_JAL(0, offset))
 #define emit_JAL_x1(offset) (emit_JAL(1, offset))
 #define emit_JR(rs)         (emit_JALR(0, rs, 0))
 #define emit_JALR_x1(rs)    (emit_JALR(1, rs, 0))
