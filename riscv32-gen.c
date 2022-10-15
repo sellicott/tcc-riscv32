@@ -175,7 +175,6 @@ static int load_symofs(int r, SValue *sv, int forstore)
             emit_LW(rr, rr, 0); // lw RR, 0(RR)
         }
     } else if (v == VT_LOCAL || v == VT_LLOCAL) {
-        rr = 8; // s0
         if (fc != sv->c.i) {
           tcc_error("unimp: store(giant local off) (0x%lx)", (long)sv->c.i);
         }
