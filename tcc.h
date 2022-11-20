@@ -65,12 +65,11 @@ extern long double strtold (const char *__nptr, char **__endptr);
 # ifndef __GNUC__
 #  define strtold (long double)strtod
 #  define strtof (float)strtod
-#  ifdef _WIN64
+#  ifndef strtoll
 #   define strtoll _strtoi64
+#  endif
+#  ifndef strtoull
 #   define strtoull _strtoui64
-#  else
-#   define strtoll strtol
-#   define strtoull strtoul
 #  endif
 # endif
 # ifdef LIBTCC_AS_DLL
@@ -359,6 +358,10 @@ extern long double strtold (const char *__nptr, char **__endptr);
 /* (target specific) libtcc1.a */
 #ifndef TCC_LIBTCC1
 # define TCC_LIBTCC1 "libtcc1.a"
+#endif
+
+#ifndef CONFIG_TCC_CROSSPREFIX
+# define CONFIG_TCC_CROSSPREFIX ""
 #endif
 
 /* library to use with CONFIG_USE_LIBGCC instead of libtcc1.a */
@@ -1830,8 +1833,16 @@ ST_FUNC void tcc_tcov_reset_ind(TCCState *s1);
 #define dwarf_str_section       s1->dwarf_str_section
 #define dwarf_line_str_section  s1->dwarf_line_str_section
 
+/* default dwarf version for "-g". use 0 to emit stab debug infos */
 #ifndef DWARF_VERSION
 # define DWARF_VERSION 0
+#endif
+
+/* default dwarf version for "-gdwarf" */
+#ifdef TCC_TARGET_MACHO
+# define DEFAULT_DWARF_VERSION 2
+#else
+# define DEFAULT_DWARF_VERSION 5
 #endif
 
 #if defined TCC_TARGET_PE
