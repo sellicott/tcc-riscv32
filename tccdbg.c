@@ -2029,7 +2029,7 @@ ST_FUNC void tcc_tcov_block_begin(TCCState *s1)
         sv.sym = &label;
 #if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64 || \
     defined TCC_TARGET_ARM || defined TCC_TARGET_ARM64 || \
-    defined TCC_TARGET_RISCV64
+    defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
         gen_increment_tcov (&sv);
 #else
         vpushv(&sv);
