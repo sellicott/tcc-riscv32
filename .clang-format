@@ -1,0 +1,45 @@
+
+# Basic style rules by Charles Lohr
+BasedOnStyle: Microsoft
+AccessModifierOffset: -4
+AlwaysBreakTemplateDeclarations: 'Yes'
+AlignTrailingComments: 'true'
+AllowAllParametersOfDeclarationOnNextLine: 'false'
+BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Stroustrup  
+BreakConstructorInitializers: BeforeComma
+ColumnLimit: '100'
+ExperimentalAutoDetectBinPacking: 'false'
+MaxEmptyLinesToKeep: 2
+PointerAlignment: Right
+
+# Options for spaces around parentheses
+SpaceInEmptyParentheses: 'false'
+SpacesInAngles: 'true'
+SpacesInContainerLiterals: 'true'
+SpacesInSquareBrackets: 'true'
+SpacesInParentheses: 'true'
+SpacesInConditionalStatement: 'true'
+SpaceBeforeParens: Never
+
+# Indentation Rules
+TabWidth: '4'
+UseTab: Never 
+FixNamespaceComments: 'true'
+IndentCaseLabels: 'true'
+NamespaceIndentation: None
+
+# Alignment Rules
+AlignAfterOpenBracket: DontAlign
+AlignOperands: AlignAfterOperator
+AlignConsecutiveAssignments: false
+AlignConsecutiveMacros: false
+AlignTrailingComments: false
+AlignEscapedNewlines: Left
+
+# Single Line rules
+AllowShortBlocksOnASingleLine: Always
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
