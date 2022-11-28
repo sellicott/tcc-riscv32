@@ -1700,7 +1700,7 @@ ST_FUNC void gen_cvt_csti(int t);
 ST_FUNC void gen_increment_tcov (SValue *sv);
 #endif
 
-/* ------------ riscv64-gen.c ------------ */
+/* ------------ riscv{64,32}-gen.c ------------ */
 #if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
 ST_FUNC void gen_opl(int op);
 //ST_FUNC void gfunc_return(CType *func_type);
