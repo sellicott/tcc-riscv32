@@ -415,9 +415,10 @@ static void asm_binary_opcode( TCCState *s1, int token )
     uint32_t rd = ops[ 0 ].reg;
     uint32_t imm = ops[ 1 ].e.v;
 
+    int ind_bak;
     switch( token ) {
         case TOK_ASM_la:
-            int ind_bak = ind;
+            ind_bak = ind;
             // both instructions need an entry use hacky method to get it to work
             generate_symbol_reallocation( &ops[ 1 ], R_RISCV_HI20 );
             ind = ind + 4;
