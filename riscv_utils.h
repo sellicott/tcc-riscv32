@@ -32,9 +32,16 @@ void emit_U(uint32_t imm, uint32_t rd, uint32_t opcode);
 // jump instructions
 void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 
+// Macros for masking values for immediate operations
+#define IMM_LOW(imm)     (imm & 0x00000FFF)
+#define IMM_HIGH(imm)    (imm & 0xFFFFF000)
+// macro to check if the immediate value will fall into the high portion of the
+// immediate space
+#define IS_IMM_HIGH(imm) ( (uint32_t) (IMM_HIGH((imm + 0x800)) >> 12) )
 
 // Now for a big table of opcodes (RV32I) from p130 of ISA documentation
 // https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf
+// clang-format off
 #define emit_LUI(rd, imm)           (emit_U((uint32_t) imm, rd,  0x37))
 #define emit_AUIPC(rd, imm)         (emit_U((uint32_t) imm, rd,  0x17)) 
 #define emit_JAL(rd, imm)           (emit_J((uint32_t) imm, rd,  0x6f))
@@ -88,6 +95,7 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 #define emit_DIVU(rd, rs1, rs2)     (emit_R(0x01, rs2, rs1, 0x5, rd, 0x33))
 #define emit_REM(rd, rs1, rs2)      (emit_R(0x01, rs2, rs1, 0x6, rd, 0x33))
 #define emit_REMU(rd, rs1, rs2)     (emit_R(0x01, rs2, rs1, 0x7, rd, 0x33))
+// clang-format on
 
 
 // Pseudo instructions (from https://risc-v.guru/instructions/)
@@ -111,6 +119,7 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 //#define emit_SEXT_W(rd, rs) (emit_ADDIW(rd, rs, 0))
 
 // branches
+// clang-format off
 #define emit_BEQZ(rs, offset)   (emit_BEQ(rs, 0, offset))
 #define emit_BNEZ(rs, offset)   (emit_BNE(rs, 0, offset))
 #define emit_BLEZ(rs, offset)   (emit_BGE(0, rs, offset))
@@ -180,5 +189,6 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 #define emit_RDTIMEH(rd)    (emit_CSRRS(rd, 0xc81, 0))
 #define emit_RDINSTRET(rd)  (emit_CSRRS(rd, 0xc02, 0))
 #define emit_RDINSTRETH(rd) (emit_CSRRS(rd, 0xc82, 0))
+// clang-format on
 
 #endif
