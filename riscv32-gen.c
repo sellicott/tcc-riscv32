@@ -192,7 +192,7 @@ static int load_symofs( int r, SValue *sv, int forstore )
         if( ( (unsigned)sv_constant + ( 1 << 11 ) ) >> 12 ) {
             // o(0x37 | (rr << 7) | ((0x800 + fc) & 0xfffff000)); //lui RR, upper(fc)
             // ER(0x33, 0, rr, rr, 8, 0); // add RR, RR, s0
-            sv->c.i = IMM_LOW(sv_constant);
+            sv->c.i = IMM_LOW( sv_constant );
             emit_LUI( rr, sv_constant );
             emit_ADD( rr, rr, s0 );
         }
@@ -483,15 +483,15 @@ ST_FUNC void store( int r, SValue *sv )
         offset = 0; // XXX support offsets regs
     }
     else if( stack_reg_type == VT_CONST ) {
-        uint64_t offset_hi = (sv->c.i >> 32);
+        uint64_t offset_hi = ( sv->c.i >> 32 );
         if( offset_hi != 0 ) {
             load_large_constant( loc_reg, offset, offset_hi );
             offset &= 0xff;
         }
         else {
             // o(0x37 | (ptrreg << 7) | ((0x800 + fc) & 0xfffff000)); //lui RR, upper(fc)
-            emit_LUI( loc_reg, IMM_HIGH(offset) );
-            offset = IMM_LOW(offset);
+            emit_LUI( loc_reg, IMM_HIGH( offset ) );
+            offset = IMM_LOW( offset );
         }
     }
     else {
@@ -938,10 +938,10 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
     if( size > 2 * XLEN ) {
         loc -= 8;
         func_vc = loc;
-        //ES( 0x23, 2, 8, 10 + areg[ 0 ]++, loc ); // sd a0, loc(s0)
+        // ES( 0x23, 2, 8, 10 + areg[ 0 ]++, loc ); // sd a0, loc(s0)
         int loc_reg = 8; // s0
-        int src_reg = ireg( areg[0]++ );
-        emit_SW(loc_reg, src_reg, loc);
+        int src_reg = ireg( areg[ 0 ]++ );
+        emit_SW( loc_reg, src_reg, loc );
         tcc_internal_error( "I don't think we are handling this case correctly" );
     }
     /* define parameters */
@@ -1003,7 +1003,7 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
         for( ; areg[ 0 ] < 8; areg[ 0 ]++ ) {
             num_va_regs++;
             // ES(0x23, 2, 8, 10 + areg[0], -8 + num_va_regs * 8); // sw aX, loc(s0)
-            emit_SW( s0, ireg( areg[0] ), -8 + num_va_regs * 8 );
+            emit_SW( s0, ireg( areg[ 0 ] ), -8 + num_va_regs * 8 );
         }
     }
 #ifdef CONFIG_TCC_BCHECK
