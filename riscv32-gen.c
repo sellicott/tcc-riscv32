@@ -340,7 +340,8 @@ ST_FUNC void load( int r, SValue *sv )
 
         if( LARGE_IMM( lvar_offset ) ) {
             rs1 = dest_reg;
-            emit_LUI( dest_reg, lvar_offset );
+            // add 0x800 so when the lower (sign extended) bits get added, they don't ruin things
+            emit_LUI( dest_reg, IMM_HIGH( lvar_offset + 0x800 )  );
         }
         if( lvar_offset || ( dest_reg != rs1 ) || do32bit || ( stack_reg & VT_SYM ) ) {
             // EI(0x13 | do32bit, 0, rd, rs1, lvar_offset << 20 >> 20); // addi[w] R, x0|R,
