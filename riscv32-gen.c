@@ -167,7 +167,7 @@ static int load_symofs( int r, SValue *sv, int forstore )
             sv->c.i = 0;
         }
         else {
-            if( IS_IMM_HIGH( sv_constant ) ) {
+            if( LARGE_IMM( sv_constant ) ) {
                 tcc_error( "unimp: large addend for global address (0x%lx)", (long)sv->c.i );
             }
             greloca( cur_text_section, sv->sym, ind, R_RISCV_GOT_HI20, 0 );
@@ -338,9 +338,7 @@ ST_FUNC void load( int r, SValue *sv )
             }
         }
 
-        if( ( (unsigned)lvar_offset + ( 1 << 11 ) ) >> 12 ) {
-            // o(0x37 | (rd << 7) | ((0x800 + lvar_offset) & 0xfffff000)), rs1 = rd; //lui Rd,
-            // upper(lvar_offset)
+        if( LARGE_IMM( lvar_offset ) ) {
             rs1 = dest_reg;
             emit_LUI( dest_reg, lvar_offset );
         }
