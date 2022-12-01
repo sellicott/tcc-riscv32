@@ -5,6 +5,25 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "rv32 compile charles_main.c",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/riscv32-tcc",
+            "args": ["-g", "-Og", "-c", "charles_test.c"],
+            "stopAtEntry": false,
+            "cwd": "/home/nebk/Documents/programs/risc-v/espwebc3/docs/dev/qemu-metal",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+        },
+        {
             "name": "rv32 compile uart16550.c",
             "type": "cppdbg",
             "request": "launch",
@@ -22,8 +41,6 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "C/C++: gcc build active file",
-            "miDebuggerPath": "/usr/bin/gdb"
         },
         {
             "name": "rv64 compile uart16550.c",
@@ -43,8 +60,6 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "C/C++: gcc build active file",
-            "miDebuggerPath": "/usr/bin/gdb"
-        }
+        },
     ]
 }
