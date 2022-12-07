@@ -7,6 +7,8 @@
  * instruction to generate the correct opcode from the memeonic.
  */
 
+#include <stdint.h>
+
 
 // Definitions for various instruction types: implemented in riscv32-asm.c
 

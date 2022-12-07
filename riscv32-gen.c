@@ -930,7 +930,8 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
     func_sub_sp_offset = ind;
     ind += 5 * 4;
 
-    areg[ 0 ] = 0, areg[ 1 ] = 0;
+    areg[ 0 ] = 0; 
+    areg[ 1 ] = 0;
     addr = 0;
     /* if the function returns by reference, then add an
        implicit pointer parameter */
@@ -1139,7 +1140,7 @@ ST_FUNC void gsym_addr( int t_, int a_ )
 
     // turn on code generation, but save the state so we can turn it off again if necessary
     int nocode_wanted_old = nocode_wanted;
-    CODE_ON();
+    //CODE_ON();
 
     while( t ) {
         // get the location that we need to write our next value to.

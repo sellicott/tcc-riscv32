@@ -249,6 +249,9 @@ case "$cpu" in
   riscv64)
     cpu="riscv64"
   ;;
+  riscv32)
+    cpu="riscv32"
+  ;;
   *)
     echo "Unsupported CPU"
     exit 1
