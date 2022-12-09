@@ -154,53 +154,65 @@ static void ES( uint32_t opcode, uint32_t func3, uint32_t rs1, uint32_t rs2, uin
 static int load_symofs( int r, SValue *sv, int forstore )
 {
     int doload = 0;
-    const int t0 = 5;
-    int rr = is_ireg( r ) ? ireg( r ) : t0; // default register is t0
-    const int sv_constant = sv->c.i; // stack value constant
-    const int v = sv->r & VT_VALMASK;
+    int t0 = 5; // t0 = x5 = 5
+    int rd; // return register
+    int sv_constant = sv->c.i; // stack value constant
+    int stack_value = sv->r & VT_VALMASK; // stack value
 
+    rd = is_ireg( r ) ? ireg( r ) : t0; // default register is t0
+
+    // check if we are dealing with a named symbol
     if( sv->r & VT_SYM ) {
+        addr_t addend = 0; // offset value when generating a relocation entry
+        int type;
         Sym label = { 0 };
-        assert( v == VT_CONST );
-        if( sv->sym->type.t & VT_STATIC ) { // XXX do this per linker relax
-            greloca( cur_text_section, sv->sym, ind, R_RISCV_PCREL_HI20, sv->c.i );
-            sv->c.i = 0;
-        }
-        else {
-            if( LARGE_IMM( sv_constant ) ) {
-                tcc_error( "unimp: large addend for global address (0x%lx)", (long)sv->c.i );
-            }
-            greloca( cur_text_section, sv->sym, ind, R_RISCV_GOT_HI20, 0 );
-            doload = 1;
-        }
+        doload = 1;
         label.type.t = VT_VOID | VT_STATIC;
+
+        assert( stack_value == VT_CONST );
+
+        if( LARGE_IMM( sv_constant ) ) {
+            tcc_error( "unimp: large addend for global address (0x%lx)", (long)sv_constant );
+        }
+
+        if( sv->sym->type.t & VT_STATIC ) { // XXX do this per linker relax
+            addend = sv_constant;
+            sv->c.i = 0;
+            // offset is probably loaded already, we don't need to generate a load in this case 
+            doload = 0; 
+        }
+
+        // generate a relocation entry with the generated offset
+        greloca( cur_text_section, sv->sym, ind, R_RISCV_GOT_HI20, addend );
+
         put_extern_sym( &label, cur_text_section, ind, 0 );
-        // o(0x17 | (rr << 7));   // auipc RR, 0 %pcrel_hi(sym)+addend
-        emit_AUIPC( rr, 0 ); // it seems like this needs a different offset value
-        const int type = ( doload || !forstore ) ? R_RISCV_PCREL_LO12_I : R_RISCV_PCREL_LO12_S;
+        // immediate value is 0 so that the linker can load values into it
+        emit_AUIPC( rd, 0 ); 
+
+        type = ( doload || !forstore ) ? R_RISCV_PCREL_LO12_I : R_RISCV_PCREL_LO12_S;
         greloca( cur_text_section, &label, ind, type, 0 );
+
         if( doload ) {
-            emit_LW( rr, rr, 0 ); // lw RR, 0(RR)
+            emit_LW( rd, rd, 0 ); // lw RR, 0(RR)
         }
     }
-    else if( v == VT_LOCAL || v == VT_LLOCAL ) {
-        const int s0 = 8; // s0
-        rr = s0;
+    else if( stack_value == VT_LOCAL || stack_value == VT_LLOCAL ) {
+        int s0;
+        s0 = 8; // s0
+        rd = s0;
         if( sv_constant != sv->c.i ) {
             tcc_error( "unimp: store(giant local off) (0x%lx)", (long)sv->c.i );
         }
-        if( ( (unsigned)sv_constant + ( 1 << 11 ) ) >> 12 ) {
-            // o(0x37 | (rr << 7) | ((0x800 + fc) & 0xfffff000)); //lui RR, upper(fc)
-            // ER(0x33, 0, rr, rr, 8, 0); // add RR, RR, s0
+        if( LARGE_IMM( sv_constant ) ) {
             sv->c.i = IMM_LOW( sv_constant );
-            emit_LUI( rr, sv_constant );
-            emit_ADD( rr, rr, s0 );
+            emit_LUI( rd, sv_constant );
+            emit_ADD( rd, rd, s0 );
         }
     }
     else {
         tcc_error( "uhh" );
     }
-    return rr;
+    return rd;
 }
 
 static void load_large_constant( int rr, int fc, uint32_t pi )
