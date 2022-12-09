@@ -126,6 +126,13 @@ ST_FUNC void relocate_plt(TCCState *s1)
     if (p < p_end) {
         uint64_t plt = s1->plt->sh_addr;
         uint64_t got = s1->got->sh_addr;
+        unsigned char* old_section;
+        int old_ind;
+
+        const uint32_t t0 = 5;
+        const uint32_t t1 = 6;
+        const uint32_t t2 = 7;
+        const uint32_t t3 = 28;
         uint64_t off = (got - plt + 0x800) >> 12;
         if ((off + ((uint32_t)1 << 20)) >> 21)
             tcc_error("Failed relocating PLT (off=0x%lx, got=0x%lx, plt=0x%lx)", (long)off, (long)got, (long)plt);
@@ -142,10 +149,6 @@ ST_FUNC void relocate_plt(TCCState *s1)
         // p += 32;
 
         // Define constants for the register values (see the riscv assembly manual for values)
-        const uint32_t t0 = 5;
-        const uint32_t t1 = 6;
-        const uint32_t t2 = 7;
-        const uint32_t t3 = 28;
 
         printf("in the relocate_plt function\n");
 
@@ -156,8 +159,8 @@ ST_FUNC void relocate_plt(TCCState *s1)
         // current_text_section->data and ind, then replace them with p and 0 respectively
 
         // save the current section and offset
-        unsigned char* old_section = cur_text_section->data;
-        int old_ind = ind;
+        old_section = cur_text_section->data;
+        old_ind = ind;
 
         cur_text_section->data = p;
         ind = 0;
