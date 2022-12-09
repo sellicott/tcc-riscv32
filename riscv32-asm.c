@@ -178,11 +178,6 @@ static int check_immediate( const Operand *op )
     return 1;
 }
 
-static void asm_emit_opcode( uint32_t opcode )
-{
-    // use the opcode generation code from riscv32-gen.c
-    o( opcode );
-}
 
 // implement helper functions from riscv_utils.h
 // Register instructions (math and stuff)
@@ -192,7 +187,7 @@ void emit_R(
     const uint32_t instruction =
         ( funct7 << 25 ) | ( rs2 << 20 ) | ( rs1 << 15 ) | ( funct3 << 12 ) | ( rd << 7 ) | opcode;
 
-    asm_emit_opcode( instruction );
+    o( instruction );
 }
 
 // immediate instructions
@@ -201,7 +196,7 @@ void emit_I( uint32_t imm, uint32_t rs1, uint32_t funct3, uint32_t rd, uint32_t 
     const uint32_t instruction =
         ( imm << 20 ) | ( rs1 << 15 ) | ( funct3 << 12 ) | ( rd << 7 ) | opcode;
 
-    asm_emit_opcode( instruction );
+    o( instruction );
 }
 
 // store instructions
@@ -213,7 +208,7 @@ void emit_S( uint32_t imm, uint32_t rs2, uint32_t rs1, uint32_t funct3, uint32_t
     const uint32_t instruction = ( imm_h << 25 ) | ( rs2 << 20 ) | ( rs1 << 15 ) |
                                  ( funct3 << 12 ) | ( imm_l << 7 ) | opcode;
 
-    asm_emit_opcode( instruction );
+    o( instruction );
 }
 
 // branch instructions
@@ -225,7 +220,7 @@ void emit_B( uint32_t imm, uint32_t rs2, uint32_t rs1, uint32_t funct3, uint32_t
     const uint32_t instruction = ( imm_h << 25 ) | ( rs2 << 20 ) | ( rs1 << 15 ) |
                                  ( funct3 << 12 ) | ( imm_l << 7 ) | opcode;
 
-    asm_emit_opcode( instruction );
+    o( instruction );
 }
 
 // big immediate instructions (LUI and AUIPC)
@@ -233,7 +228,7 @@ void emit_U( uint32_t imm, uint32_t rd, uint32_t opcode )
 {
     // only want bits 31:12 of immediate
     const uint32_t instruction = ( 0xfffff000 & imm ) | ( rd << 7 ) | opcode;
-    asm_emit_opcode( instruction );
+    o( instruction );
 }
 
 // jump instructions
@@ -249,7 +244,7 @@ void emit_J( uint32_t imm, uint32_t rd, uint32_t opcode )
                                ( ( ( imm >> 1 ) & 0x3ff ) << 21 ) | ( ( ( imm >> 20 ) & 1 ) << 31 );
 
     const uint32_t instruction = immediate | ( rd << 7 ) | opcode;
-    asm_emit_opcode( instruction );
+    o( instruction );
 }
 
 /*
@@ -271,7 +266,7 @@ static void asm_nullary_opcode( TCCState *s1, int token )
     switch( token ) {
         case TOK_ASM_wfi:
             // I don't really know what WFI is
-            asm_emit_opcode( ( 0x1C << 2 ) | 3 | ( 0x105 << 20 ) );
+            o( ( 0x1C << 2 ) | 3 | ( 0x105 << 20 ) );
             return;
 
         case TOK_ASM_ret: emit_RET(); return;
@@ -284,6 +279,7 @@ static void asm_nullary_opcode( TCCState *s1, int token )
 static void asm_unary_opcode( TCCState *s1, int token )
 {
     Operand op;
+    int rd;
     parse_operand( s1, &op );
     if( token != TOK_ASM_j && op.type != OP_REG ) {
         expect( "register" );
@@ -294,7 +290,7 @@ static void asm_unary_opcode( TCCState *s1, int token )
         return;
     }
 
-    int rd = op.reg;
+    rd = op.reg;
 
     switch( token ) {
         case TOK_ASM_j: emit_J_inst( op.e.v ); return;
