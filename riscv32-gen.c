@@ -1142,39 +1142,33 @@ ST_FUNC void gen_fill_nops( int bytes )
 }
 
 // Patch all branches in list pointed to by t to branch to a:
-ST_FUNC void gsym_addr( int t_, int a_ )
+ST_FUNC void gsym_addr( int branch_list, int target_address )
 {
-    uint32_t t = t_;
-    uint32_t a = a_;
+    uint32_t current_branch = branch_list;
+    uint32_t target_address_uint = target_address;
 
-    // save the current location so that we can go back to it at the end of the function.
-    unsigned char *base_ptr = cur_text_section->data;
-    int original_ind = ind;
 
+    // hack so that we can use emmit_<opcode> macros to generate code
     // turn on code generation, but save the state so we can turn it off again if necessary
-    int nocode_wanted_old = nocode_wanted;
-    //CODE_ON();
+    int nocode_wanted_old = nocode_wanted; // save the old no code state
+    int original_ind = ind;                // save the current pointer location
+    nocode_wanted &= ~0x20000000;          // copy code from the NO_CODE macro (move to tcc.h?)
 
-    while( t ) {
+    while( current_branch ) {
+        int32_t rel_jmp;
         // get the location that we need to write our next value to.
-        unsigned char *ptr = base_ptr + t;
-        // update the offset from the data section, so that we can use our instruction writing
-        // macros
-        ind = t;
-
-        // rel_jmp can have up to a +-1MiB range (20bits 0 to 0x1fffff)
-        int32_t rel_jmp = a - t;
-        if( ( rel_jmp + ( 1 << 21 ) ) & ~( ( 1U << 22 ) - 2 ) ) {
-            tcc_error( "out-of-range branch chain: %#03x", rel_jmp );
-        }
-        // if ((int) rel_jmp > 0xfffff || (int) rel_jmp < -0xfffff) {
-        //   tcc_error("out-of-range branch chain (> +-1MiB): %d", rel_jmp);
-        //   goto cleanup;
-        // }
-
+        unsigned char* ptr = cur_text_section->data + current_branch;
         // get the offset for the next iteration
-        t = read32le( ptr );
+        current_branch = read32le( ptr );
+        // note that the ind variable is a global variable used to set the write location in the 
+        // generation code
+        ind = (int) ptr;
+        // rel_jmp can have up to a +-1MiB range (20bits 0 to 0x1fffff)
+        rel_jmp = target_address_uint - current_branch;
 
+        if( ( rel_jmp + ( 1 << 21 ) ) & ~( ( 1U << 22 ) - 2 ) ) {
+            tcc_error("out-of-range branch chain (> +-1MiB): %#03x", rel_jmp);
+        }
 
         // generate the jmp table
         if( rel_jmp == 4 ) {
@@ -1185,6 +1179,7 @@ ST_FUNC void gsym_addr( int t_, int a_ )
         else {
             emit_J_inst( rel_jmp );
         }
+
     }
 
     // reset the nocode_wanted variable back to its previous state
