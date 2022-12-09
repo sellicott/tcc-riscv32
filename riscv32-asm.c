@@ -352,7 +352,7 @@ static void asm_branch_zero_opcode( TCCState *s1, int token )
     offset = imm.e.v;
     if( offset > 0xfff ) {
         tcc_error( "'%s': Expected third operand that is an immediate value between 0 and 0xfff\n"
-                   "received: %ld",
+                   "received: %lld",
             get_tok_str( token, NULL ), imm.e.v );
         return;
     }
