@@ -1134,7 +1134,6 @@ ST_FUNC void gsym_addr( int branch_list, int target_address )
     uint32_t current_branch = branch_list;
     uint32_t target_address_uint = target_address;
 
-
     // hack so that we can use emmit_<opcode> macros to generate code
     // turn on code generation, but save the state so we can turn it off again if necessary
     int nocode_wanted_old = nocode_wanted; // save the old no code state
@@ -1148,8 +1147,8 @@ ST_FUNC void gsym_addr( int branch_list, int target_address )
         // get the offset for the next iteration
         current_branch = read32le( ptr );
         // note that the ind variable is a global variable used to set the write location in the 
-        // generation code
-        ind = (int) ptr;
+        // generation code it is the offset from cur_text_section->data
+        ind = current_branch; 
         // rel_jmp can have up to a +-1MiB range (20bits 0 to 0x1fffff)
         rel_jmp = target_address_uint - current_branch;
 
@@ -1169,10 +1168,8 @@ ST_FUNC void gsym_addr( int branch_list, int target_address )
 
     }
 
-    // reset the nocode_wanted variable back to its previous state
+    // reset globals back to their original state
     nocode_wanted = nocode_wanted_old;
-
-    // get back to where we once belonged
     ind = original_ind;
 }
 
