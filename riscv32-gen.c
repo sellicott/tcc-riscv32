@@ -1075,53 +1075,40 @@ ST_FUNC void gfunc_epilog( void )
         gen_bounds_epilog();
 #endif
 
-    loc = ( loc - num_va_regs * 8 );
+    loc = ( loc - num_va_regs * PTR_SIZE );
     d = v = ( -loc + 15 ) & -16;
 
 
     if( v >= ( 1 << 11 ) ) {
         d = 16;
-        // o(0x37 | (5 << 7) | ((0x800 + (v-16)) & 0xfffff000)); //lui t0, upper(v)
-        // EI(0x13, 0, 5, 5, (v-16) << 20 >> 20); // addi t0, t0, lo(v)
-        // ER(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
-
-        emit_LUI( t0, v );
-        emit_ADDI( t0, t0, v );
+        emit_LI(t0, v)
         emit_ADD( sp, sp, t0 );
     }
-    // EI(0x03, 2, 1, 2, d - 8 - num_va_regs * 8);  // lw ra, v-8(sp)
-    // EI(0x03, 2, 8, 2, d - 16 - num_va_regs * 8); // lw s0, v-16(sp)
-    // EI(0x13, 0, 2, 2, d);      // addi sp, sp, v
-    // EI(0x67, 0, 0, 1, 0);      // jalr x0, 0(x1), aka ret
 
-    emit_LW( ra, sp, d - 8 - ( num_va_regs * 8 ) );
-    emit_LW( s0, sp, d - 16 - ( num_va_regs * 8 ) );
+    emit_LW( ra, sp, d - PTR_SIZE - ( num_va_regs * PTR_SIZE ) );
+    emit_LW( s0, sp, d - 2 * PTR_SIZE - ( num_va_regs * PTR_SIZE ) );
     emit_ADDI( sp, sp, d );
-    emit_JALR( zero, ra, 0 );
+    emit_RET();
     large_ofs_ind = ind;
     if( v >= ( 1 << 11 ) ) {
-        // EI(0x13, 0, 8, 2, d - num_va_regs * 8);      // addi s0, sp, d
-        // o(0x37 | (5 << 7) | ((0x800 + (v-16)) & 0xfffff000)); //lui t0, upper(v)
-        // EI(0x13, 0, 5, 5, (v-16) << 20 >> 20); // addi t0, t0, lo(v)
-        // ER(0x33, 0, 2, 2, 5, 0x20); // sub sp, sp, t0
-        emit_ADDI( s0, sp, d );
-        emit_LUI( t0, v );
-        emit_ADDI( t0, t0, v );
+        emit_ADDI( s0, sp, d - num_va_regs * PTR_SIZE );
+        emit_LI( t0, v );
         emit_SUB( sp, sp, t0 );
         gjmp_addr( func_sub_sp_offset + 5 * 4 );
     }
     saved_ind = ind;
 
     ind = func_sub_sp_offset;
-    EI( 0x13, 0, 2, 2, -d ); // addi sp, sp, -d
-    ES( 0x23, 2, 2, 1, d - 8 - num_va_regs * 8 ); // sw ra, d-8(sp)
-    ES( 0x23, 2, 2, 8, d - 16 - num_va_regs * 8 ); // sw s0, d-16(sp)
+    emit_ADDI(sp, sp, -d);
+    emit_SW(sp, ra, d - PTR_SIZE - num_va_regs * PTR_SIZE);
+    emit_SW(sp, s0, d - 2*PTR_SIZE - num_va_regs * PTR_SIZE);
+
     if( v < ( 1 << 11 ) )
-        EI( 0x13, 0, 8, 2, d - num_va_regs * 8 ); // addi s0, sp, d
+        emit_ADDI( s0, sp, d - num_va_regs * PTR_SIZE );
     else
         gjmp_addr( large_ofs_ind );
     if( ( ind - func_sub_sp_offset ) != 5 * 4 )
-        EI( 0x13, 0, 0, 0, 0 ); // addi x0, x0, 0 == nop
+        emit_NOP();
     ind = saved_ind;
 }
 
