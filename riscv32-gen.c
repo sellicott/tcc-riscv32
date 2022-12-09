@@ -579,13 +579,13 @@ static void gen_bounds_prolog( void )
 
 static void gen_bounds_epilog( void )
 {
-    tcc_error( "no bounds checking" );
     addr_t saved_ind;
     addr_t *bounds_ptr;
     Sym *sym_data;
     Sym label = { 0 };
-
     int offset_modified = func_bound_offset != lbounds_section->data_offset;
+
+    tcc_error( "no bounds checking" );
 
     if( !offset_modified && !func_bound_add_epilog )
         return;
@@ -689,6 +689,8 @@ ST_FUNC void gfunc_call( int nb_args )
     int stack_adj = 0, tempspace = 0, stack_add, ofs, splitofs = 0;
     SValue *sv;
     Sym *sa;
+    const uint32_t t0 = 5;
+    const uint32_t sp = 2;
 
 #ifdef CONFIG_TCC_BCHECK
     int bc_save = tcc_state->do_bounds_check;
@@ -763,8 +765,6 @@ ST_FUNC void gfunc_call( int nb_args )
     if( ( vtop->r & VT_VALMASK ) == VT_CMP )
         gv( RC_INT );
 
-    const uint32_t t0 = 5;
-    const uint32_t sp = 2;
     if( stack_add ) {
         if( stack_add >= 0x1000 ) {
             // o(0x37 | (5 << 7) | (-stack_add & 0xfffff000)); //lui t0, upper(v)
@@ -949,11 +949,13 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
        implicit pointer parameter */
     size = type_size( &func_vt, &align );
     if( size > 2 * XLEN ) {
+        int s0 = 8;
+        int loc_reg = s0; // s0
+        int src_reg = ireg( areg[ 0 ]++ );
+
         loc -= 8;
         func_vc = loc;
-        // ES( 0x23, 2, 8, 10 + areg[ 0 ]++, loc ); // sd a0, loc(s0)
-        int loc_reg = 8; // s0
-        int src_reg = ireg( areg[ 0 ]++ );
+
         emit_SW( loc_reg, src_reg, loc );
         tcc_internal_error( "I don't think we are handling this case correctly" );
     }
@@ -1063,6 +1065,10 @@ ST_FUNC void arch_transfer_ret_regs( int aftercall )
 ST_FUNC void gfunc_epilog( void )
 {
     int v, saved_ind, d, large_ofs_ind;
+    const uint32_t ra = 1;
+    const uint32_t sp = 2;
+    const uint32_t t0 = 5;
+    const uint32_t s0 = 8;
 
 #ifdef CONFIG_TCC_BCHECK
     if( tcc_state->do_bounds_check )
@@ -1073,11 +1079,6 @@ ST_FUNC void gfunc_epilog( void )
     d = v = ( -loc + 15 ) & -16;
 
 
-    const uint32_t zero = 0;
-    const uint32_t ra = 1;
-    const uint32_t sp = 2;
-    const uint32_t t0 = 5;
-    const uint32_t s0 = 8;
     if( v >= ( 1 << 11 ) ) {
         d = 16;
         // o(0x37 | (5 << 7) | ((0x800 + (v-16)) & 0xfffff000)); //lui t0, upper(v)
@@ -1336,13 +1337,14 @@ static void gen_opil( int op, int ll )
 // otherwise returns 0
 static int gen_opi_immediate( int op, int fc, int ll )
 {
+    // get values from the main stack
+    int a, d, rd;
+    int m = 31;
+
     if( ll ) {
         tcc_error( "trying to emit 64bit instruction, gonna have a bad time" );
     }
 
-    // get values from the main stack
-    int a, d, rd;
-    int m = 31;
     vswap();
     gv( RC_INT );
     a = ireg( vtop[ 0 ].r );
@@ -1597,11 +1599,12 @@ ST_FUNC void gen_vla_alloc( CType *type, int align )
     vpop();
 #if defined( CONFIG_TCC_BCHECK )
     if( tcc_state->do_bounds_check ) {
+        const uint32_t a0 = 10;
+        const uint32_t sp = 2;
+
         vpushi( 0 );
         vtop->r = TREG_R( 0 );
         // o(0x00010513); /* mv a0,sp */
-        const uint32_t a0 = 10;
-        const uint32_t sp = 2;
         emit_MV( a0, sp );
         vswap();
         vpush_helper_func( TOK___bound_new_region );
