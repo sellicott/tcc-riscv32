@@ -378,6 +378,10 @@ static void asm_branch_zero_opcode( TCCState *s1, int token )
 static void asm_binary_opcode( TCCState *s1, int token )
 {
     Operand ops[ 2 ];
+    uint32_t rd;
+    uint32_t imm;
+    int ind_bak;
+
     parse_operand( s1, &ops[ 0 ] );
     if( ops[ 0 ].type != OP_REG ) {
         tcc_error(
@@ -408,10 +412,9 @@ static void asm_binary_opcode( TCCState *s1, int token )
             return;
         }
     }
-    uint32_t rd = ops[ 0 ].reg;
-    uint32_t imm = ops[ 1 ].e.v;
+    rd = ops[ 0 ].reg;
+    imm = ops[ 1 ].e.v;
 
-    int ind_bak;
     switch( token ) {
         case TOK_ASM_la:
             ind_bak = ind;
