@@ -117,7 +117,6 @@ ST_FUNC unsigned create_plt_entry(TCCState *s1, unsigned got_offset, struct sym_
    address for PLT and GOT are known (see fill_program_header) */
 ST_FUNC void relocate_plt(TCCState *s1)
 {
-    uint8_t *p, *p_end;
     int nocode_wanted_old = nocode_wanted;
     int old_ind = ind;
     int end_offset;
@@ -125,8 +124,6 @@ ST_FUNC void relocate_plt(TCCState *s1)
     if (!s1->plt)
       return;
 
-    p = s1->plt->data;
-    p_end = p + s1->plt->data_offset;
     end_offset = s1->plt->data_offset;
 
     // for our general opcode generation functions to work we need to make the section we are
@@ -185,9 +182,9 @@ ST_FUNC void relocate_plt(TCCState *s1)
         emit_JR(t3);
         
         while (ind < end_offset) {
-            uint64_t pc = plt + (p - s1->plt->data);
+            uint64_t pc = plt + ind;
             //uint64_t addr = got + read64le(p);
-            uint64_t addr = got + read32le(p);
+            uint64_t addr = got + read32le(cur_text_section->data + ind);
             uint64_t off = (addr - pc + 0x800) >> 12;
             if ((off + ((uint32_t)1 << 20)) >> 21)
                 tcc_error("Failed relocating PLT (off=0x%lx, addr=0x%lx, pc=0x%lx)", (long)off, (long)addr, (long)pc);
@@ -211,7 +208,7 @@ ST_FUNC void relocate_plt(TCCState *s1)
 
     if (s1->plt->reloc) {
         ElfW_Rel *rel;
-        p = s1->got->data;
+        uint8_t *p = s1->got->data;
         for_each_elem(s1->plt->reloc, 0, rel, ElfW_Rel) {
             write64le(p + rel->r_offset, s1->plt->sh_addr);
         }
