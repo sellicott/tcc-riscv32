@@ -118,19 +118,38 @@ ST_FUNC unsigned create_plt_entry(TCCState *s1, unsigned got_offset, struct sym_
 ST_FUNC void relocate_plt(TCCState *s1)
 {
     uint8_t *p, *p_end;
+    int nocode_wanted_old = nocode_wanted;
+    int old_ind = ind;
+    int end_offset;
 
     if (!s1->plt)
       return;
 
     p = s1->plt->data;
     p_end = p + s1->plt->data_offset;
+    end_offset = s1->plt->data_offset;
 
-    if (p < p_end) {
+    // for our general opcode generation functions to work we need to make the section we are
+    // writing to into current_text_section->data and set the ind variable to 0 offset
+    // using these functions will increment ind
+    // We assume since we are filling in the plt, we are done with code generation and
+    // cur_text_section is NULL, so we can just overwrite it 
+    // current_text_section->data and ind, then replace them with p and 0 respectively
+
+    tcc_state = s1;
+    assert(cur_text_section == NULL);
+
+    // we need to override the emit macros location to point to the PLT
+    cur_text_section = s1->plt;
+    ind = 0;
+    // we need to enable code generation here
+    // copy code from the NO_CODE macro (move to tcc.h?)
+    nocode_wanted = 0;
+
+
+    if (ind < end_offset) {
         uint64_t plt = s1->plt->sh_addr;
         uint64_t got = s1->got->sh_addr;
-        unsigned char* old_section;
-        int nocode_wanted_old = nocode_wanted;
-        int old_ind;
 
         const uint32_t t0 = 5;
         const uint32_t t1 = 6;
@@ -155,22 +174,6 @@ ST_FUNC void relocate_plt(TCCState *s1)
 
         printf("in the relocate_plt function\n");
 
-        // for our general opcode generation functions to work we need to make the section we are
-        // writing to into current_text_section->data and set the ind variable to 0 offset
-        // using these functions will increment ind
-        // We assume since we are filling in the plt, we are done with code generation and
-        // cur_text_section is NULL, so we can just overwrite it 
-        // current_text_section->data and ind, then replace them with p and 0 respectively
-
-        assert(cur_text_section == NULL);
-        old_ind = ind;
-
-        // we need to override the emit macros location to point to the PLT
-        cur_text_section = plt;
-        ind = 0;
-        // we need to enable code generation here
-        // copy code from the NO_CODE macro (move to tcc.h?)
-        nocode_wanted &= ~0x20000000;
 
         emit_AUIPC(t2, off); // auipc, t2 %pcrelhi(got)
         emit_SUB(t1, t1, t3);
@@ -181,7 +184,7 @@ ST_FUNC void relocate_plt(TCCState *s1)
         emit_LW(t0, t0, PTR_SIZE);
         emit_JR(t3);
         
-        while (p < p_end) {
+        while (ind < end_offset) {
             uint64_t pc = plt + (p - s1->plt->data);
             //uint64_t addr = got + read64le(p);
             uint64_t addr = got + read32le(p);
@@ -200,11 +203,11 @@ ST_FUNC void relocate_plt(TCCState *s1)
             emit_JAL(t1, t3); // this should perhaps be JALR
             emit_NOP();
         }
-        // clean up after ourselves and reset current_text_section to its old position
-        cur_text_section = NULL;
-        ind = old_ind;
-        nocode_wanted = nocode_wanted_old;
     }
+    // clean up after ourselves and reset current_text_section to its old position
+    cur_text_section = NULL;
+    ind = old_ind;
+    nocode_wanted = nocode_wanted_old;
 
     if (s1->plt->reloc) {
         ElfW_Rel *rel;
