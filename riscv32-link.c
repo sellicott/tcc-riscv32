@@ -19,6 +19,8 @@
 
 #else /* !TARGET_DEFS_ONLY */
 
+#include <assert.h>
+
 //#define DEBUG_RELOC
 #include "tcc.h"
 #include "riscv_utils.h"
