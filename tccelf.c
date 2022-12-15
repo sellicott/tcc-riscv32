@@ -2525,6 +2525,8 @@ static void tcc_output_elf(TCCState *s1, FILE *f, int phnum, ElfW(Phdr) *phdr,
 #elif defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
 #ifdef TCC_RISCV_ilp32
     ehdr.e_flags = EF_RISCV_RVC;
+#elif defined TCC_TARGET_RISCV32
+    ehdr.e_flags = EF_RISCV_FLOAT_ABI_DOUBLE | EF_RISCV_RVC;
 #else
     ehdr.e_flags = EF_RISCV_FLOAT_ABI_DOUBLE;
 #endif
