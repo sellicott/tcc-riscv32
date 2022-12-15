@@ -1731,8 +1731,8 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
 #if defined TCC_TARGET_ARM && TARGETOS_FreeBSD
         tcc_add_library_err(s1, "gcc_s"); // unwind code
 #endif
-        if (TCC_LIBTCC1[0])
-            tcc_add_support(s1, TCC_LIBTCC1);
+        //if (TCC_LIBTCC1[0])
+        //    tcc_add_support(s1, TCC_LIBTCC1);
 
         /* add crt end if not memory output */
 	if (s1->output_type != TCC_OUTPUT_MEMORY) {
