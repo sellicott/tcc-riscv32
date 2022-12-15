@@ -155,15 +155,17 @@ ST_FUNC void relocate_plt(TCCState *s1)
         // for our general opcode generation functions to work we need to make the section we are
         // writing to into current_text_section->data and set the ind variable to 0 offset
         // using these functions will increment ind
-        // To avoid messing things up for other people we need to save the current value of 
+        // We assume since we are filling in the plt, we are done with code generation and
+        // cur_text_section is NULL, so we can just overwrite it 
         // current_text_section->data and ind, then replace them with p and 0 respectively
 
-        // save the current section and offset
-        old_section = cur_text_section->data;
+        assert(cur_text_section == NULL);
         old_ind = ind;
 
-        cur_text_section->data = p;
+        // we need to override the emit macros location to point to the PLT
+        cur_text_section = plt;
         ind = 0;
+
         emit_AUIPC(t2, off); // auipc, t2 %pcrelhi(got)
         emit_SUB(t1, t1, t3);
         emit_LW(t3, t2, (got - plt)); 
@@ -193,7 +195,7 @@ ST_FUNC void relocate_plt(TCCState *s1)
             emit_NOP();
         }
         // clean up after ourselves and reset current_text_section to its old position
-        cur_text_section->data = old_section;
+        cur_text_section = NULL;
         ind = old_ind;
     }
 
