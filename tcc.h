@@ -334,9 +334,9 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #  define CONFIG_TCC_ELFINTERP "/lib/ld-linux-riscv64-lp64d.so.1"
 //#  if defined(TCC_TARGET_RISCV32)
 //#   warning "using riscv64 interpreter"
+//#  endif
 # elif defined(TCC_TARGET_RISCV32)
 #  define CONFIG_TCC_ELFINTERP "/lib/ld-linux-riscv32-ilp32d.so.1"
-#  endif
 # elif !defined(TCC_ARM_EABI)
 #  if defined(TCC_MUSL)
 #   if defined(TCC_TARGET_I386)
