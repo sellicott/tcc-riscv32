@@ -129,6 +129,7 @@ ST_FUNC void relocate_plt(TCCState *s1)
         uint64_t plt = s1->plt->sh_addr;
         uint64_t got = s1->got->sh_addr;
         unsigned char* old_section;
+        int nocode_wanted_old = nocode_wanted;
         int old_ind;
 
         const uint32_t t0 = 5;
@@ -167,6 +168,9 @@ ST_FUNC void relocate_plt(TCCState *s1)
         // we need to override the emit macros location to point to the PLT
         cur_text_section = plt;
         ind = 0;
+        // we need to enable code generation here
+        // copy code from the NO_CODE macro (move to tcc.h?)
+        nocode_wanted &= ~0x20000000;
 
         emit_AUIPC(t2, off); // auipc, t2 %pcrelhi(got)
         emit_SUB(t1, t1, t3);
@@ -199,6 +203,7 @@ ST_FUNC void relocate_plt(TCCState *s1)
         // clean up after ourselves and reset current_text_section to its old position
         cur_text_section = NULL;
         ind = old_ind;
+        nocode_wanted = nocode_wanted_old;
     }
 
     if (s1->plt->reloc) {
