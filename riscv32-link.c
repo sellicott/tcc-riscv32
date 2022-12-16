@@ -234,7 +234,8 @@ void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
         if ((off64 + (1 << 12)) & ~(uint64_t)0x1ffe)
           tcc_error("R_RISCV_BRANCH relocation failed"
                     " (val=%lx, addr=%lx)", (long)val, (long)addr);
-        off32 = off64 >> 1;
+        //off32 = off64 >> 1;
+        off32 = off64;
         write32le(ptr, (read32le(ptr) & ~0xfe000f80)
                        | ((off32 & 0x800) << 20)
                        | ((off32 & 0x3f0) << 21)
