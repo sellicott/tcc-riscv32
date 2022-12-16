@@ -2406,7 +2406,7 @@ static void fill_dynamic(TCCState *s1, struct dyn_inf *dyninf)
         put_dt(dynamic, DT_PLTGOT, s1->got->sh_addr);
         put_dt(dynamic, DT_PLTRELSZ, s1->plt->reloc->data_offset);
         put_dt(dynamic, DT_JMPREL, s1->plt->reloc->sh_addr);
-        put_dt(dynamic, DT_PLTREL, DT_REL);
+        put_dt(dynamic, DT_PLTREL, DT_RELA);
     }
     put_dt(dynamic, DT_RELCOUNT, 0);
 #endif
