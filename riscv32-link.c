@@ -109,7 +109,7 @@ ST_FUNC unsigned create_plt_entry(TCCState *s1, unsigned got_offset, struct sym_
     plt_offset = plt->data_offset;
 
     p = section_ptr_add(plt, 16);
-    write64le(p, got_offset);
+    write32le(p, got_offset);
     return plt_offset;
 }
 
@@ -376,12 +376,14 @@ void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
         return;
     case R_RISCV_ADD64:
         write64le(ptr, read64le(ptr) + val);
+        tcc_error_noabort("trying to write 64-bit value");
         return;
     case R_RISCV_ADD32:
         write32le(ptr, read32le(ptr) + val);
         return;
     case R_RISCV_SUB64:
         write64le(ptr, read64le(ptr) - val);
+        tcc_error_noabort("trying to write 64-bit value");
         return;
     case R_RISCV_SUB32:
         write32le(ptr, read32le(ptr) - val);
