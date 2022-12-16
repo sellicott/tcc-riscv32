@@ -210,7 +210,7 @@ ST_FUNC void relocate_plt(TCCState *s1)
         ElfW_Rel *rel;
         uint8_t *p = s1->got->data;
         for_each_elem(s1->plt->reloc, 0, rel, ElfW_Rel) {
-            write64le(p + rel->r_offset, s1->plt->sh_addr);
+            write32le(p + rel->r_offset, s1->plt->sh_addr);
         }
     }
 }
@@ -223,6 +223,7 @@ void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
     int sym_index = ELFW(R_SYM)(rel->r_info), esym_index;
     ElfW(Sym) *sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
 
+    printf("in the relocate function\n");
     switch(type) {
     case R_RISCV_ALIGN:
     case R_RISCV_RELAX:
