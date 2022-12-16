@@ -373,7 +373,7 @@ void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
             }
         }
     case R_RISCV_JUMP_SLOT:
-        add64le(ptr, val);
+        add32le(ptr, val);
         return;
     case R_RISCV_ADD64:
         write64le(ptr, read64le(ptr) + val);
