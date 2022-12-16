@@ -2399,7 +2399,7 @@ static void fill_dynamic(TCCState *s1, struct dyn_inf *dyninf)
     }
     put_dt(dynamic, DT_RELACOUNT, 0);
 #else
-    put_dt(dynamic, DT_REL, dyninf->rel_addr);
+    put_dt(dynamic, DT_RELA, dyninf->rel_addr);
     put_dt(dynamic, DT_RELSZ, dyninf->rel_size);
     put_dt(dynamic, DT_RELENT, sizeof(ElfW_Rel));
     if (s1->plt && s1->plt->reloc) {
@@ -2408,7 +2408,7 @@ static void fill_dynamic(TCCState *s1, struct dyn_inf *dyninf)
         put_dt(dynamic, DT_JMPREL, s1->plt->reloc->sh_addr);
         put_dt(dynamic, DT_PLTREL, DT_RELA);
     }
-    put_dt(dynamic, DT_RELCOUNT, 0);
+    put_dt(dynamic, DT_RELACOUNT, 0);
 #endif
     if (versym_section && verneed_section) {
 	/* The dynamic linker can not handle VERSYM without VERNEED */
