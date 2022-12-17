@@ -167,9 +167,9 @@ ST_FUNC void relocate_plt( TCCState *s1 )
         printf( "in the relocate_plt function\n" );
 
 
-        printf("got: %p\n", got - plt);
-        printf("plc: %p\n", plt);
-        printf("off: %u\n", off);
+        printf("got: %p\n", (void*) (got - plt));
+        printf("plt: %p\n", (void*) plt);
+        printf("off: %llu\n", off);
         emit_AUIPC( t2, off ); // auipc, t2 %pcrelhi(got)
         emit_SUB( t1, t1, t3 );
         emit_LW( t3, t2, IMM_LOW( got - plt ) );
