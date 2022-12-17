@@ -164,12 +164,6 @@ ST_FUNC void relocate_plt( TCCState *s1 )
 
         // Define constants for the register values (see the riscv assembly manual for values)
 
-        printf( "in the relocate_plt function\n" );
-
-
-        printf("got: %p\n", (void*) (got - plt));
-        printf("plt: %p\n", (void*) plt);
-        printf("off: %llu\n", off);
         emit_AUIPC( t2, (off << 12) ); // auipc, t2 %pcrelhi(got)
         emit_SUB( t1, t1, t3 );
         emit_LW( t3, t2, IMM_LOW( got - plt ) );
@@ -183,7 +177,6 @@ ST_FUNC void relocate_plt( TCCState *s1 )
             uint64_t pc = plt + ind;
             // uint64_t addr = got + read64le(p);
             uint64_t addr = got + read32le( cur_text_section->data + ind );
-            printf("addr: %llx\n", addr);
             uint64_t off = ( addr - pc + 0x800 ) >> 12;
             if( ( off + ( (uint32_t)1 << 20 ) ) >> 21 )
                 tcc_error( "Failed relocating PLT (off=0x%lx, addr=0x%lx, pc=0x%lx)", (long)off,
