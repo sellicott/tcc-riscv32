@@ -2412,8 +2412,8 @@ static void fill_dynamic(TCCState *s1, struct dyn_inf *dyninf)
 #endif
     if (versym_section && verneed_section) {
 	/* The dynamic linker can not handle VERSYM without VERNEED */
-        put_dt(dynamic, DT_VERSYM, versym_section->sh_addr);
-        put_dt(dynamic, DT_VERNEED, verneed_section->sh_addr);
+        put_dt(dynamic, DT_VERSYM, 0xffff & versym_section->sh_addr);
+        put_dt(dynamic, DT_VERNEED, 0xffff & verneed_section->sh_addr);
         put_dt(dynamic, DT_VERNEEDNUM, dt_verneednum);
     }
     s = find_section_create (s1, ".preinit_array", 0);
