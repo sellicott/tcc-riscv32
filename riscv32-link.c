@@ -195,9 +195,9 @@ ST_FUNC void relocate_plt( TCCState *s1 )
             // write32le(p + 12, 0x00000013); // nop
             // p += 16;
 
-            mit_AUIPC( t3, (off << 12) );
+            emit_AUIPC( t3, (off << 12) );
             emit_LW( t3, t3, ( addr - pc ) );
-            emit_JAL( t1, t3 ); // this should perhaps be JALR
+            emit_JALR( t1, t3 ); // this should perhaps be JALR
             emit_NOP();
         }
     }
