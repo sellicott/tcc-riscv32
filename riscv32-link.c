@@ -169,7 +169,7 @@ ST_FUNC void relocate_plt( TCCState *s1 )
 
         emit_AUIPC( t2, off ); // auipc, t2 %pcrelhi(got)
         emit_SUB( t1, t1, t3 );
-        printf("ld t3 \%pcrel_low(got)(t2): (%p)\n", got-plt);
+        printf("ld t3 pcrel_low(got)(t2): (%p)\n", got-plt);
         emit_LW( t3, t2, ( got - plt ) );
         emit_ADDI( t1, t1, -( 32 + 12 ) );
         emit_ADDI( t0, t2, ( got - plt ) );
