@@ -2401,7 +2401,7 @@ static void fill_dynamic(TCCState *s1, struct dyn_inf *dyninf)
 #else
     put_dt(dynamic, DT_RELA, dyninf->rel_addr);
     put_dt(dynamic, DT_RELSZ, dyninf->rel_size);
-    put_dt(dynamic, DT_RELENT, sizeof(ElfW_Rela));
+    put_dt(dynamic, DT_RELENT, sizeof(ElfW_Rel));
     if (s1->plt && s1->plt->reloc) {
         put_dt(dynamic, DT_PLTGOT, s1->got->sh_addr);
         put_dt(dynamic, DT_PLTRELSZ, s1->plt->reloc->data_offset);
