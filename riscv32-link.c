@@ -169,6 +169,7 @@ ST_FUNC void relocate_plt( TCCState *s1 )
 
         emit_AUIPC( t2, off ); // auipc, t2 %pcrelhi(got)
         emit_SUB( t1, t1, t3 );
+        printf("ld t3 \%pcrel_low(got)(t2): (%p)\n", got-plt);
         emit_LW( t3, t2, ( got - plt ) );
         emit_ADDI( t1, t1, -( 32 + 12 ) );
         emit_ADDI( t0, t2, ( got - plt ) );
@@ -219,7 +220,6 @@ void relocate( TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr, addr_t
     int sym_index = ELFW( R_SYM )( rel->r_info ), esym_index;
     ElfW( Sym ) *sym = &( (ElfW( Sym ) *)symtab_section->data )[ sym_index ];
 
-    printf( "in the relocate function\n" );
     switch( type ) {
         case R_RISCV_ALIGN:
         case R_RISCV_RELAX: return;
