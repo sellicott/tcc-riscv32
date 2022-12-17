@@ -201,6 +201,8 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #  define TCC_IS_NATIVE
 # elif defined __riscv && defined __LP64__ && defined TCC_TARGET_RISCV64
 #  define TCC_IS_NATIVE
+# elif defined __riscv && defined  TCC_TARGET_RISCV32
+#  define TCC_IS_NATIVE
 # endif
 #endif
 
