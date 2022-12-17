@@ -182,7 +182,8 @@ ST_FUNC void relocate_plt( TCCState *s1 )
         while( ind < end_offset ) {
             uint64_t pc = plt + ind;
             // uint64_t addr = got + read64le(p);
-            uint64_t addr = got + read32le( cur_text_section->data + ind );
+            uint64_t addr = got + read32le( clr_text_section->data + ind );
+            printf("addr: %llx\n", addr);
             uint64_t off = ( addr - pc + 0x800 ) >> 12;
             if( ( off + ( (uint32_t)1 << 20 ) ) >> 21 )
                 tcc_error( "Failed relocating PLT (off=0x%lx, addr=0x%lx, pc=0x%lx)", (long)off,
