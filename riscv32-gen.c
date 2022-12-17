@@ -183,7 +183,7 @@ static int load_symofs( int r, SValue *sv, int forstore )
         }
 
         // generate a relocation entry with the generated offset
-        greloca( cur_text_section, sv->sym, ind, R_RISCV_PCREL_HI20, addend );
+        greloca( cur_text_section, sv->sym, ind, R_RISCV_GOT_HI20, addend );
 
         put_extern_sym( &label, cur_text_section, ind, 0 );
         // immediate value is 0 so that the linker can load values into it
@@ -603,7 +603,7 @@ static void gen_bounds_epilog( void )
         saved_ind = ind;
         ind = func_bound_ind;
         put_extern_sym( &label, cur_text_section, ind, 0 );
-        greloca( cur_text_section, sym_data, ind, R_RISCV_PCREL_HI20, 0 );
+        greloca( cur_text_section, sym_data, ind, R_RISCV_GOT_HI20, 0 );
         o( 0x17 | ( 10 << 7 ) ); // auipc a0, 0 %pcrel_hi(sym)+addend
         greloca( cur_text_section, &label, ind, R_RISCV_PCREL_LO12_I, 0 );
         EI( 0x03, 2, 10, 10, 0 ); // lw a0, 0(a0)
@@ -616,7 +616,7 @@ static void gen_bounds_epilog( void )
     o( 0xe02a1101 ); /* addi sp,sp,-32  sd   a0,0(sp)   */
     o( 0xa82ae42e ); /* sd   a1,8(sp)   fsd  fa0,16(sp) */
     put_extern_sym( &label, cur_text_section, ind, 0 );
-    greloca( cur_text_section, sym_data, ind, R_RISCV_PCREL_HI20, 0 );
+    greloca( cur_text_section, sym_data, ind, R_RISCV_GOT_HI20, 0 );
     o( 0x17 | ( 10 << 7 ) ); // auipc a0, 0 %pcrel_hi(sym)+addend
     greloca( cur_text_section, &label, ind, R_RISCV_PCREL_LO12_I, 0 );
     EI( 0x03, 2, 10, 10, 0 ); // lw a0, 0(a0)
