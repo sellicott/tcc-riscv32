@@ -167,12 +167,14 @@ ST_FUNC void relocate_plt( TCCState *s1 )
         printf( "in the relocate_plt function\n" );
 
 
+        printf("got: %p\n", got);
+        printf("plc: %p\n", plt);
+        printf("off: %d\n", off);
         emit_AUIPC( t2, off ); // auipc, t2 %pcrelhi(got)
         emit_SUB( t1, t1, t3 );
-        printf("ld t3 pcrel_low(got)(t2): (%p)\n", got-plt);
-        emit_LW( t3, t2, ( got - plt ) );
+        emit_LW( t3, t2, IMM_LOW( got - plt ) );
         emit_ADDI( t1, t1, -( 32 + 12 ) );
-        emit_ADDI( t0, t2, ( got - plt ) );
+        emit_ADDI( t0, t2, IMM_LOW( got - plt ) );
         emit_SRLI( t1, t1, 4 - 2 ); // srli t1, t1, log2(16/PTRSIZE) -> log2(16) - log2(PTRSIZE)
         emit_LW( t0, t0, PTR_SIZE );
         emit_JR( t3 );
