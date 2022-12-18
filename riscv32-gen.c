@@ -1148,6 +1148,8 @@ ST_FUNC void gsym_addr( int branch_list_offset, int target_offset )
         ind = next_branch_offset; 
         // rel_jmp can have up to a +-1MiB range (20bits 0 to 0x1fffff)
         rel_jmp = target_offset_uint - ind;
+        // get the location that we need to write our next value to.
+        next_branch_offset = read32le(cur_text_section->data + ind);
         if( ( rel_jmp + ( 1 << 21 ) ) & ~( ( 1U << 22 ) - 2 ) ) {
             tcc_error("out-of-range branch chain (> +-1MiB): %#03x", rel_jmp);
         }
@@ -1160,8 +1162,6 @@ ST_FUNC void gsym_addr( int branch_list_offset, int target_offset )
         else {
             emit_J_inst( rel_jmp );
         }
-        // get the location that we need to write our next value to.
-        next_branch_offset = read32le(cur_text_section->data + ind);
     }
 
     // reset globals back to their original state
