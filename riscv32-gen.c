@@ -1128,11 +1128,11 @@ ST_FUNC void gen_fill_nops( int bytes )
     }
 }
 
-// Patch all branches in list pointed to by t to branch to a:
-ST_FUNC void gsym_addr( int branch_list, int target_address )
+// Patch all branches in list pointed to by branch_list_offset to branch to target_offset:
+ST_FUNC void gsym_addr( int branch_list_offset, int target_offset )
 {
-    uint32_t current_branch = branch_list;
-    uint32_t target_address_uint = target_address;
+    uint32_t next_branch_offset = branch_list_offset;
+    uint32_t target_offset_uint = target_offset;
 
     // hack so that we can use emmit_<opcode> macros to generate code
     // turn on code generation, but save the state so we can turn it off again if necessary
@@ -1140,22 +1140,17 @@ ST_FUNC void gsym_addr( int branch_list, int target_address )
     int original_ind = ind;                // save the current pointer location
     nocode_wanted &= ~0x20000000;          // copy code from the NO_CODE macro (move to tcc.h?)
 
-    while( current_branch ) {
+    while( next_branch_offset ) {
         int32_t rel_jmp;
-        // get the location that we need to write our next value to.
-        unsigned char* ptr = cur_text_section->data + current_branch;
-        // get the offset for the next iteration
-        current_branch = read32le( ptr );
-        // note that the ind variable is a global variable used to set the write location in the 
+        // set the current branch offset (the offset from the data section to write to).
+        // Note that the ind variable is a global variable used to set the write location in the 
         // generation code it is the offset from cur_text_section->data
-        ind = current_branch; 
+        ind = next_branch_offset; 
         // rel_jmp can have up to a +-1MiB range (20bits 0 to 0x1fffff)
-        rel_jmp = target_address_uint - current_branch;
-
+        rel_jmp = target_offset_uint - ind;
         if( ( rel_jmp + ( 1 << 21 ) ) & ~( ( 1U << 22 ) - 2 ) ) {
             tcc_error("out-of-range branch chain (> +-1MiB): %#03x", rel_jmp);
         }
-
         // generate the jmp table
         if( rel_jmp == 4 ) {
             // we just need a nop as PC will increment by 4 for us (this will need to be updated
@@ -1165,7 +1160,8 @@ ST_FUNC void gsym_addr( int branch_list, int target_address )
         else {
             emit_J_inst( rel_jmp );
         }
-
+        // get the location that we need to write our next value to.
+        next_branch_offset = read32le(cur_text_section->data + ind);
     }
 
     // reset globals back to their original state
