@@ -211,11 +211,15 @@ void emit_S( uint32_t imm, uint32_t rs2, uint32_t rs1, uint32_t funct3, uint32_t
     o( instruction );
 }
 
-// branch instructions
+/* branch instructions
+ * takes a 13-bit immediate value (LSB is discarded)
+ */
 void emit_B( uint32_t imm, uint32_t rs2, uint32_t rs1, uint32_t funct3, uint32_t opcode )
 {
     // we have to break up the immediate value into two sections (12,10:5, 4:1,11)
-    const uint32_t imm_h = 0x7f & ( ( 0x800 & imm >> 1 ) | imm ) >> 5;
+    // imm_h[5:0] = {12, 10:5}
+    // imm_l[5:0] = {4:1, 11}
+    const uint32_t imm_h = 0x7f & ( ( ( 0x800 & imm ) >> 1 ) | ( 0x7e0 & imm ) ) >> 5;
     const uint32_t imm_l = ( 0x1e & imm ) | ( 0x1 & ( imm >> 11 ) );
     const uint32_t instruction = ( imm_h << 25 ) | ( rs2 << 20 ) | ( rs1 << 15 ) |
                                  ( funct3 << 12 ) | ( imm_l << 7 ) | opcode;
@@ -233,7 +237,9 @@ void emit_U( uint32_t imm, uint32_t rd, uint32_t opcode )
     o( instruction );
 }
 
-// jump instructions
+/* jump instructions
+ * takes a 21-bit immediate value
+ */
 void emit_J( uint32_t imm, uint32_t rd, uint32_t opcode )
 {
     // immediate value 20|10:1|11|19:12
