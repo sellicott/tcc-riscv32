@@ -146,7 +146,7 @@ ST_FUNC void relocate_plt( TCCState *s1 )
         const uint32_t t1 = 6;
         const uint32_t t2 = 7;
         const uint32_t t3 = 28;
-        uint64_t off = ( got - plt + 0x800 ) >> 12;
+        uint64_t off = IMM_HIGH( got - plt ) + 1;
         if( ( off + ( (uint32_t)1 << 20 ) ) >> 21 )
             tcc_error( "Failed relocating PLT (off=0x%lx, got=0x%lx, plt=0x%lx)", (long)off,
                 (long)got, (long)plt );
@@ -164,7 +164,7 @@ ST_FUNC void relocate_plt( TCCState *s1 )
 
         // Define constants for the register values (see the riscv assembly manual for values)
 
-        emit_AUIPC( t2, (off << 12) ); // auipc, t2 %pcrelhi(got)
+        emit_AUIPC( t2, off ); // auipc, t2 %pcrelhi(got)
         emit_SUB( t1, t1, t3 );
         emit_LW( t3, t2, IMM_LOW( got - plt ) );
         emit_ADDI( t1, t1, -( 32 + 12 ) );
@@ -188,7 +188,7 @@ ST_FUNC void relocate_plt( TCCState *s1 )
             // write32le(p + 12, 0x00000013); // nop
             // p += 16;
 
-            emit_AUIPC( t3, (off << 12) );
+            emit_AUIPC( t3, off );
             emit_LW( t3, t3, ( addr - pc ) );
             emit_JALR( t1, t3, 0 ); // this should perhaps be JALR
             emit_NOP();

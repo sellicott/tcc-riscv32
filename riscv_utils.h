@@ -168,13 +168,14 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 #define emit_JALR_x1(rs)    (emit_JALR(1, rs, 0))
 #define emit_RET()          (emit_JALR(0, 1, 0))
 
+// todo make these functions and put in relocation call directly there
 #define emit_CALL(offset) \
-    emit_AUIPC(6, offset >> 12); \
-    emit_JALR(1, 6, offset);
+    emit_AUIPC(6,   IMM_HIGH(offset) ); \
+    emit_JALR(1, 6, IMM_LOW(offset)  );
 
 #define emit_TAIL(offset) \
-    emit_AUIPC(6, offset >> 12); \
-    emit_JALR(0, 6, offset);
+    emit_AUIPC(6,   IMM_HIGH(offset) ); \
+    emit_JALR(0, 6, IMM_LOW(offset)  );
 
 // Logical
 #define emit_NOT(rd, rs)    (emit_XORI(rd, rs, -1))

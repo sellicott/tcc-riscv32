@@ -205,7 +205,7 @@ static int load_symofs( int r, SValue *sv, int forstore )
         }
         if( LARGE_IMM( sv_constant ) ) {
             sv->c.i = IMM_LOW( sv_constant );
-            emit_LUI( rd, sv_constant );
+            emit_LUI( rd, IMM_HIGH( sv_constant ) );
             emit_ADD( rd, rd, s0 );
         }
     }
@@ -219,10 +219,10 @@ static void load_large_constant( int rr, int fc, uint32_t pi )
 {
     if( fc < 0 )
         pi++;
-    emit_LUI( rr, pi );
-    emit_ADDI( rr, rr, pi );
+    emit_LUI( rr, IMM_HIGH( pi ) );
+    emit_ADDI( rr, rr, IMM_LOW( pi ) );
     emit_SLLI( rr, rr, 12 );
-    emit_ADDI( rr, rr, fc );
+    emit_ADDI( rr, rr, IMM_LOW( fc ) );
     emit_SLLI( rr, rr, 12 );
     emit_ADDI( rr, rr, IMM_LOW( fc ) );
     emit_SLLI( rr, rr, 8 );
@@ -771,13 +771,12 @@ ST_FUNC void gfunc_call( int nb_args )
             // EI(0x13, 0, 5, 5, -stack_add << 20 >> 20); // addi t0, t0, lo(v)
             // ER(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
 
-            emit_LUI( t0, -stack_add );
-            emit_ADDI( t0, t0, -stack_add );
+            emit_LUI( t0, IMM_HIGH( -stack_add ) );
+            emit_ADDI( t0, t0, IMM_LOW( -stack_add ) );
             emit_ADD( sp, sp, t0 );
         }
         else {
-            // emit_I(0x13, 0, 2, 2, -stack_add);   // addi sp, sp, -adj
-            emit_ADDI( sp, sp, -stack_add );
+            emit_ADDI( sp, sp, IMM_LOW( -stack_add ) );
         }
         for( i = ofs = 0; i < nb_args; i++ ) {
             if( info[ i ] & ( 64 | 32 ) ) {
@@ -914,8 +913,8 @@ ST_FUNC void gfunc_call( int nb_args )
             // EI(0x13, 0, 5, 5, stack_add << 20 >> 20); // addi t0, t0, lo(v)
             // ER(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
 
-            emit_LUI( t0, stack_add );
-            emit_ADDI( t0, t0, stack_add );
+            emit_LUI( t0, IMM_HIGH( stack_add ) );
+            emit_ADDI( t0, t0, IMM_LOW( stack_add ) );
             emit_ADD( sp, sp, t0 );
         }
         else {
@@ -1189,8 +1188,8 @@ ST_FUNC void gjmp_addr( int a )
         // lui t0 upper(rel_jmp)
         // jalr x0 rel_jmp(t0)
         uint32_t t0 = 5;
-        emit_LUI( t0, rel_jmp );
-        emit_JALR( 0, t0, rel_jmp << 20 >> 20 );
+        emit_LUI( t0, IMM_HIGH( rel_jmp ) );
+        emit_JALR( 0, t0, IMM_LOW( rel_jmp ) );
     }
     else {
         // near jump
