@@ -223,11 +223,13 @@ void emit_B( uint32_t imm, uint32_t rs2, uint32_t rs1, uint32_t funct3, uint32_t
     o( instruction );
 }
 
-// big immediate instructions (LUI and AUIPC)
+/* big immediate instructions (LUI and AUIPC)
+ * takes a 24-bit immediate value
+ * we expect the immediate passed into this function to be in the lower space (i.e we will shift)
+ */
 void emit_U( uint32_t imm, uint32_t rd, uint32_t opcode )
 {
-    // only want bits 31:12 of immediate
-    const uint32_t instruction = ( 0xfffff000 & imm ) | ( rd << 7 ) | opcode;
+    const uint32_t instruction = ( imm << 12 ) | ( rd << 7 ) | opcode;
     o( instruction );
 }
 
