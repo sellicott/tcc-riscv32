@@ -266,7 +266,7 @@ static void load_lvalue( int r, SValue *sv )
     else if( masked_stack_reg == VT_LLOCAL ) {
         rs1 = load_symofs( r, sv, 0 );
         lvar_offset = sv->c.i;
-        emit_LW( dest_reg, rs1, lvar_offset ); // lw rd, lvaroffset[rs1]
+        emit_LW( dest_reg, rs1, lvar_offset );
         rs1 = dest_reg;
         lvar_offset = 0;
     }
@@ -286,7 +286,7 @@ static void load_lvalue( int r, SValue *sv )
     else {
         tcc_error( "unimp: load(non-local lval)" );
     }
-    // EI(opcode, func3, rd, rs1, lvar_offset); // l[bhwd][u] / fl[wd] Rd, lvar_offset(BR)
+    // TODO handle floating pont, 64-bit values, and 128-bit values
     switch( size ) {
         case 1: emit_LB( dest_reg, rs1, lvar_offset ); break;
         case 2: emit_LH( dest_reg, rs1, lvar_offset ); break;
@@ -310,7 +310,6 @@ ST_FUNC void load( int r, SValue *sv )
     int stack_type = sv->type.t & VT_BTYPE; // bt
     int stack_reg = sv->r; // fr
     int masked_stack_reg = stack_reg & VT_VALMASK; // v
-    // int align, size;
 
     // loading to an lvalue i.e. pointer into register
     if( stack_reg & VT_LVAL ) {
@@ -513,12 +512,10 @@ ST_FUNC void store( int r, SValue *sv )
     if( is_freg( r ) ) {
         tcc_error( "unip: floating point" );
     }
-    // ES(is_freg(r) ? 0x27 : 0x23,                          // fs... | s...
-    //    size == 1 ? 0 : size == 2 ? 1 : size == 4 ? 2 : 3, // ... [wd] | [bhwd]
-    //    ptrreg, rr, fc);                                   // RR, fc(base)
 
     // load the value from the source register into the location pointed to by
     // loc_reg
+    // TODO: store floating point, 64-bit, and 128-bit values
     switch( size ) {
         case 1: emit_SB( loc_reg, src_reg, offset ); break;
         case 2: emit_SH( loc_reg, src_reg, offset ); break;
@@ -534,21 +531,19 @@ static void gcall_or_jmp( int docall )
         ( ( vtop->r & VT_SYM ) && vtop->c.i == (int)vtop->c.i ) ) {
         /* constant symbolic case -> simple relocation */
         greloca( cur_text_section, vtop->sym, ind, R_RISCV_CALL_PLT, (int)vtop->c.i );
-        // o(0x17 | (tr << 7));   // auipc TR, 0 %call(func)
-        // EI(0x67, 0, tr, tr, 0);// jalr  TR, r(TR)
+        // auipc TR, 0 %call(func)
+        // jalr  TR, r(TR)
         emit_AUIPC( tr, 0 );
         emit_JALR( tr, tr, 0 );
     }
     else if( vtop->r < VT_CONST ) {
         int r = ireg( vtop->r );
-        // EI(0x67, 0, tr, r, 0);      // jalr TR, 0(R)
         emit_JALR( tr, r, 0 );
     }
     else {
         int r = TREG_RA;
         load( r, vtop );
         r = ireg( r );
-        // EI(0x67, 0, tr, r, 0);      // jalr TR, 0(R)
         emit_JALR( tr, r, 0 );
     }
 }
@@ -767,10 +762,6 @@ ST_FUNC void gfunc_call( int nb_args )
 
     if( stack_add ) {
         if( stack_add >= 0x1000 ) {
-            // o(0x37 | (5 << 7) | (-stack_add & 0xfffff000)); //lui t0, upper(v)
-            // EI(0x13, 0, 5, 5, -stack_add << 20 >> 20); // addi t0, t0, lo(v)
-            // ER(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
-
             emit_LUI( t0, IMM_HIGH( -stack_add ) );
             emit_ADDI( t0, t0, IMM_LOW( -stack_add ) );
             emit_ADD( sp, sp, t0 );
@@ -893,7 +884,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 assert( vtop->r2 <= 7 && r2 <= 7 );
                 /* XXX we'd like to have 'gv' move directly into
                    the right class instead of us fixing it up.  */
-                // EI(0x13, 0, ireg(r2), ireg(vtop->r2), 0); // mv Ra+1, RR2
+                // mv Ra+1, RR2
                 emit_MV( ireg( r2 ), ireg( vtop->r2 ) );
                 vtop->r2 = r2;
             }
@@ -909,16 +900,11 @@ ST_FUNC void gfunc_call( int nb_args )
         const uint32_t t0 = 5;
         const uint32_t sp = 2;
         if( stack_add >= 0x1000 ) {
-            // o(0x37 | (5 << 7) | (stack_add & 0xfffff000)); //lui t0, upper(v)
-            // EI(0x13, 0, 5, 5, stack_add << 20 >> 20); // addi t0, t0, lo(v)
-            // ER(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
-
             emit_LUI( t0, IMM_HIGH( stack_add ) );
             emit_ADDI( t0, t0, IMM_LOW( stack_add ) );
             emit_ADD( sp, sp, t0 );
         }
         else {
-            // EI(0x13, 0, 2, 2, stack_add);      // addi sp, sp, adj
             emit_ADDI( sp, sp, stack_add );
         }
     }
@@ -990,10 +976,8 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
                 const uint32_t s0 = 8;
                 if( areg[ prc[ 1 + i ] - 1 ] >= 8 ) {
                     assert( i == 1 && regcount == 2 && !( addr & 7 ) );
-                    // EI(0x03, 2, 5, 8, addr); // lw t0, addr(s0)
                     emit_LW( t0, s0, addr );
                     addr += XLEN;
-                    // emit_S(0x23, 2, 8, 5, loc + i*4); // sw t0, loc(s0)
                     emit_SW( s0, t0, loc + i * 4 );
                 }
                 else if( prc[ 1 + i ] == RC_FLOAT ) {
@@ -1002,7 +986,7 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
                     tcc_error( "unimp: floating point support" );
                 }
                 else {
-                    // ES(0x23, 2, 8, 10 + areg[0]++, loc + i*8); // sw aX, loc(s0) // XXX
+                    // sw aX, loc(s0) // XXX
                     emit_SW( s0, ireg( areg[ 0 ]++ ), loc + i * XLEN );
                 }
             }
@@ -1185,8 +1169,6 @@ ST_FUNC void gjmp_addr( int a )
     // do we have a near jump or a far jump
     if( ( rel_jmp + ( 1 << 21 ) ) & ~( ( 1U << 22 ) - 2 ) ) {
         // far jump
-        // lui t0 upper(rel_jmp)
-        // jalr x0 rel_jmp(t0)
         uint32_t t0 = 5;
         emit_LUI( t0, IMM_HIGH( rel_jmp ) );
         emit_JALR( 0, t0, IMM_LOW( rel_jmp ) );
@@ -1372,7 +1354,6 @@ static int gen_opi_immediate( int op, int fc, int ll )
         case TOK_UGT: /* -> TOK_ULE */
         case TOK_GE: /* -> TOK_LT */
         case TOK_GT: /* -> TOK_LE */
-            // gen_opil(op - 1, !ll);
             gen_opil( op - 1, 0 );
             vtop->cmp_op ^= 1;
             return 0;
@@ -1380,7 +1361,6 @@ static int gen_opi_immediate( int op, int fc, int ll )
         case TOK_NE:
         case TOK_EQ:
             if( fc ) {
-                // gen_opil('-', !ll);
                 gen_opil( '-', 0 );
                 a = ireg( vtop++->r );
             }
@@ -1513,25 +1493,24 @@ ST_FUNC void gen_increment_tcov( SValue *sv )
     r2 = get_reg( RC_INT );
     r1 = ireg( r1 );
     r2 = ireg( r2 );
+
+    // this is a load global pseudo instruction
     greloca( cur_text_section, sv->sym, ind, R_RISCV_PCREL_HI20, 0 );
     put_extern_sym( &label, cur_text_section, ind, 0 );
-    // o(0x17 | (r1 << 7)); // auipc RR, 0 %pcrel_hi(sym)
     emit_AUIPC( r1, 0 );
 
     greloca( cur_text_section, &label, ind, R_RISCV_PCREL_LO12_I, 0 );
-    // EI(0x03, 3, r2, r1, 0); // ld r2, x[r1]
-    // EI(0x13, 0, r2, r2, 1); // addi r2, r2, #1
     emit_LW( r2, r1, 0 );
+
     emit_ADDI( r2, r2, 1 );
 
+    // this is a store global pseudo instruction
     greloca( cur_text_section, sv->sym, ind, R_RISCV_PCREL_HI20, 0 );
     label.c = 0; /* force new local ELF symbol */
     put_extern_sym( &label, cur_text_section, ind, 0 );
-    // o(0x17 | (r1 << 7)); // auipc RR, 0 %pcrel_hi(sym)
     emit_AUIPC( r1, 0 );
 
     greloca( cur_text_section, &label, ind, R_RISCV_PCREL_LO12_S, 0 );
-    // ES(0x23, 3, r1, r2, 0); // sd r2, [r1]
     emit_SW( r2, r1, 0 );
     vpop();
 }

@@ -142,28 +142,27 @@ ST_FUNC void relocate_plt( TCCState *s1 )
         uint64_t plt = s1->plt->sh_addr;
         uint64_t got = s1->got->sh_addr;
 
+        // Define constants for the register values (see the riscv assembly manual for values)
         const uint32_t t0 = 5;
         const uint32_t t1 = 6;
         const uint32_t t2 = 7;
         const uint32_t t3 = 28;
         uint64_t off = IMM_HIGH( got - plt ) + 1;
+
         if( ( off + ( (uint32_t)1 << 20 ) ) >> 21 )
             tcc_error( "Failed relocating PLT (off=0x%lx, got=0x%lx, plt=0x%lx)", (long)off,
                 (long)got, (long)plt );
-        // write32le(p, 0x397 | (off << 12)); // auipc t2, %pcrel_hi(got)
-        // write32le(p + 4, 0x41c30333); // sub t1, t1, t3
-        // write32le(p + 8, 0x0003be03   // ld t3, %pcrel_lo(got)(t2)
-        //                  | (((got - plt) & 0xfff) << 20));
-        // write32le(p + 12, 0xfd430313); // addi t1, t1, -(32+12)
-        // write32le(p + 16, 0x00038293   // addi t0, t2, %pcrel_lo(got)
-        //                   | (((got - plt) & 0xfff) << 20));
-        // write32le(p + 20, 0x00135313); // srli t1, t1, log2(16/PTRSIZE)
-        // write32le(p + 24, 0x0082b283); // ld t0, PTRSIZE(t0)
-        // write32le(p + 28, 0x000e0067); // jr t3
-        // p += 32;
 
-        // Define constants for the register values (see the riscv assembly manual for values)
 
+
+        // auipc t2, %pcrel_hi(got)
+        // sub t1, t1, t3
+        // ld t3, %pcrel_lo(got)(t2)
+        // addi t1, t1, -(32+12)
+        // addi t0, t2, %pcrel_lo(got)
+        // srli t1, t1, log2(16/PTRSIZE)
+        // ld t0, PTRSIZE(t0)
+        // jr t3
         emit_AUIPC( t2, off ); // auipc, t2 %pcrelhi(got)
         emit_SUB( t1, t1, t3 );
         emit_LW( t3, t2, IMM_LOW( got - plt ) );
@@ -175,22 +174,19 @@ ST_FUNC void relocate_plt( TCCState *s1 )
 
         while( ind < end_offset ) {
             uint64_t pc = plt + ind;
-            // uint64_t addr = got + read64le(p);
             uint64_t addr = got + read32le( cur_text_section->data + ind );
             uint64_t off = ( addr - pc + 0x800 ) >> 12;
             if( ( off + ( (uint32_t)1 << 20 ) ) >> 21 )
                 tcc_error( "Failed relocating PLT (off=0x%lx, addr=0x%lx, pc=0x%lx)", (long)off,
                     (long)addr, (long)pc );
-            // write32le(p, 0xe17 | (off << 12)); // auipc t3, %pcrel_hi(func@got)
-            // write32le(p + 4, 0x000e3e03 // ld t3, %pcrel_lo(func@got)(t3)
-            //                  | (((addr - pc) & 0xfff) << 20));
-            // write32le(p + 8, 0x000e0367); // jalr t1, t3
-            // write32le(p + 12, 0x00000013); // nop
-            // p += 16;
 
+            // auipc t3, %pcrel_hi(func@got)
+            // ld t3, %pcrel_lo(func@got)(t3)
+            // jalr t1, t3
+            // nop
             emit_AUIPC( t3, off );
             emit_LW( t3, t3, ( addr - pc ) );
-            emit_JALR( t1, t3, 0 ); // this should perhaps be JALR
+            emit_JALR( t1, t3, 0 );
             emit_NOP();
         }
     }
