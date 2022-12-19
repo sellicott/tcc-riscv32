@@ -35,11 +35,13 @@ void emit_U(uint32_t imm, uint32_t rd, uint32_t opcode);
 void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 
 // Macros for masking values for immediate operations
+// mask off the lower 12 bits of a 32-bit value
 #define IMM_LOW(imm)     ((imm) & 0x00000FFF)
-#define IMM_HIGH(imm)    ((imm) & 0xFFFFF000)
+// mask and shift a 32-bit immediate value to grab the upper 24 bits
+#define IMM_HIGH(imm)    (((imm) & 0xFFFFF000) >> 12)
 
 // macro to check if the immediate value will be larger than 12 bits 
-#define LARGE_IMM(imm) ( ((uint32_t) (IMM_HIGH(((imm) + 0x800)) >> 12) ) )
+#define LARGE_IMM(imm)  ((uint32_t) (IMM_HIGH(imm) + 1))
 
 // Now for a big table of opcodes (RV32I) from p130 of ISA documentation
 // https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf
