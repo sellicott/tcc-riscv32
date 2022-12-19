@@ -3,7 +3,7 @@
 
 /* riscv_utils.h
  * Some helper functions and macros that make generating instructions easier
- * Implementations of the base instruction types, and macros for each 
+ * Implementations of the base instruction types, and macros for each
  * instruction to generate the correct opcode from the memeonic.
  */
 
@@ -13,35 +13,32 @@
 // Definitions for various instruction types: implemented in riscv32-asm.c
 
 // Register instructions (math and stuff)
-void emit_R(uint32_t funct7, uint32_t rs2, uint32_t rs1,
-            uint32_t funct3, uint32_t rd, uint32_t opcode);
+void emit_R(
+    uint32_t funct7, uint32_t rs2, uint32_t rs1, uint32_t funct3, uint32_t rd, uint32_t opcode );
 
 // immediate instructions
-void emit_I(uint32_t imm, uint32_t rs1,
-            uint32_t funct3, uint32_t rd, uint32_t opcode);
+void emit_I( uint32_t imm, uint32_t rs1, uint32_t funct3, uint32_t rd, uint32_t opcode );
 
 // store instructions
-void emit_S(uint32_t imm, uint32_t rs2, uint32_t rs1,
-            uint32_t funct3, uint32_t opcode);
+void emit_S( uint32_t imm, uint32_t rs2, uint32_t rs1, uint32_t funct3, uint32_t opcode );
 
 // branch instructions
-void emit_B(uint32_t imm, uint32_t rs2, uint32_t rs1,
-            uint32_t funct3, uint32_t opcode);
+void emit_B( uint32_t imm, uint32_t rs2, uint32_t rs1, uint32_t funct3, uint32_t opcode );
 
 // big immediate instructions (LUI and AUIPC)
-void emit_U(uint32_t imm, uint32_t rd, uint32_t opcode);
+void emit_U( uint32_t imm, uint32_t rd, uint32_t opcode );
 
 // jump instructions
-void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
+void emit_J( uint32_t imm, uint32_t rd, uint32_t opcode );
 
 // Macros for masking values for immediate operations
 // mask off the lower 12 bits of a 32-bit value
-#define IMM_LOW(imm)     ((imm) & 0x00000FFF)
+#define IMM_LOW( imm ) ( (imm)&0x00000FFF )
 // mask and shift a 32-bit immediate value to grab the upper 24 bits
-#define IMM_HIGH(imm)    (((imm) & 0xFFFFF000) >> 12)
+#define IMM_HIGH( imm ) ( ( (imm)&0xFFFFF000 ) >> 12 )
 
-// macro to check if the immediate value will be larger than 12 bits 
-#define LARGE_IMM(imm)  ((uint32_t) (IMM_HIGH(imm) + 1))
+// macro to check if the immediate value will be larger than 12 bits
+#define LARGE_IMM( imm ) ( (uint32_t)( IMM_HIGH( imm ) + 1 ) )
 
 // Now for a big table of opcodes (RV32I) from p130 of ISA documentation
 // https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf
@@ -105,14 +102,14 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 // Pseudo instructions (from https://risc-v.guru/instructions/)
 
 // TODO make this switch between emit_LLA and emit_LGA to produce PIC code
-#define emit_LA( rd, symbol ) ( emit_LLA( rd, symbol ) ) 
+#define emit_LA( rd, symbol ) emit_LLA( rd, symbol )
 
 #define emit_NOP() ( emit_ADDI( 0, 0, 0 ) )
 
-#define emit_LI( rd, imm )                                        \
+#define emit_LI( rd, imm )                                    \
     /* add 1 to the upper 24 bits so that the sign extended*/ \
-    /* lower bits don't mess up the upper bits*/                  \
-    emit_LUI( rd, IMM_HIGH( imm ) + 1 );                          \
+    /* lower bits don't mess up the upper bits*/              \
+    emit_LUI( rd, IMM_HIGH( imm ) + 1 );                      \
     emit_ADDI( rd, rd, IMM_LOW( imm ) );
 
 // TODO make emit_LLA and emit_LGA functions so that we can generate realloc symbols without hackery
@@ -125,7 +122,7 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 
 // load global address used to load global symbol addresses
 // example `lga a0, msg + 1
-// this will need to generate two relocation entries 
+// this will need to generate two relocation entries
 // R_RISCV_GOT_HI20 for auipc and
 // R_RISCV_PCREL_LO12_I
 #define emit_LGA( rd, imm )            \
@@ -134,9 +131,9 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 
 // ret pseudo instruction
 // ret -> jalr x0, x1, 0
-#define emit_RET() (emit_JALR(0, 1, 0))
+#define emit_RET() ( emit_JALR( 0, 1, 0 ) )
 
-#define emit_MV(rd, rs)     (emit_ADDI(rd, rs, 0))
+#define emit_MV( rd, rs ) ( emit_ADDI( rd, rs, 0 ) )
 //#define emit_SEXT_W(rd, rs) (emit_ADDIW(rd, rs, 0))
 
 // branches
@@ -166,7 +163,6 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 #define emit_JAL_x1(offset) (emit_JAL(1, offset))
 #define emit_JR(rs)         (emit_JALR(0, rs, 0))
 #define emit_JALR_x1(rs)    (emit_JALR(1, rs, 0))
-#define emit_RET()          (emit_JALR(0, 1, 0))
 
 // todo make these functions and put in relocation call directly there
 #define emit_CALL(offset) \
