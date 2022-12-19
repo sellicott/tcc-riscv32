@@ -109,7 +109,7 @@ void emit_J( uint32_t imm, uint32_t rd, uint32_t opcode );
 #define emit_LI( rd, imm )                                    \
     /* add 1 to the upper 24 bits so that the sign extended*/ \
     /* lower bits don't mess up the upper bits*/              \
-    emit_LUI( rd, IMM_HIGH( imm ) + 1 );                      \
+    emit_LUI( rd, IMM_HIGH( ( imm ) + 0x800 ) );              \
     emit_ADDI( rd, rd, IMM_LOW( imm ) );
 
 // TODO make emit_LLA and emit_LGA functions so that we can generate realloc symbols without hackery
@@ -181,7 +181,6 @@ void emit_J( uint32_t imm, uint32_t rd, uint32_t opcode );
 // Sync
 #define emit_FENCE_ALL()        (emit_FENCE(0xf, 0xf, 0x0))
 #define emit_FENCE_DEFAULT()    (emit_FENCE(0x0, 0x0, 0x0))
-
 
 // Zicsr (Control and Status) extension
 #define emit_CSRRW(rd, csr, rs1)    (emit_I(csr, rs1, 0x1, rd, 0x73))
