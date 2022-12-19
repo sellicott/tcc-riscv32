@@ -1,0 +1,19 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "TCC_TARGET_RISCV32",
+                "ONE_SOURCE=0",
+                "SDE_RISCV32_DEV"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "intelliSenseMode": "linux-gcc-x64",
+            "compilerArgs": []
+        }
+    ],
+    "version": 4
+}

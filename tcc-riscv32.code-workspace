@@ -9,7 +9,9 @@
         "files.associations": {
             "tcc.h": "c",
             "stddef.h": "c",
-            "cstdlib": "cpp"
+            "cstdlib": "c",
+            "stdint.h": "c",
+            "stdint-gcc.h": "c"
         }
     }
 }
