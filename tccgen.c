@@ -1765,7 +1765,7 @@ ST_FUNC int gv(int rc)
 
         bt = vtop->type.t & VT_BTYPE;
 
-#ifdef TCC_TARGET_RISCV64
+#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
         /* XXX mega hack */
         if (bt == VT_LDOUBLE && rc == RC_FLOAT)
           rc = RC_INT;
