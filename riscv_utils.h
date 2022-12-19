@@ -102,18 +102,33 @@ void emit_J(uint32_t imm, uint32_t rd, uint32_t opcode);
 
 // Pseudo instructions (from https://risc-v.guru/instructions/)
 
-// note that this will not produce PIC code
-#define emit_LA(rd, symbol) \
-    emit_AUIPC(rd, symbol >> 12); \
-    emit_ADDI(rd, rd, symbol);
+// TODO make this switch between emit_LLA and emit_LGA to produce PIC code
+#define emit_LA( rd, symbol ) ( emit_LLA( rd, symbol ) ) 
 
-#define emit_NOP() (emit_ADDI(0, 0, 0))
+#define emit_NOP() ( emit_ADDI( 0, 0, 0 ) )
 
-#define emit_LI(rd, imm)\
-    /* add 0x800 to the upper 24 bits so that the sign extended*/ \
-    /* lower bits don't mess up the upper bits*/ \
-    emit_LUI(rd, (imm + 0x800) >> 12); \
-    emit_ADDI(rd, rd, imm);
+#define emit_LI( rd, imm )                                        \
+    /* add 1 to the upper 24 bits so that the sign extended*/ \
+    /* lower bits don't mess up the upper bits*/                  \
+    emit_LUI( rd, IMM_HIGH( imm ) + 1 );                          \
+    emit_ADDI( rd, rd, IMM_LOW( imm ) );
+
+// TODO make emit_LLA and emit_LGA functions so that we can generate realloc symbols without hackery
+
+// load a local symbol address
+// example `lga a0, msg + 1
+#define emit_LLA( rd, imm )            \
+    emit_AUIPC( rd, IMM_HIGH( imm ) ); \
+    emit_ADDI( rd, rd, IMM_LOW( imm ) );
+
+// load global address used to load global symbol addresses
+// example `lga a0, msg + 1
+// this will need to generate two relocation entries 
+// R_RISCV_GOT_HI20 for auipc and
+// R_RISCV_PCREL_LO12_I
+#define emit_LGA( rd, imm )            \
+    emit_AUIPC( rd, IMM_HIGH( imm ) ); \
+    emit_LW( rd, IMM_LOW( imm ) );
 
 // ret pseudo instruction
 // ret -> jalr x0, x1, 0
