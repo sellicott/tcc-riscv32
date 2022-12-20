@@ -1170,8 +1170,8 @@ ST_FUNC void gjmp_addr( int a )
     if( ( rel_jmp + ( 1 << 21 ) ) & ~( ( 1U << 22 ) - 2 ) ) {
         // far jump
         uint32_t t0 = 5;
-        emit_LUI( t0, IMM_HIGH( rel_jmp ) );
-        emit_JALR( 0, t0, IMM_LOW( rel_jmp ) );
+        emit_LUI( t0, IMM_HIGH( rel_jmp + 0x800 ) );
+        emit_JALR( 0, t0, IMM_LOW( rel_jmp ) << 20 >> 20); // sign extend masked value
     }
     else {
         // near jump
