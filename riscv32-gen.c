@@ -193,7 +193,7 @@ static int load_symofs( int r, SValue *sv, int forstore )
         greloca( cur_text_section, &label, ind, type, 0 );
 
         if( doload ) {
-            emit_LW( rd, rd, 0 ); // lw RR, 0(RR)
+            emit_ADDI( rd, rd, 0 ); // lw RR, 0(RR)
         }
     }
     else if( stack_value == VT_LOCAL || stack_value == VT_LLOCAL ) {
@@ -205,7 +205,7 @@ static int load_symofs( int r, SValue *sv, int forstore )
         }
         if( LARGE_IMM( sv_constant ) ) {
             sv->c.i = IMM_LOW( sv_constant );
-            emit_LUI( rd, IMM_HIGH( sv_constant ) );
+            emit_LUI( rd, IMM_HIGH( sv_constant + 0x800 ) );
             emit_ADD( rd, rd, s0 );
         }
     }
