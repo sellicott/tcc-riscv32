@@ -147,7 +147,7 @@ ST_FUNC void relocate_plt( TCCState *s1 )
         const uint32_t t1 = 6;
         const uint32_t t2 = 7;
         const uint32_t t3 = 28;
-        uint64_t off = IMM_HIGH( got - plt ) + 1;
+        uint64_t off = IMM_HIGH( got - plt + 0x800 );
 
         if( ( off + ( (uint32_t)1 << 20 ) ) >> 21 )
             tcc_error( "Failed relocating PLT (off=0x%lx, got=0x%lx, plt=0x%lx)", (long)off,
