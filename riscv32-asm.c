@@ -434,16 +434,23 @@ static void asm_binary_opcode( TCCState *s1, int token )
 
     switch( token ) {
         case TOK_ASM_la:
+            // hacky method to generate relocation entries at the correct offsets (ind)
             ind_bak = ind;
-            // both instructions need an entry use hacky method to get it to work
             generate_symbol_reallocation( &ops[ 1 ], R_RISCV_HI20 );
             ind = ind + 4;
             generate_symbol_reallocation( &ops[ 1 ], R_RISCV_LO12_I );
+            // rewind offset to put instructions at the correct offsets
             ind = ind_bak;
             emit_LA( rd, imm );
             return;
         case TOK_ASM_li:
+            // hacky method to generate relocation entries at the correct offsets (ind)
+            ind_bak = ind;
+            generate_symbol_reallocation( &ops[ 1 ], R_RISCV_HI20 );
+            ind = ind + 4;
             generate_symbol_reallocation( &ops[ 1 ], R_RISCV_LO12_I );
+            // rewind offset to put instructions at the correct offsets
+            ind = ind_bak;
             emit_LI( rd, imm );
             return;
         case TOK_ASM_lui:
