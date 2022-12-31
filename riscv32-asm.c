@@ -321,9 +321,9 @@ static void asm_unary_opcode( TCCState *s1, int token )
 
 static void asm_binary_pseudocode( TCCState *s1, int token )
 {
-    Operand src, dst;
-    parse_operand( s1, &dst );
-    if( dst.type != OP_REG ) {
+    Operand rs, rd;
+    parse_operand( s1, &rd );
+    if( rd.type != OP_REG ) {
         tcc_error(
             "'%s': Expected destination operand that is a register", get_tok_str( token, NULL ) );
         return;
@@ -336,14 +336,19 @@ static void asm_binary_pseudocode( TCCState *s1, int token )
         expect( "','" );
     }
     // printf("hi 2\n");
-    parse_operand( s1, &src );
-    if( src.type != OP_REG ) {
+    parse_operand( s1, &rs );
+    if( rs.type != OP_REG ) {
         tcc_error( "'%s': Expected source operand that is a register", get_tok_str( token, NULL ) );
         return;
     }
 
     switch( token ) {
-        case TOK_ASM_mv: emit_MV( dst.reg, src.reg ); return;
+        case TOK_ASM_mv: emit_MV( rd.reg, rs.reg ); return;
+        // comparison to zero pseudoinstructions
+        case TOK_ASM_seqz: emit_SEQZ( rd.reg, rs.reg ); return;
+        case TOK_ASM_snez: emit_SNEZ( rd.reg, rs.reg ); return;
+        case TOK_ASM_sltz: emit_SLTZ( rd.reg, rs.reg ); return;
+        case TOK_ASM_sgtz: emit_SGTZ( rd.reg, rs.reg ); return;
     }
 }
 
