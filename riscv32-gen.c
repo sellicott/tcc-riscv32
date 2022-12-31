@@ -410,7 +410,7 @@ ST_FUNC void load( int r, SValue *sv )
                     b = t;
                     inv ^= 1;
                 }
-                ER( 0x33, ( op > TOK_UGT ) ? 2 : 3, dest_reg, a, b, 0 ); // slt[u] d, a, b
+                //ER( 0x33, ( op > TOK_UGT ) ? 2 : 3, dest_reg, a, b, 0 ); // slt[u] d, a, b
                 if( op > TOK_UGT ) {
                     emit_SLT( dest_reg, a, b );
                 }
@@ -426,11 +426,14 @@ ST_FUNC void load( int r, SValue *sv )
                 if( dest_reg != a || b ) {
                     emit_SUB( dest_reg, a, b ); // sub d, a, b
                 }
+                else {
+                    tcc_error( "Unable to subtract during equality comparison");
+                }
                 if( op == TOK_NE ) {
-                    emit_SLTU( r, 0, dest_reg ); // sltu d, x0, d == snez d,d
+                    emit_SNEZ( dest_reg, dest_reg ); // sltu d, x0, d == snez d,d
                 }
                 else {
-                    emit_SLTIU( dest_reg, dest_reg, 1 ); // sltiu d, d, 1 == seqz d,d
+                    emit_SEQZ( dest_reg, dest_reg ); // sltiu d, d, 1 == seqz d,d
                 }
                 break;
         }
