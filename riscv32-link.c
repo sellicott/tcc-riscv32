@@ -3,7 +3,7 @@
 #define EM_TCC_TARGET EM_RISCV
 
 #define R_DATA_32 R_RISCV_32
-#define R_DATA_PTR R_RISCV_64
+#define R_DATA_PTR R_RISCV_32
 #define R_JMP_SLOT R_RISCV_JUMP_SLOT
 #define R_GLOB_DAT R_RISCV_32
 #define R_COPY R_RISCV_COPY
@@ -152,8 +152,6 @@ ST_FUNC void relocate_plt( TCCState *s1 )
         if( ( off + ( (uint32_t)1 << 20 ) ) >> 21 )
             tcc_error( "Failed relocating PLT (off=0x%lx, got=0x%lx, plt=0x%lx)", (long)off,
                 (long)got, (long)plt );
-
-
 
         // auipc t2, %pcrel_hi(got)
         // sub t1, t1, t3
