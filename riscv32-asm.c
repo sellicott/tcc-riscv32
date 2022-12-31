@@ -293,11 +293,15 @@ static void asm_unary_opcode( TCCState *s1, int token )
     int rd;
     parse_operand( s1, &op );
     if( token != TOK_ASM_j && op.type != OP_REG ) {
-        expect( "register" );
+        tcc_error( "'%s': Expected operand to be a register\n"
+                   "received: %d",
+            get_tok_str( token, NULL ), op.reg );
         return;
     }
     else if( token == TOK_ASM_j && op.type == OP_REG ) {
-        expect( "immediate offset" );
+        tcc_error( "'%s': Expected operand to be an immediate offset\n"
+                   "received: %ld",
+            get_tok_str( token, NULL ), op.e.v );
         return;
     }
 
@@ -351,7 +355,9 @@ static void asm_branch_zero_opcode( TCCState *s1, int token )
     Operand r1, imm;
     parse_operand( s1, &r1 );
     if( r1.type != OP_REG ) {
-        expect( "register" );
+        tcc_error( "'%s': Expected first operand to be a register\n"
+                   "received: %d",
+            get_tok_str( token, NULL ), r1.reg );
         return;
     }
     if( tok == ',' )
@@ -458,7 +464,9 @@ static void asm_branch_opcode( TCCState *s1, int token )
     Operand ops[ 2 ], imm;
     parse_operand( s1, &ops[ 0 ] );
     if( ops[ 0 ].type != OP_REG ) {
-        expect( "register" );
+        tcc_error( "'%s': Expected first operand to be a register\n"
+                   "received: %d",
+            get_tok_str( token, NULL ), ops[ 0 ].reg );
         return;
     }
     if( tok == ',' )
@@ -467,7 +475,9 @@ static void asm_branch_opcode( TCCState *s1, int token )
         expect( "','" );
     parse_operand( s1, &ops[ 1 ] );
     if( ops[ 1 ].type != OP_REG ) {
-        expect( "register" );
+        tcc_error( "'%s': Expected second operand to be a register\n"
+                   "received: %d",
+            get_tok_str( token, NULL ), ops[ 1 ].reg );
         return;
     }
     if( tok == ',' )
@@ -913,10 +923,13 @@ static void asm_jump_opcode( TCCState *s1, int token )
     parse_operand( s1, &ops[ 1 ] );
 
     // check if we have an immediate and we are in the jal instruction
-    if( ops[ 1 ].type != OP_REG ) {
+    if( ops[ 0 ].type != OP_REG ) {
         // Other instructions need a register so issue an error
         if( token != TOK_ASM_jal ) {
             expect( "register" );
+            tcc_error( "'%s': Expected first operand to be a register\n"
+                       "received: %d",
+                get_tok_str( token, NULL ), ops[ 0 ].reg );
             return;
         }
         // check if the data type fits our expectations on its size
