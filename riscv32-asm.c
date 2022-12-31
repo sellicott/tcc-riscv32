@@ -29,11 +29,13 @@ enum {
     OPT_IM12S,
     OPT_IM21,
     OPT_IM32,
+    OPT_SYM,
 };
 #define OP_REG ( 1 << OPT_REG )
 #define OP_IM32 ( 1 << OPT_IM32 )
 #define OP_IM21 ( 1 << OPT_IM21 )
 #define OP_IM12S ( 1 << OPT_IM12S )
+#define OP_SYM ( 1 << OPT_SYM )
 
 // I don't think we need these anymore, but I haven't deleted them yet
 #define ENCODE_RS1( register_index ) ( ( register_index ) << 15 )
@@ -145,14 +147,15 @@ static void parse_operand( TCCState *s1, Operand *op )
 
         // get the type and value information from the included symbol
         Sym *sym = op->e.sym;
+        op->type = OP_SYM;
         if( ( reg = asm_parse_regvar( sym->v ) ) != -1 ) {
-            op->type = OP_REG;
+            op->type |= OP_REG;
             op->reg = reg;
             return;
         }
 
         // immediate value? do type size checking
-        op->type = imm_op_type_from_size( sym->c );
+        op->type |= imm_op_type_from_size( sym->c );
         op->e.v = sym->c;
     }
 }
@@ -474,6 +477,10 @@ static void asm_branch_opcode( TCCState *s1, int token )
     parse_operand( s1, &imm );
 
     offset = imm.e.v;
+    // if we are using a symbol, the value will be handled by the relocation table
+    if( imm.type & OP_SYM ) {
+        offset = 0;
+    }
     if( offset > 0xfff ) {
         tcc_error( "'%s': Expected third operand that is an immediate value between 0 and 0xfff\n"
                    "received: %u",
