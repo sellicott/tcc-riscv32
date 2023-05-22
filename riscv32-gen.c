@@ -492,8 +492,6 @@ ST_FUNC void store( int r, SValue *sv )
     }
     else if( stack_reg_type < VT_CONST ) {
         loc_reg = ireg( stack_reg_type );
-        /*if (((unsigned)fc + (1 << 11)) >> 12)
-          tcc_error("unimp: store(large addend) (0x%x)", fc);*/
         offset = 0; // XXX support offsets regs
     }
     else if( stack_reg_type == VT_CONST ) {
@@ -503,7 +501,7 @@ ST_FUNC void store( int r, SValue *sv )
             offset &= 0xff;
         }
         else {
-            // o(0x37 | (ptrreg << 7) | ((0x800 + fc) & 0xfffff000)); //lui RR, upper(fc)
+            //lui RR, upper(fc)
             emit_LUI( loc_reg, IMM_HIGH( offset ) );
             offset = IMM_LOW( offset );
         }
@@ -1114,7 +1112,7 @@ ST_FUNC void gen_fill_nops( int bytes )
     }
 }
 
-// Patch all branches in list pointed to by branch_list_offset to branch to target_offset:
+// Patch all branches in list "pointed to" by branch_list_offset to branch to target_offset:
 ST_FUNC void gsym_addr( int branch_list_offset, int target_offset )
 {
     uint32_t next_branch_offset = branch_list_offset;
