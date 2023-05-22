@@ -5,6 +5,44 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "rv32 compile 32_led.c",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/riscv32-tcc",
+            "args": ["-g", "-c", "32_led.c", "-o", "32_led.o"],
+            "stopAtEntry": false,
+            "cwd": "/home/nebk/Documents/programs/risc-v/tcc-riscv32/tests/tests2",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+        },
+        {
+            "name": "rv32 compile boot.S",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/riscv32-tcc",
+            "args": ["-g", "-c", "boot.S", "-o", "boot.o"],
+            "stopAtEntry": false,
+            "cwd": "/home/nebk/Documents/programs/risc-v/espwebc3/docs/dev/qemu-metal",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+        },
+        {
             "name": "rv32 compile charles_main.c",
             "type": "cppdbg",
             "request": "launch",

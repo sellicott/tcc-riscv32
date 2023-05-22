@@ -11,7 +11,9 @@
             "stddef.h": "c",
             "cstdlib": "c",
             "stdint.h": "c",
-            "stdint-gcc.h": "c"
+            "stdint-gcc.h": "c",
+            "sstream": "c",
+            "tcctok.h": "c"
         }
     }
 }
