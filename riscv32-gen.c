@@ -1,3 +1,7 @@
+#ifdef SDE_RISCV32_DEV
+#undef TARGET_DEFS_ONLY
+#define PTR_SIZE 4
+#endif
 #ifdef TARGET_DEFS_ONLY
 
 // Number of registers available to allocator:
