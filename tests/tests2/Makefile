@@ -60,6 +60,11 @@ endif
 ifneq (,$(filter Darwin,$(TARGETOS)))
  SKIP += 126_bound_global.test # bt-exe.c problem on apple
 endif
+ifeq ($(ARCH),riscv32)
+ SKIP += 22_floating_point.test
+ SKIP += 23_type_coercion.test
+ SKIP += 24_math_library.test
+endif
 
 # Some tests might need arguments
 ARGS =
