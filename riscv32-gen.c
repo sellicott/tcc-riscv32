@@ -391,6 +391,7 @@ ST_FUNC void load( int r, SValue *sv )
         int a = vtop->cmp_r & 0xff;
         int b = ( vtop->cmp_r >> 8 ) & 0xff;
         int inv = 0;
+        // TODO cleanup this code so that it uses more of the pseudo operation
         switch( op ) {
             case TOK_ULT:
             case TOK_UGE:
@@ -423,11 +424,11 @@ ST_FUNC void load( int r, SValue *sv )
                 break;
             case TOK_NE:
             case TOK_EQ:
+                // we only need to subtract if the comparison isn't already against zero
+                // we check if the comparison is against zero by checking if the two source registers
+                // are different from the destination
                 if( dest_reg != a || b ) {
                     emit_SUB( dest_reg, a, b ); // sub d, a, b
-                }
-                else {
-                    tcc_error( "Unable to subtract during equality comparison");
                 }
                 if( op == TOK_NE ) {
                     emit_SNEZ( dest_reg, dest_reg ); // sltu d, x0, d == snez d,d
