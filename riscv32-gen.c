@@ -1370,6 +1370,13 @@ static int gen_opi_immediate( int op, int fc, int ll )
             vset_VT_CMP( op );
             vtop->cmp_r = a | 0 << 8;
             return 0;
+        default:
+            /*
+              default case means we have to bail, since otherwise we're pretending we handled it properly
+              as an example, '*' will hit this if RHS is an immediate since RV32M doesn't have MULI,
+              so we used to just... not actually compile a multiplication instruction in at all
+            */
+            return 1;
     }
 
     // push the value to the stack (general case)
