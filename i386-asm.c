@@ -1002,15 +1002,21 @@ again:
     modrm_index = -1;
     modreg_index = -1;
     if (pa->instr_type & OPC_MODRM) {
+#ifdef TCC_TARGET_X86_64
 	if (!nb_ops) {
 	    /* A modrm opcode without operands is a special case (e.g. mfence).
-	       It has a group and acts as if there's an register operand 0
-	       (ax).  */
+	       It has a group and acts as if there's an register operand 0 */
 	    i = 0;
 	    ops[i].type = OP_REG;
-	    ops[i].reg = 0;
+	    if (pa->sym == TOK_ASM_endbr64)
+	      ops[i].reg = 2; // dx
+	    else if (pa->sym >= TOK_ASM_lfence && pa->sym <= TOK_ASM_sfence)
+  	      ops[i].reg = 0; // ax
+	    else
+	      tcc_error("bad MODR/M opcode without operands");
 	    goto modrm_found;
 	}
+#endif
         /* first look for an ea operand */
         for(i = 0;i < nb_ops; i++) {
             if (op_type[i] & OP_EA)
