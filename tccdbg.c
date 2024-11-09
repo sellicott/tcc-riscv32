@@ -71,7 +71,7 @@ static const struct {
     {   VT_BOOL, 1, DW_ATE_boolean, "bool:t26=r26;0;255;" },
 #if LONG_SIZE == 4
     {   VT_VOID, 1, DW_ATE_unsigned_char, "void:t27=27" },
-#else 
+#else
     /* bitfields use these */
     {   VT_LONG | VT_INT, 8, DW_ATE_signed, "long int:t27=r27;-9223372036854775808;9223372036854775807;" },
     {   VT_LONG | VT_INT | VT_UNSIGNED, 8, DW_ATE_unsigned, "long unsigned int:t28=r28;0;01777777777777777777777;" },
@@ -407,6 +407,8 @@ struct _tccdbg {
 #define dwarf_info          s1->dState->dwarf_info
 #define tcov_data           s1->dState->tcov_data
 
+#define	FDE_ENCODING        (DW_EH_PE_udata4 | DW_EH_PE_signed | DW_EH_PE_pcrel)
+
 /* ------------------------------------------------------------------------- */
 static void put_stabs(TCCState *s1, const char *str, int type, int other,
     int desc, unsigned long value);
@@ -611,7 +613,7 @@ static void dwarf_file(TCCState *s1)
 	    }
 	if (i == dwarf_line.dir_size) {
 	    dwarf_line.dir_size++;
-	    dwarf_line.dir_table = 
+	    dwarf_line.dir_table =
                 (char **) tcc_realloc(dwarf_line.dir_table,
                                       dwarf_line.dir_size *
                                       sizeof (char *));
@@ -708,6 +710,299 @@ static void dwarf_sleb128_op (TCCState *s1, long long value)
         more = value != end || (byte & 0x40) != last;
         dwarf_line_op(s1, byte | (0x80 * more));
     } while (more);
+}
+
+ST_FUNC void tcc_eh_frame_start(TCCState *s1)
+{
+#if !(defined _WIN32 || defined __APPLE__ || defined TCC_TARGET_ARM || \
+      defined TARGETOS_BSD)
+    eh_frame_section = new_section(s1, ".eh_frame", SHT_PROGBITS, SHF_ALLOC);
+
+    s1->eh_start = eh_frame_section->data_offset;
+    dwarf_data4(eh_frame_section, 0); // length
+    dwarf_data4(eh_frame_section, 0); // CIE ID
+    dwarf_data1(eh_frame_section, 1); // Version
+    dwarf_data1(eh_frame_section, 'z'); // Augmentation String
+    dwarf_data1(eh_frame_section, 'R');
+    dwarf_data1(eh_frame_section, 0);
+#if defined TCC_TARGET_I386
+    dwarf_uleb128(eh_frame_section, 1); // code_alignment_factor
+    dwarf_sleb128(eh_frame_section, -4); // data_alignment_factor
+    dwarf_uleb128(eh_frame_section, 8); // return address column
+    dwarf_uleb128(eh_frame_section, 1); // Augmentation len
+    dwarf_data1(eh_frame_section, FDE_ENCODING);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa);
+    dwarf_uleb128(eh_frame_section, 4); // r4 (esp)
+    dwarf_uleb128(eh_frame_section, 4); // ofs 4
+    dwarf_data1(eh_frame_section, DW_CFA_offset + 8); // r8 (eip)
+    dwarf_uleb128(eh_frame_section, 1); // cfa-4
+#elif defined TCC_TARGET_X86_64
+    dwarf_uleb128(eh_frame_section, 1); // code_alignment_factor
+    dwarf_sleb128(eh_frame_section, -8); // data_alignment_factor
+    dwarf_uleb128(eh_frame_section, 16); // return address column
+    dwarf_uleb128(eh_frame_section, 1); // Augmentation len
+    dwarf_data1(eh_frame_section, FDE_ENCODING);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa);
+    dwarf_uleb128(eh_frame_section, 7); // r7 (rsp)
+    dwarf_uleb128(eh_frame_section, 8); // ofs 8
+    dwarf_data1(eh_frame_section, DW_CFA_offset + 16); // r16 (rip)
+    dwarf_uleb128(eh_frame_section, 1); // cfa-8
+#elif defined TCC_TARGET_ARM
+    /* TODO: arm must be compiled with: -funwind-tables */
+    /* arm also uses .ARM.extab and .ARM.exidx sections */
+    dwarf_uleb128(eh_frame_section, 2); // code_alignment_factor
+    dwarf_sleb128(eh_frame_section, -4); // data_alignment_factor
+    dwarf_uleb128(eh_frame_section, 14); // return address column
+    dwarf_uleb128(eh_frame_section, 1); // Augmentation len
+    dwarf_data1(eh_frame_section, FDE_ENCODING);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa);
+    dwarf_uleb128(eh_frame_section, 13); // r13 (sp)
+    dwarf_uleb128(eh_frame_section, 0); // ofs 0
+#elif defined TCC_TARGET_ARM64
+    dwarf_uleb128(eh_frame_section, 4); // code_alignment_factor
+    dwarf_sleb128(eh_frame_section, -8); // data_alignment_factor
+    dwarf_uleb128(eh_frame_section, 30); // return address column
+    dwarf_uleb128(eh_frame_section, 1); // Augmentation len
+    dwarf_data1(eh_frame_section, FDE_ENCODING);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa);
+    dwarf_uleb128(eh_frame_section, 31); // x31 (sp)
+    dwarf_uleb128(eh_frame_section, 0); // ofs 0
+#elif defined TCC_TARGET_RISCV64
+    eh_frame_section->data[s1->eh_start + 8] = 3; // version = 3
+    dwarf_uleb128(eh_frame_section, 1); // code_alignment_factor
+    dwarf_sleb128(eh_frame_section, -4); // data_alignment_factor
+    dwarf_uleb128(eh_frame_section, 1); // return address column
+    dwarf_uleb128(eh_frame_section, 1); // Augmentation len
+    dwarf_data1(eh_frame_section, FDE_ENCODING);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa);
+    dwarf_uleb128(eh_frame_section, 2); // r2 (sp)
+    dwarf_uleb128(eh_frame_section, 0); // ofs 0
+#endif
+    while ((eh_frame_section->data_offset - s1->eh_start) & 3)
+	dwarf_data1(eh_frame_section, DW_CFA_nop);
+    write32le(eh_frame_section->data + s1->eh_start, // length
+	      eh_frame_section->data_offset - s1->eh_start - 4);
+#endif
+}
+
+static void tcc_debug_frame_end(TCCState *s1, int size)
+{
+    int eh_section_sym;
+    unsigned long fde_start;
+
+    if (!eh_frame_section)
+	return;
+    eh_section_sym = dwarf_get_section_sym(text_section);
+    fde_start = eh_frame_section->data_offset;
+    dwarf_data4(eh_frame_section, 0); // length
+    dwarf_data4(eh_frame_section,
+		fde_start - s1->eh_start + 4); // CIE Pointer
+#if TCC_TARGET_I386
+    dwarf_reloc(eh_frame_section, eh_section_sym, R_386_PC32);
+#elif defined TCC_TARGET_X86_64
+    dwarf_reloc(eh_frame_section, eh_section_sym, R_X86_64_PC32);
+#elif defined TCC_TARGET_ARM
+    dwarf_reloc(eh_frame_section, eh_section_sym, R_ARM_REL32);
+#elif defined TCC_TARGET_ARM64
+    dwarf_reloc(eh_frame_section, eh_section_sym, R_AARCH64_PREL32);
+#elif defined TCC_TARGET_RISCV64
+    dwarf_reloc(eh_frame_section, eh_section_sym, R_RISCV_32_PCREL);
+#endif
+    dwarf_data4(eh_frame_section, func_ind); // PC Begin
+    dwarf_data4(eh_frame_section, size); // PC Range
+    dwarf_data1(eh_frame_section, 0); // Augmentation Length
+#if TCC_TARGET_I386
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc + 1);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa_offset);
+    dwarf_uleb128(eh_frame_section, 8);
+    dwarf_data1(eh_frame_section, DW_CFA_offset + 5); // r5 (ebp)
+    dwarf_uleb128(eh_frame_section, 2); // cfa-8
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc + 2);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa_register);
+    dwarf_uleb128(eh_frame_section, 5); // r5 (ebp)
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc4);
+    dwarf_data4(eh_frame_section, size - 5);
+    dwarf_data1(eh_frame_section, DW_CFA_restore + 5); // r5 (ebp)
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa);
+    dwarf_uleb128(eh_frame_section, 4); // r4 (esp)
+    dwarf_uleb128(eh_frame_section, 4); // ofs 4
+#elif defined TCC_TARGET_X86_64
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc + 1);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa_offset);
+    dwarf_uleb128(eh_frame_section, 16);
+    dwarf_data1(eh_frame_section, DW_CFA_offset + 6); // r6 (rbp)
+    dwarf_uleb128(eh_frame_section, 2); // cfa-16
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc + 3);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa_register);
+    dwarf_uleb128(eh_frame_section, 6); // r6 (rbp)
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc4);
+    dwarf_data4(eh_frame_section, size - 5);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa);
+    dwarf_uleb128(eh_frame_section, 7); // r7 (rsp)
+    dwarf_uleb128(eh_frame_section, 8); // ofs 8
+#elif defined TCC_TARGET_ARM
+    /* TODO */
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc + 2);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa_offset);
+    dwarf_uleb128(eh_frame_section, 8);
+    dwarf_data1(eh_frame_section, DW_CFA_offset + 14); // r14 (lr)
+    dwarf_uleb128(eh_frame_section, 1);
+    dwarf_data1(eh_frame_section, DW_CFA_offset + 11); // r11 (fp)
+    dwarf_uleb128(eh_frame_section, 2);
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc4);
+    dwarf_data4(eh_frame_section, size / 2 - 5);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa_register);
+    dwarf_uleb128(eh_frame_section, 11); // r11 (fp)
+#elif defined TCC_TARGET_ARM64
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc + 1);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa_offset);
+    dwarf_uleb128(eh_frame_section, 224);
+    dwarf_data1(eh_frame_section, DW_CFA_offset + 29); // x29 (fp)
+    dwarf_uleb128(eh_frame_section, 28); // cfa-224
+    dwarf_data1(eh_frame_section, DW_CFA_offset + 30); // x30 (lr)
+    dwarf_uleb128(eh_frame_section, 27); // cfa-216
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc + 3);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa_offset);
+    dwarf_uleb128(eh_frame_section, 224 + ((-loc + 15) & ~15));
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc4);
+    dwarf_data4(eh_frame_section, size / 4 - 5);
+    dwarf_data1(eh_frame_section, DW_CFA_restore + 30); // x30 (lr)
+    dwarf_data1(eh_frame_section, DW_CFA_restore + 29); // x29 (fp)
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa_offset);
+    dwarf_uleb128(eh_frame_section, 0);
+#elif defined TCC_TARGET_RISCV64
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc + 4);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa_offset);
+    dwarf_uleb128(eh_frame_section, 16); // ofs 16
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc + 8);
+    dwarf_data1(eh_frame_section, DW_CFA_offset + 1); // r1 (ra, lr)
+    dwarf_uleb128(eh_frame_section, 2); // cfa-8
+    dwarf_data1(eh_frame_section, DW_CFA_offset + 8); // r8 (s0, fp)
+    dwarf_uleb128(eh_frame_section, 4); // cfa-16
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc + 8);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa);
+    dwarf_uleb128(eh_frame_section, 8); // r8 (s0, fp)
+    dwarf_uleb128(eh_frame_section, 0); // ofs 0
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc4);
+    while (size >= 4 &&
+	   read32le(cur_text_section->data + func_ind + size - 4) != 0x00008067)
+	size -= 4;
+    dwarf_data4(eh_frame_section, size - 36);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa);
+    dwarf_uleb128(eh_frame_section, 2); // r2 (r2, sp)
+    dwarf_uleb128(eh_frame_section, 16); // ofs 16
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc + 4);
+    dwarf_data1(eh_frame_section, DW_CFA_restore + 1); // r1 (lr)
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc + 4);
+    dwarf_data1(eh_frame_section, DW_CFA_restore + 8); // r8 (s0, fp)
+    dwarf_data1(eh_frame_section, DW_CFA_advance_loc + 4);
+    dwarf_data1(eh_frame_section, DW_CFA_def_cfa_offset);
+    dwarf_uleb128(eh_frame_section, 0); // ofs 0
+#endif
+    while ((eh_frame_section->data_offset - fde_start) & 3)
+	dwarf_data1(eh_frame_section, DW_CFA_nop);
+    write32le(eh_frame_section->data + fde_start, // length
+	      eh_frame_section->data_offset - fde_start - 4);
+}
+
+ST_FUNC void tcc_eh_frame_end(TCCState *s1)
+{
+    if (!eh_frame_section)
+	return;
+    dwarf_data4(eh_frame_section, 0);
+}
+
+struct eh_search_table {
+    uint32_t pc_offset;
+    uint32_t fde_offset;
+};
+
+static int sort_eh_table(const void *a, const void *b)
+{
+    uint32_t pc1 = ((const struct eh_search_table *)a)->pc_offset;
+    uint32_t pc2 = ((const struct eh_search_table *)b)->pc_offset;
+
+    return pc1 < pc2 ? -1 : pc1 > pc2 ? 1 : 0;
+}
+
+ST_FUNC void tcc_eh_frame_hdr(TCCState *s1, int final)
+{
+    int count = 0, offset;
+    unsigned long count_offset, tab_offset;
+    unsigned char *ln, *end;
+    unsigned int last_cie_offset = 0xffffffff;
+
+    if (!eh_frame_section || !eh_frame_section->data_offset)
+	return;
+    if (final && !eh_frame_hdr_section)
+	return;
+    if (final == 0)
+        eh_frame_hdr_section =
+	    new_section(s1, ".eh_frame_hdr", SHT_PROGBITS, SHF_ALLOC);
+    eh_frame_hdr_section->data_offset = 0;
+    dwarf_data1(eh_frame_hdr_section, 1); // Version
+    // Pointer Encoding Format
+    dwarf_data1(eh_frame_hdr_section, DW_EH_PE_sdata4 | DW_EH_PE_pcrel);
+    // Count Encoding Format
+    dwarf_data1(eh_frame_hdr_section, DW_EH_PE_udata4 | DW_EH_PE_absptr);
+    // Table Encoding Format
+    dwarf_data1(eh_frame_hdr_section, DW_EH_PE_sdata4 | DW_EH_PE_datarel);
+    offset = eh_frame_section->sh_addr -
+             eh_frame_hdr_section->sh_addr -
+             eh_frame_hdr_section->data_offset;
+    dwarf_data4(eh_frame_hdr_section, offset); // eh_frame_ptr
+    // Count
+    count_offset = eh_frame_hdr_section->data_offset;
+    dwarf_data4(eh_frame_hdr_section, 0);
+    tab_offset = eh_frame_hdr_section->data_offset;
+    ln = eh_frame_section->data;
+    end = eh_frame_section->data + eh_frame_section->data_offset;
+    while (ln < end) {
+	unsigned char *fde = ln, *rd = ln;
+	unsigned int cie_offset, version, length = dwarf_read_4(rd, end);
+	unsigned int pc_offset, fde_offset;
+
+	if (length == 0)
+	    goto next;
+        cie_offset = dwarf_read_4(rd, end);
+	if (cie_offset == 0)
+	    goto next;
+	if (cie_offset != last_cie_offset) {
+	    unsigned char *cie = rd - cie_offset + 4;
+
+	    if (cie < eh_frame_section->data)
+		goto next;
+	    version = dwarf_read_1(cie, end);
+	    if ((version == 1 || version == 3) &&
+	        dwarf_read_1(cie, end) == 'z' && // Augmentation String
+		dwarf_read_1(cie, end) == 'R' &&
+		dwarf_read_1(cie, end) == 0) {
+	        dwarf_read_uleb128(&cie, end); // code_alignment_factor
+	        dwarf_read_sleb128(&cie, end); // data_alignment_factor
+		dwarf_read_1(cie, end); // return address column
+		if (dwarf_read_uleb128(&cie, end) == 1 &&
+		    dwarf_read_1(cie, end) == FDE_ENCODING) {
+		    last_cie_offset = cie_offset;
+		}
+		else
+		    goto next;
+	    }
+	    else
+		goto next;
+	}
+	count++;
+	fde_offset = eh_frame_section->sh_addr +
+		     (fde - eh_frame_section->data) -
+		     eh_frame_hdr_section->sh_addr;
+	pc_offset = dwarf_read_4(rd, end) + fde_offset + 8;
+	dwarf_data4(eh_frame_hdr_section, pc_offset);
+	dwarf_data4(eh_frame_hdr_section, fde_offset);
+next:
+	ln += length + 4;
+    }
+    add32le(eh_frame_hdr_section->data + count_offset, count);
+    qsort(eh_frame_hdr_section->data + tab_offset, count,
+	  sizeof(struct eh_search_table), sort_eh_table);
 }
 
 /* start of translation unit info */
@@ -1875,6 +2170,7 @@ ST_FUNC void tcc_debug_funcend(TCCState *s1, int size)
     /* lldb does not like function end and next function start at same pc */
     int min_instr_len;
 
+    tcc_debug_frame_end(s1, size);
     if (!s1->do_debug)
         return;
     min_instr_len = dwarf_line.last_pc == ind ? 0 : DWARF_MIN_INSTR_LEN;

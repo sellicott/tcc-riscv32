@@ -218,7 +218,7 @@ ST_FUNC void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
                     break;
                 }
             }
-	    write32le(ptr, val - addr);
+	    add32le(ptr, val - addr);
 	    return;
         case R_AARCH64_MOVW_UABS_G0_NC:
             write32le(ptr, ((read32le(ptr) & 0xffe0001f) |

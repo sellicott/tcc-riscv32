@@ -352,8 +352,21 @@ ST_FUNC void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
     case R_RISCV_SUB6:
         *ptr = (*ptr & ~0x3f) | ((*ptr - val) & 0x3f);
         return;
-
     case R_RISCV_32_PCREL:
+        if (s1->output_type & TCC_OUTPUT_DYN) {
+	    /* DLL relocation */
+	    esym_index = get_sym_attr(s1, sym_index, 0)->dyn_index;
+	    if (esym_index) {
+                qrel->r_offset = rel->r_offset;
+                qrel->r_info = ELFW(R_INFO)(esym_index, R_RISCV_32_PCREL);
+                /* Use sign extension! */
+                qrel->r_addend = (int)read32le(ptr) + rel->r_addend;
+                qrel++;
+		break;
+	    }
+        }
+	add32le(ptr, val - addr);
+        return;
     case R_RISCV_COPY:
         /* XXX */
         return;

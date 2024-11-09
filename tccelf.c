@@ -95,6 +95,8 @@ ST_FUNC void tccelf_new(TCCState *s)
         tcc_debug_new(s);
     }
 
+    tcc_eh_frame_start(s);
+
 #ifdef CONFIG_TCC_BCHECK
     if (s->do_bounds_check) {
         /* if bound checking, then add corresponding sections */
@@ -2271,6 +2273,8 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
         ++phnum;
     if (d->dynamic)
         ++phnum;
+    if (eh_frame_hdr_section)
+        ++phnum;
     if (d->roinf)
         ++phnum;
     d->phnum = phnum;
@@ -2391,6 +2395,12 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
         fill_phdr(++ph, PT_NOTE, d->note);
     if (d->dynamic)
         fill_phdr(++ph, PT_DYNAMIC, d->dynamic)->p_flags |= PF_W;
+    if (eh_frame_hdr_section) {
+	add32le(eh_frame_hdr_section->data + 4,
+		eh_frame_section->sh_offset -
+		eh_frame_hdr_section->sh_offset - 4);
+        fill_phdr(++ph, PT_GNU_EH_FRAME, eh_frame_hdr_section);
+    }
     if (d->roinf)
         fill_phdr(++ph, PT_GNU_RELRO, d->roinf)->p_flags |= PF_W;
     if (d->interp)
@@ -2859,6 +2869,10 @@ static int elf_output_file(TCCState *s1, const char *filename)
                 /* shared library case: simply export all global symbols */
                 export_global_syms(s1);
             }
+
+	    /* fill with initial data */
+	    tcc_eh_frame_hdr(s1, 0);
+
 	    dyninf.gnu_hash = create_gnu_hash(s1);
         } else {
             build_got_entries(s1, 0);
@@ -2942,6 +2956,9 @@ static int elf_output_file(TCCState *s1, const char *filename)
         update_gnu_hash(s1, dyninf.gnu_hash);
 
     reorder_sections(s1, sec_order);
+
+    /* fill with final data */
+    tcc_eh_frame_hdr(s1, 1);
 
     /* Create the ELF file with name 'filename' */
     ret = tcc_write_elf_file(s1, filename, dyninf.phnum, dyninf.phdr);

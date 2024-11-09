@@ -760,19 +760,9 @@ found:
 /* ------------------------------------------------------------- */
 /* rt_printline - dwarf version */
 
-#define MAX_128	((8 * sizeof (long long) + 6) / 7)
-
 #define DIR_TABLE_SIZE	(64)
 #define FILE_TABLE_SIZE	(512)
 
-#define	dwarf_read_1(ln,end) \
-	((ln) < (end) ? *(ln)++ : 0)
-#define	dwarf_read_2(ln,end) \
-	((ln) + 2 < (end) ? (ln) += 2, read16le((ln) - 2) : 0)
-#define	dwarf_read_4(ln,end) \
-	((ln) + 4 < (end) ? (ln) += 4, read32le((ln) - 4) : 0)
-#define	dwarf_read_8(ln,end) \
-	((ln) + 8 < (end) ? (ln) += 8, read64le((ln) - 8) : 0)
 #define	dwarf_ignore_type(ln, end) /* timestamp/size/md5/... */ \
 	switch (entry_format[j].form) { \
 	case DW_FORM_data1: (ln) += 1; break; \
@@ -783,45 +773,6 @@ found:
 	case DW_FORM_udata: dwarf_read_uleb128(&(ln), (end)); break; \
 	default: goto next_line; \
 	}
-
-static unsigned long long
-dwarf_read_uleb128(unsigned char **ln, unsigned char *end)
-{
-    unsigned char *cp = *ln;
-    unsigned long long retval = 0;
-    int i;
-
-    for (i = 0; i < MAX_128; i++) {
-	unsigned long long byte = dwarf_read_1(cp, end);
-
-        retval |= (byte & 0x7f) << (i * 7);
-	if ((byte & 0x80) == 0)
-	    break;
-    }
-    *ln = cp;
-    return retval;
-}
-
-static long long
-dwarf_read_sleb128(unsigned char **ln, unsigned char *end)
-{
-    unsigned char *cp = *ln;
-    long long retval = 0;
-    int i;
-
-    for (i = 0; i < MAX_128; i++) {
-	unsigned long long byte = dwarf_read_1(cp, end);
-
-        retval |= (byte & 0x7f) << (i * 7);
-	if ((byte & 0x80) == 0) {
-	    if ((byte & 0x40) && (i + 1) * 7 < 64)
-		retval |= -1LL << ((i + 1) * 7);
-	    break;
-	}
-    }
-    *ln = cp;
-    return retval;
-}
 
 static addr_t rt_printline_dwarf (rt_context *rc, addr_t wanted_pc, bt_info *bi)
 {
