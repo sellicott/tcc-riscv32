@@ -797,7 +797,7 @@ static void tcc_debug_frame_end(TCCState *s1, int size)
     dwarf_data4(eh_frame_section, 0); // length
     dwarf_data4(eh_frame_section,
 		fde_start - s1->eh_start + 4); // CIE Pointer
-#if TCC_TARGET_I386
+#if defined TCC_TARGET_I386
     dwarf_reloc(eh_frame_section, eh_section_sym, R_386_PC32);
 #elif defined TCC_TARGET_X86_64
     dwarf_reloc(eh_frame_section, eh_section_sym, R_X86_64_PC32);
@@ -811,7 +811,7 @@ static void tcc_debug_frame_end(TCCState *s1, int size)
     dwarf_data4(eh_frame_section, func_ind); // PC Begin
     dwarf_data4(eh_frame_section, size); // PC Range
     dwarf_data1(eh_frame_section, 0); // Augmentation Length
-#if TCC_TARGET_I386
+#if defined TCC_TARGET_I386
     dwarf_data1(eh_frame_section, DW_CFA_advance_loc + 1);
     dwarf_data1(eh_frame_section, DW_CFA_def_cfa_offset);
     dwarf_uleb128(eh_frame_section, 8);
