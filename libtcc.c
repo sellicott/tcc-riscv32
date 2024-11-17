@@ -822,6 +822,7 @@ LIBTCCAPI TCCState *tcc_new(void)
     s->warn_implicit_function_declaration = 1;
     s->warn_discarded_qualifiers = 1;
     s->ms_extensions = 1;
+    s->unwind_tables = 1;
 
 #ifdef CHAR_IS_UNSIGNED
     s->char_is_unsigned = 1;
@@ -1674,6 +1675,8 @@ static const FlagDef options_f[] = {
     { offsetof(TCCState, dollars_in_identifiers), 0, "dollars-in-identifiers" },
     { offsetof(TCCState, test_coverage), 0, "test-coverage" },
     { offsetof(TCCState, reverse_funcargs), 0, "reverse-funcargs" },
+    { offsetof(TCCState, gnu89_inline), 0, "gnu89-inline" },
+    { offsetof(TCCState, unwind_tables), 0, "asynchronous-unwind-tables" },
     { 0, 0, NULL }
 };
 

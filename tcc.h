@@ -777,6 +777,8 @@ struct TCCState {
     unsigned char dollars_in_identifiers;  /* allows '$' char in identifiers */
     unsigned char ms_bitfields; /* if true, emulate MS algorithm for aligning bitfields */
     unsigned char reverse_funcargs; /* if true, evaluate last function arg first */
+    unsigned char gnu89_inline; /* treat 'extern inline' like 'static inline' */
+    unsigned char unwind_tables; /* create eh_frame section */
 
     /* warning switches */
     unsigned char warn_none;

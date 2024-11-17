@@ -8459,6 +8459,7 @@ static int decl(int l)
     CType type, btype;
     Sym *sym;
     AttributeDef ad, adbase;
+    ElfSym *esym;
 
     while (1) {
 
@@ -8529,21 +8530,17 @@ static int decl(int l)
                     func_vt = type;
                     decl(VT_CMP);
                 }
-#if defined TCC_TARGET_MACHO || defined TARGETOS_ANDROID
-                if (sym->f.func_alwinl
-                    && ((type.t & (VT_EXTERN | VT_INLINE))
-                        == (VT_EXTERN | VT_INLINE))) {
+
+                if ((type.t & (VT_EXTERN|VT_INLINE)) == (VT_EXTERN|VT_INLINE)) {
                     /* always_inline functions must be handled as if they
                        don't generate multiple global defs, even if extern
                        inline, i.e. GNU inline semantics for those.  Rewrite
                        them into static inline.  */
-                    type.t &= ~VT_EXTERN;
-                    type.t |= VT_STATIC;
+                    if (tcc_state->gnu89_inline || sym->f.func_alwinl)
+                        type.t = (type.t & ~VT_EXTERN) | VT_STATIC;
+                    else
+                        type.t &= ~VT_INLINE; /* always compile otherwise */
                 }
-#endif
-                /* always compile 'extern inline' */
-                if (type.t & VT_EXTERN)
-                    type.t &= ~VT_INLINE;
 
             } else if (oldint) {
                 tcc_warning("type defaults to int");
@@ -8682,7 +8679,7 @@ static int decl(int l)
                         ) {
                         /* external variable or function */
                         type.t |= VT_EXTERN;
-                        sym = external_sym(v, &type, r, &ad);
+                        external_sym(v, &type, r, &ad);
                     } else {
                         if (l == VT_CONST || (type.t & VT_STATIC))
                             r |= VT_CONST;
@@ -8702,8 +8699,7 @@ static int decl(int l)
                            We only support the case where the base is already
                            defined, otherwise we would need deferring to emit
                            the aliases until the end of the compile unit.  */
-                        Sym *alias_target = sym_find(ad.alias_target);
-                        ElfSym *esym = elfsym(alias_target);
+                        esym = elfsym(sym_find(ad.alias_target));
                         if (!esym)
                             tcc_error("unsupported forward __alias__ attribute");
                         put_extern_sym2(sym_find(v), esym->st_shndx,

@@ -116,6 +116,8 @@ static const char help2[] =
     "  ms-extensions                 allow anonymous struct in struct\n"
     "  dollars-in-identifiers        allow '$' in C symbols\n"
     "  reverse-funcargs              evaluate function arguments right to left\n"
+    "  gnu89-inline                  'extern inline' is like 'static inline'\n"
+    "  asynchronous-unwind-tables    create eh_frame section [on]\n"
     "  test-coverage                 create code coverage code\n"
     "-m... target specific options:\n"
     "  ms-bitfields                  use MSVC bitfield layout\n"

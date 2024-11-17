@@ -716,6 +716,8 @@ ST_FUNC void tcc_eh_frame_start(TCCState *s1)
 {
 #if !(defined _WIN32 || defined __APPLE__ || defined TCC_TARGET_ARM || \
       defined TARGETOS_BSD)
+    if (!s1->unwind_tables)
+        return;
     eh_frame_section = new_section(s1, ".eh_frame", SHT_PROGBITS, SHF_ALLOC);
 
     s1->eh_start = eh_frame_section->data_offset;
