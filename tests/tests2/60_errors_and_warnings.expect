@@ -240,3 +240,7 @@ arg[1] = "Y"
 
 [test_pointer_plus_double]
 60_errors_and_warnings.c:490: error: invalid operand types for binary operation
+
+[test_duplicate_case]
+60_errors_and_warnings.c:499: warning: empty case range
+60_errors_and_warnings.c:507: error: duplicate case value

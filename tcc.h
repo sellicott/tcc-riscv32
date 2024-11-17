@@ -564,14 +564,16 @@ typedef struct Sym {
             union {
                 int sym_scope; /* scope level for locals */
                 int jnext; /* next jump label */
+                int jind; /* label position */
                 struct FuncAttr f; /* function attributes */
                 int auxtype; /* bitfield access type */
             };
         };
         long long enum_val; /* enum constant if IS_ENUM_VAL */
         int *d; /* define token stream */
-        struct Sym *ncl; /* next cleanup */
+        struct Sym *cleanup_func;
     };
+
     CType type; /* associated type */
     union {
         struct Sym *next; /* next related symbol (for fields and anoms) */
