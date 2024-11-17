@@ -401,7 +401,9 @@ ST_FUNC int tccgen_compile(TCCState *s1)
     gen_inline_functions(s1);
     check_vstack();
     /* end of translation unit info */
+#if TCC_EH_FRAME
     tcc_eh_frame_end(s1);
+#endif
     tcc_debug_end(s1);
     tcc_tcov_end(s1);
     return 0;

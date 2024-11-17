@@ -1004,6 +1004,8 @@ static int tcc_glob_so(TCCState *s1, const char *pattern, char *buf, int size)
 }
 #endif
 
+static int guess_filetype(const char *filename);
+
 ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
 {
     int fd, ret = -1;
@@ -1013,6 +1015,9 @@ ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
     if (tcc_glob_so(s1, filename, buf, sizeof buf) >= 0)
         filename = buf;
 #endif
+
+    if (0 == (flags & AFF_TYPE_MASK))
+        flags |= guess_filetype(filename);
 
     /* ignore binary files with -E */
     if (s1->output_type == TCC_OUTPUT_PREPROCESS
@@ -1123,10 +1128,10 @@ check_success:
     return ret;
 }
 
-LIBTCCAPI int tcc_add_file(TCCState *s, const char *filename)
+static int guess_filetype(const char *filename)
 {
-    int filetype = s->filetype;
-    if (0 == (filetype & AFF_TYPE_MASK)) {
+    int filetype = 0;
+    if (1) {
         /* use a file extension to detect a filetype */
         const char *ext = tcc_fileextension(filename);
         if (ext[0]) {
@@ -1145,7 +1150,12 @@ LIBTCCAPI int tcc_add_file(TCCState *s, const char *filename)
             filetype = AFF_TYPE_C;
         }
     }
-    return tcc_add_file_internal(s, filename, filetype | AFF_PRINT_ERROR);
+    return filetype;
+}
+
+LIBTCCAPI int tcc_add_file(TCCState *s, const char *filename)
+{
+    return tcc_add_file_internal(s, filename, s->filetype | AFF_PRINT_ERROR);
 }
 
 LIBTCCAPI int tcc_add_library_path(TCCState *s, const char *pathname)
@@ -1162,12 +1172,12 @@ static int tcc_add_library_internal(TCCState *s1, const char *fmt,
 
     for(i = 0; i < nb_paths; i++) {
         snprintf(buf, sizeof(buf), fmt, paths[i], filename);
-        ret = tcc_add_file_internal(s1, buf, (flags & ~AFF_PRINT_ERROR) | AFF_TYPE_BIN);
+        ret = tcc_add_file_internal(s1, buf, flags & ~AFF_PRINT_ERROR);
         if (ret != FILE_NOT_FOUND)
             return ret;
     }
     if (flags & AFF_PRINT_ERROR)
-        tcc_error_noabort("file '%s' not found", filename);
+        tcc_error_noabort("library '%s' not found", filename);
     return FILE_NOT_FOUND;
 }
 
@@ -1219,15 +1229,7 @@ LIBTCCAPI int tcc_add_library(TCCState *s, const char *libraryname)
             return ret;
         ++pp;
     }
-    return FILE_NOT_FOUND;
-}
-
-PUB_FUNC int tcc_add_library_err(TCCState *s1, const char *libname)
-{
-    int ret = tcc_add_library(s1, libname);
-    if (ret == FILE_NOT_FOUND)
-        tcc_error_noabort("library '%s' not found", libname);
-    return ret;
+    return tcc_add_dll(s, libraryname, AFF_PRINT_ERROR);
 }
 
 /* handle #pragma comment(lib,) */
@@ -1235,7 +1237,7 @@ ST_FUNC void tcc_add_pragma_libs(TCCState *s1)
 {
     int i;
     for (i = 0; i < s1->nb_pragma_libs; i++)
-        tcc_add_library_err(s1, s1->pragma_libs[i]);
+        tcc_add_library(s1, s1->pragma_libs[i]);
 }
 
 LIBTCCAPI int tcc_add_symbol(TCCState *s1, const char *name, const void *val)

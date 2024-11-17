@@ -1929,23 +1929,28 @@ ST_FUNC void preprocess(int is_bof)
         break;
     case TOK_LINE:
         next_nomacro();
-        if (tok != TOK_PPNUM)
+        if (tok != TOK_PPNUM) {
     _line_err:
+            if (parse_flags & PARSE_FLAG_ASM_FILE)
+                goto ignore;
             tcc_error("wrong #line format");
+        }
     case TOK_PPNUM:
-        parse_number(tokc.str.data);
-        n = tokc.i;
+        for (n = 0, q = tokc.str.data; *q; ++q) {
+            if (!isnum(*q))
+                goto _line_err;
+            n = n * 10 + *q - '0';
+        }
         next_nomacro();
         if (tok != TOK_LINEFEED) {
             if (tok == TOK_PPSTR && tokc.str.data[0] == '"') {
                 tokc.str.data[tokc.str.size - 2] = 0;
                 tccpp_putfile(tokc.str.data + 1);
-            } else if (parse_flags & PARSE_FLAG_ASM_FILE)
-                goto ignore;
-            else
+            } else
                 goto _line_err;
             next_nomacro();
-        }
+        } else if (parse_flags & PARSE_FLAG_ASM_FILE)
+            goto ignore;
         if (file->fd > 0)
             total_lines += file->line_num - n;
         file->line_num = n;

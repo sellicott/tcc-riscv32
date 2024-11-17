@@ -424,7 +424,7 @@ ST_FUNC void tcc_debug_new(TCCState *s1)
     if (s1->do_debug && s1->output_type == TCC_OUTPUT_MEMORY)
         s1->do_backtrace = 1;
     if (s1->do_backtrace)
-        shf = SHF_ALLOC | SHF_WRITE; // SHF_WRITE needed for musl/SELINUX
+        shf = SHF_ALLOC; /* have debug data available at runtime */
 #endif
 
     if (s1->dwarf) {
@@ -511,7 +511,7 @@ static void put_stabn(TCCState *s1, int type, int other, int desc, int value)
 
 /* ------------------------------------------------------------------------- */
 #define	dwarf_data1(s,data) \
-	{ unsigned char *p = section_ptr_add((s), 1); *p = (data); }
+	(*(uint8_t*)section_ptr_add((s), 1) = (data))
 #define	dwarf_data2(s,data) \
 	write16le(section_ptr_add((s), 2), (data))
 #define	dwarf_data4(s,data) \
@@ -712,10 +712,9 @@ static void dwarf_sleb128_op (TCCState *s1, long long value)
     } while (more);
 }
 
+#if TCC_EH_FRAME
 ST_FUNC void tcc_eh_frame_start(TCCState *s1)
 {
-#if !(defined _WIN32 || defined __APPLE__ || defined TCC_TARGET_ARM || \
-      defined TARGETOS_BSD)
     if (!s1->unwind_tables)
         return;
     eh_frame_section = new_section(s1, ".eh_frame", SHT_PROGBITS, SHF_ALLOC);
@@ -784,7 +783,6 @@ ST_FUNC void tcc_eh_frame_start(TCCState *s1)
 	dwarf_data1(eh_frame_section, DW_CFA_nop);
     write32le(eh_frame_section->data + s1->eh_start, // length
 	      eh_frame_section->data_offset - s1->eh_start - 4);
-#endif
 }
 
 static void tcc_debug_frame_end(TCCState *s1, int size)
@@ -1006,6 +1004,7 @@ next:
     qsort(eh_frame_hdr_section->data + tab_offset, count,
 	  sizeof(struct eh_search_table), sort_eh_table);
 }
+#endif
 
 /* start of translation unit info */
 ST_FUNC void tcc_debug_start(TCCState *s1)
@@ -2172,7 +2171,9 @@ ST_FUNC void tcc_debug_funcend(TCCState *s1, int size)
     /* lldb does not like function end and next function start at same pc */
     int min_instr_len;
 
+#if TCC_EH_FRAME
     tcc_debug_frame_end(s1, size);
+#endif
     if (!s1->do_debug)
         return;
     min_instr_len = dwarf_line.last_pc == ind ? 0 : DWARF_MIN_INSTR_LEN;

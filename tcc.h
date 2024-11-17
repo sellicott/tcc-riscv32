@@ -974,8 +974,6 @@ struct TCCState {
     int uw_sym;
     unsigned uw_offs;
 # endif
-#else
-    unsigned shf_RELRO; /* section flags for RELRO sections */
 #endif
 
 #if defined TCC_TARGET_MACHO
@@ -1874,10 +1872,6 @@ ST_FUNC int gen_makedeps(TCCState *s, const char *target, const char *filename);
 
 /* ------------ tccdbg.c ------------ */
 
-ST_FUNC void tcc_eh_frame_start(TCCState *s1);
-ST_FUNC void tcc_eh_frame_end(TCCState *s1);
-ST_FUNC void tcc_eh_frame_hdr(TCCState *s1, int final);
-
 ST_FUNC void tcc_debug_new(TCCState *s);
 
 ST_FUNC void tcc_debug_start(TCCState *s1);
@@ -1895,6 +1889,13 @@ ST_FUNC void tcc_debug_extern_sym(TCCState *s1, Sym *sym, int sh_num, int sym_bi
 ST_FUNC void tcc_debug_typedef(TCCState *s1, Sym *sym);
 ST_FUNC void tcc_debug_stabn(TCCState *s1, int type, int value);
 ST_FUNC void tcc_debug_fix_anon(TCCState *s1, CType *t);
+
+#if !(defined ELF_OBJ_ONLY || defined TCC_TARGET_ARM || defined TARGETOS_BSD)
+ST_FUNC void tcc_eh_frame_start(TCCState *s1);
+ST_FUNC void tcc_eh_frame_end(TCCState *s1);
+ST_FUNC void tcc_eh_frame_hdr(TCCState *s1, int final);
+#define TCC_EH_FRAME 1
+#endif
 
 ST_FUNC void tcc_tcov_start(TCCState *s1);
 ST_FUNC void tcc_tcov_end(TCCState *s1);
