@@ -80,7 +80,11 @@
 #define __stdcall __attribute__((__stdcall__))
 #define _X86_ 1
 #define _M_IX86 300 /* Visual Studio */
-#define _USE_32BIT_TIME_T
+#ifndef __MINGW_USE_VC2005_COMPAT /* time became 64, but not timeval.tv_sec */
+# ifndef _USE_32BIT_TIME_T
+#  define _USE_32BIT_TIME_T
+# endif
+#endif
 #endif
 
 /* in stddef.h */
