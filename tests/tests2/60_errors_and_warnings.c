@@ -505,5 +505,15 @@ int main()
         case 5:
     }
 }
+#elif defined test_normal_funcargs || defined test_reverse_funcargs
+
+#ifdef test_reverse_funcargs
+# pragma comment(option, "-freverse-funcargs")
+#endif
+int printf(const char*, ...);
+int main()
+{
+    printf(" %d %d %d\n", printf("1"), printf("22"), printf("333"));
+}
 
 #endif

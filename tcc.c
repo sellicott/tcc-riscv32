@@ -115,6 +115,7 @@ static const char help2[] =
     "  leading-underscore            decorate extern symbols\n"
     "  ms-extensions                 allow anonymous struct in struct\n"
     "  dollars-in-identifiers        allow '$' in C symbols\n"
+    "  reverse-funcargs              evaluate function arguments right to left\n"
     "  test-coverage                 create code coverage code\n"
     "-m... target specific options:\n"
     "  ms-bitfields                  use MSVC bitfield layout\n"

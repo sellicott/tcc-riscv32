@@ -243,4 +243,10 @@ arg[1] = "Y"
 
 [test_duplicate_case]
 60_errors_and_warnings.c:499: warning: empty case range
-60_errors_and_warnings.c:507: error: duplicate case value
+60_errors_and_warnings.c:503: error: duplicate case value
+
+[test_normal_funcargs]
+122333 1 2 3
+
+[test_reverse_funcargs]
+333221 1 2 3

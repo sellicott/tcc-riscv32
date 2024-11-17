@@ -154,8 +154,7 @@ static void gen_inline_functions(TCCState *s);
 static void free_inline_functions(TCCState *s);
 static void skip_or_save_block(TokenString **str);
 static void gv_dup(void);
-static int get_temp_local_var(int size,int align);
-static void clear_temp_local_var_list();
+static int get_temp_local_var(int size,int align,int *r2);
 static void cast_error(CType *st, CType *dt);
 static void end_switch(void);
 
@@ -957,42 +956,38 @@ static void vdup(void)
     vpushv(vtop);
 }
 
-/* rotate n first stack elements to the bottom
-   I1 ... In -> I2 ... In I1 [top is right]
-*/
+/* rotate the stack element at position n-1 to the top */
 ST_FUNC void vrotb(int n)
 {
-    int i;
     SValue tmp;
-
+    if (--n < 1)
+        return;
     vcheck_cmp();
-    tmp = vtop[-n + 1];
-    for(i=-n+1;i!=0;i++)
-        vtop[i] = vtop[i+1];
+    tmp = vtop[-n];
+    memmove(vtop - n, vtop - n + 1, sizeof *vtop * n);
     vtop[0] = tmp;
 }
 
-/* rotate the n elements before entry e towards the top
-   I1 ... In ... -> In I1 ... I(n-1) ... [top is right]
- */
-ST_FUNC void vrote(SValue *e, int n)
+/* rotate the top stack element into position n-1 */
+ST_FUNC void vrott(int n)
+{
+    SValue tmp;
+    if (--n < 1)
+        return;
+    vcheck_cmp();
+    tmp = vtop[0];
+    memmove(vtop - n + 1, vtop - n, sizeof *vtop * n);
+    vtop[-n] = tmp;
+}
+
+/* reverse order of the the first n stack elements */
+ST_FUNC void vrev(int n)
 {
     int i;
     SValue tmp;
-
     vcheck_cmp();
-    tmp = *e;
-    for(i = 0;i < n - 1; i++)
-        e[-i] = e[-i - 1];
-    e[-n + 1] = tmp;
-}
-
-/* rotate n first stack elements to the top
-   I1 ... In -> In I1 ... I(n-1)  [top is right]
- */
-ST_FUNC void vrott(int n)
-{
-    vrote(vtop, n);
+    for (i = 0, n = -n; i > ++n; --i)
+        tmp = vtop[i], vtop[i] = vtop[n], vtop[n] = tmp;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1354,14 +1349,14 @@ ST_FUNC void save_reg(int r)
    if seen up to (vtop - n) stack entry */
 ST_FUNC void save_reg_upstack(int r, int n)
 {
-    int l, size, align, bt;
+    int l, size, align, bt, r2;
     SValue *p, *p1, sv;
 
     if ((r &= VT_VALMASK) >= VT_CONST)
         return;
     if (nocode_wanted)
         return;
-    l = 0;
+    l = r2 = 0;
     for(p = vstack, p1 = vtop - n; p <= p1; p++) {
         if ((p->r & VT_VALMASK) == r || p->r2 == r) {
             /* must save value on stack if not already done */
@@ -1373,7 +1368,7 @@ ST_FUNC void save_reg_upstack(int r, int n)
                     bt = VT_PTR;
                 sv.type.t = bt;
                 size = type_size(&sv.type, &align);
-                l = get_temp_local_var(size,align);
+                l = get_temp_local_var(size, align, &r2);
                 sv.r = VT_LOCAL | VT_LVAL;
                 sv.c.i = l;
                 store(p->r & VT_VALMASK, &sv);
@@ -1400,7 +1395,7 @@ ST_FUNC void save_reg_upstack(int r, int n)
                 p->type.t &= ~VT_ARRAY; /* cannot combine VT_LVAL with VT_ARRAY */
             }
             p->sym = NULL;
-            p->r2 = VT_CONST;
+            p->r2 = r2;
             p->c.i = l;
         }
     }
@@ -1471,54 +1466,46 @@ ST_FUNC int get_reg(int rc)
     return -1;
 }
 
-/* find a free temporary local variable (return the offset on stack) match the size and align. If none, add new temporary stack variable*/
-static int get_temp_local_var(int size,int align){
-	int i;
-	struct temp_local_variable *temp_var;
-	int found_var;
-	SValue *p;
-	int r;
-	char free;
-	char found;
-	found=0;
-	for(i=0;i<nb_temp_local_vars;i++){
-		temp_var=&arr_temp_local_vars[i];
-		if(temp_var->size<size||align!=temp_var->align){
-			continue;
-		}
-		/*check if temp_var is free*/
-		free=1;
-		for(p=vstack;p<=vtop;p++) {
-			r=p->r&VT_VALMASK;
-			if(r==VT_LOCAL||r==VT_LLOCAL){
-				if(p->c.i==temp_var->location){
-					free=0;
-					break;
-				}
-			}
-		}
-		if(free){
-			found_var=temp_var->location;
-			found=1;
-			break;
-		}
-	}
-	if(!found){
-		loc = (loc - size) & -align;
-		if(nb_temp_local_vars<MAX_TEMP_LOCAL_VARIABLE_NUMBER){
-			temp_var=&arr_temp_local_vars[i];
-			temp_var->location=loc;
-			temp_var->size=size;
-			temp_var->align=align;
-			nb_temp_local_vars++;
-		}
-		found_var=loc;
-	}
-	return found_var;
-}
+/* find a free temporary local variable (return the offset on stack) match
+   size and align. If none, add new temporary stack variable */
+static int get_temp_local_var(int size,int align, int *r2)
+{
+    int i;
+    struct temp_local_variable *temp_var;
+    SValue *p;
+    int r;
+    unsigned used = 0;
 
-static void clear_temp_local_var_list(){
-	nb_temp_local_vars=0;
+    /* mark locations that are still in use */
+    for (p = vstack; p <= vtop; p++) {
+	r = p->r & VT_VALMASK;
+	if (r == VT_LOCAL || r == VT_LLOCAL) {
+	    r = p->r2 - (VT_CONST + 1);
+	    if (r >= 0 && r < MAX_TEMP_LOCAL_VARIABLE_NUMBER)
+	        used |= 1<<r;
+	}
+    }
+    for (i=0;i<nb_temp_local_vars;i++) {
+	temp_var=&arr_temp_local_vars[i];
+	if(!(used & 1<<i)
+	 && temp_var->size>=size
+	 && temp_var->align>=align) {
+ret_tmp:
+	    *r2 = (VT_CONST + 1) + i;
+	    return temp_var->location;
+	}
+    }
+    loc = (loc - size) & -align;
+    if (nb_temp_local_vars<MAX_TEMP_LOCAL_VARIABLE_NUMBER) {
+	temp_var=&arr_temp_local_vars[i];
+	temp_var->location=loc;
+	temp_var->size=size;
+	temp_var->align=align;
+	nb_temp_local_vars++;
+	goto ret_tmp;
+    }
+    *r2 = VT_CONST;
+    return loc;
 }
 
 /* move register 's' (of type 't') to 'r', and flush previous value of r to memory
@@ -6056,6 +6043,7 @@ special_math_val:
             SValue ret;
             Sym *sa;
             int nb_args, ret_nregs, ret_align, regsize, variadic;
+            TokenString *p, *p2;
 
             /* function call  */
             if ((vtop->type.t & VT_BTYPE) != VT_FUNC) {
@@ -6120,10 +6108,18 @@ special_math_val:
                 ret.c.i = 0;
                 PUT_R_RET(&ret, ret.type.t);
             }
+
+            p = NULL;
             if (tok != ')') {
+                r = tcc_state->reverse_funcargs;
                 for(;;) {
-                    expr_eq();
-                    gfunc_param_typed(s, sa);
+                    if (r) {
+                        skip_or_save_block(&p2);
+                        p2->prev = p, p = p2;
+                    } else {
+                        expr_eq();
+                        gfunc_param_typed(s, sa);
+                    }
                     nb_args++;
                     if (sa)
                         sa = sa->next;
@@ -6134,7 +6130,23 @@ special_math_val:
             }
             if (sa)
                 tcc_error("too few arguments to function");
-            skip(')');
+
+            if (p) { /* with reverse_funcargs */
+                for (n = 0; p; p = p2, ++n) {
+                    p2 = p, sa = s;
+                    do {
+                        sa = sa->next, p2 = p2->prev;
+                    } while (p2 && sa);
+                    p2 = p->prev;
+                    begin_macro(p, 1), next();
+                    expr_eq();
+                    gfunc_param_typed(s, sa);
+                    end_macro();
+                }
+                vrev(n);
+            }
+
+            next();
             gfunc_call(nb_args);
 
             if (ret_nregs < 0) {
@@ -8335,12 +8347,12 @@ static void gen_function(Sym *sym)
     /* push a dummy symbol to enable local sym storage */
     sym_push2(&local_stack, SYM_FIELD, 0, 0);
     local_scope = 1; /* for function parameters */
+    nb_temp_local_vars = 0;
     gfunc_prolog(sym);
     tcc_debug_prolog_epilog(tcc_state, 0);
 
     local_scope = 0;
     rsym = 0;
-    clear_temp_local_var_list();
     func_vla_arg(sym);
     block(0);
     gsym(rsym);

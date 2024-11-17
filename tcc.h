@@ -776,6 +776,7 @@ struct TCCState {
     unsigned char ms_extensions; /* allow nested named struct w/o identifier behave like unnamed */
     unsigned char dollars_in_identifiers;  /* allows '$' char in identifiers */
     unsigned char ms_bitfields; /* if true, emulate MS algorithm for aligning bitfields */
+    unsigned char reverse_funcargs; /* if true, evaluate last function arg first */
 
     /* warning switches */
     unsigned char warn_none;
@@ -1490,9 +1491,9 @@ ST_FUNC void vpushi(int v);
 ST_FUNC void vpushv(SValue *v);
 ST_FUNC void vpushsym(CType *type, Sym *sym);
 ST_FUNC void vswap(void);
-ST_FUNC void vrote(SValue *e, int n);
 ST_FUNC void vrott(int n);
 ST_FUNC void vrotb(int n);
+ST_FUNC void vrev(int n);
 ST_FUNC void vpop(void);
 #if PTR_SIZE == 4
 ST_FUNC void lexpand(void);
