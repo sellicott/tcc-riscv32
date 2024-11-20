@@ -497,21 +497,38 @@ ST_FUNC int tcc_tool_cross(TCCState *s1, char **argv, int option)
 #ifdef _WIN32
 #include <process.h>
 
-/* quote quotes in string and quote string if it contains spaces */
-static char *quote_win32(const char *s0)
+/* - Empty argument or with space/tab (not newline) requires quoting.
+ * - Double-quotes at the value require '\'-escape, retardless of quoting.
+ * - Consecutive (or 1) backslashes at the value all need '\'-escape only if
+ *   followed by [escaped] double quote, else taken literally, e.g. <x\\y\>
+ *   remains literal without quoting or esc, but <x\\"y\> becomes <x\\\\\"y\>.
+ * - This "before double quote" rule applies also before delimiting quoting,
+ *   e.g. <x\y \"z\> becomes <"x\y \\\"z\\"> (quoting required because space).
+ *
+ * https://learn.microsoft.com/en-us/cpp/c-language/parsing-c-command-line-arguments
+ */
+static char *quote_win32(const char *s)
 {
-    const char *s;
-    char *p, *q;
-    int a = 0, b = 0, c;
-    for (s = s0; !!(c = *s); ++s)
-        a += c == '"', b |= c == ' ';
-    q = p = tcc_malloc(s - s0 + a + b + b + 1);
-    *q = '"', q += b;
-    for (s = s0; !!(c = *s); *q++ = c, ++s)
-        if (c == '"')
-            *q++ = '\\';
-    *q = '"', q += b, *q = '\0';
-    return p;
+    char *o, *r = tcc_malloc(2 * strlen(s) + 3);   /* max-esc, quotes, \0 */
+    int cbs = 0, quoted = !*s;  /* consecutive backslashes before current */
+
+    for (o = r; *s; *o++ = *s++) {
+        quoted |= *s == ' ' || *s == '\t';
+        if (*s == '\\' || *s == '"')
+            *o++ = '\\';
+        else
+            o -= cbs;  /* undo cbs escpaes, if any (not followed by DQ) */
+        cbs = *s == '\\' ? cbs + 1 : 0;
+    }
+    if (quoted) {
+        memmove(r + 1, r, o++ - r);
+        *r = *o++ = '"';
+    } else {
+        o -= cbs;
+    }
+
+    *o = 0;
+    return r; /* don't bother with realloc(r, o-r+1) */
 }
 
 static int execvp_win32(const char *prog, char **argv)
