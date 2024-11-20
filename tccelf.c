@@ -3020,7 +3020,7 @@ LIBTCCAPI int tcc_output_file(TCCState *s, const char *filename)
         return elf_output_obj(s, filename);
 #ifdef TCC_TARGET_PE
     return  pe_output_file(s, filename);
-#elif TCC_TARGET_MACHO
+#elif defined TCC_TARGET_MACHO
     return macho_output_file(s, filename);
 #else
     return elf_output_file(s, filename);
