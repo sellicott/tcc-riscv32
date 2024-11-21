@@ -48,18 +48,6 @@ static unsigned long le2belong(unsigned long ul) {
         ((ul & 0xFF)<<24)+((ul & 0xFF00)<<8);
 }
 
-/* Returns 1 if s contains any of the chars of list, else 0 */
-static int contains_any(const char *s, const char *list) {
-  const char *l;
-  for (; *s; s++) {
-      for (l = list; *l; l++) {
-          if (*s == *l)
-              return 1;
-      }
-  }
-  return 0;
-}
-
 static int ar_usage(int ret) {
     fprintf(stderr, "usage: tcc -ar [crstvx] lib [files]\n");
     fprintf(stderr, "create library ([abdiopN] not supported).\n");
@@ -103,16 +91,16 @@ ST_FUNC int tcc_tool_ar(TCCState *s1, int argc, char **argv)
     i_lib = 0; i_obj = 0;  // will hold the index of the lib and first obj
     for (i = 1; i < argc; i++) {
         const char *a = argv[i];
-        if (*a == '-' && strstr(a, "."))
+        if (*a == '-' && strchr(a, '.'))
             ret = 1; // -x.y is always invalid (same as gnu ar)
-        if ((*a == '-') || (i == 1 && !strstr(a, "."))) {  // options argument
-            if (contains_any(a, ops_conflict))
+        if ((*a == '-') || (i == 1 && !strchr(a, '.'))) {  // options argument
+            if (strpbrk(a, ops_conflict))
                 ret = 1;
-            if (strstr(a, "x"))
+            if (strchr(a, 'x'))
                 extract = 1;
-            if (strstr(a, "t"))
+            if (strchr(a, 't'))
                 table = 1;
-            if (strstr(a, "v"))
+            if (strchr(a, 'v'))
                 verbose = 1;
         } else {  // lib or obj files: don't abort - keep validating all args.
             if (!i_lib)  // first file is the lib
