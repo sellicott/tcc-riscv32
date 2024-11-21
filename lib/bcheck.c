@@ -37,6 +37,8 @@
 #include <sys/syscall.h>
 #endif
 
+#include "config.h"
+
 #define BOUND_DEBUG             (1)
 #define BOUND_STATISTIC         (1)
 
@@ -161,7 +163,7 @@ static pthread_spinlock_t bounds_spin;
 #define HAVE_TLS_FUNC          (1)
 #define HAVE_TLS_VAR           (0)
 #endif
-#if defined TCC_MUSL || defined __ANDROID__
+#if defined CONFIG_TCC_MUSL || defined __ANDROID__
 # undef HAVE_CTYPE
 #endif
 #endif
@@ -1187,7 +1189,7 @@ void __attribute__((destructor)) __bound_exit(void)
     dprintf(stderr, "%s, %s():\n", __FILE__, __FUNCTION__);
 
     if (inited) {
-#if !defined(_WIN32) && !defined(__APPLE__) && !defined TCC_MUSL && \
+#if !defined(_WIN32) && !defined(__APPLE__) && !defined CONFIG_TCC_MUSL && \
     !defined(__OpenBSD__) && !defined(__FreeBSD__) && !defined(__NetBSD__) && \
     !defined(__ANDROID__)
         if (print_heap) {

@@ -218,11 +218,6 @@ ST_FUNC void load(int r, SValue *sv)
     int v, t, ft, fc, fr;
     SValue v1;
 
-#ifdef TCC_TARGET_PE
-    SValue v2;
-    sv = pe_getimport(sv, &v2);
-#endif
-
     fr = sv->r;
     ft = sv->type.t & ~VT_DEFSIGN;
     fc = sv->c.i;
@@ -296,11 +291,6 @@ ST_FUNC void load(int r, SValue *sv)
 ST_FUNC void store(int r, SValue *v)
 {
     int fr, bt, ft, fc;
-
-#ifdef TCC_TARGET_PE
-    SValue v2;
-    v = pe_getimport(v, &v2);
-#endif
 
     ft = v->type.t;
     fc = v->c.i;

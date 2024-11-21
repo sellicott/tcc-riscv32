@@ -364,11 +364,6 @@ void load(int r, SValue *sv)
     int v, t, ft, fc, fr;
     SValue v1;
 
-#ifdef TCC_TARGET_PE
-    SValue v2;
-    sv = pe_getimport(sv, &v2);
-#endif
-
     fr = sv->r;
     ft = sv->type.t & ~VT_DEFSIGN;
     fc = sv->c.i;
@@ -572,11 +567,6 @@ void store(int r, SValue *v)
     int op64 = 0;
     /* store the REX prefix in this variable when PIC is enabled */
     int pic = 0;
-
-#ifdef TCC_TARGET_PE
-    SValue v2;
-    v = pe_getimport(v, &v2);
-#endif
 
     fr = v->r & VT_VALMASK;
     ft = v->type.t;

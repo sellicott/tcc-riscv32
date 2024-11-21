@@ -157,6 +157,7 @@ static void gv_dup(void);
 static int get_temp_local_var(int size,int align,int *r2);
 static void cast_error(CType *st, CType *dt);
 static void end_switch(void);
+static void do_Static_assert(void);
 
 /* ------------------------------------------------------------------------- */
 /* Automagical code suppression */
@@ -4340,8 +4341,6 @@ static void struct_layout(CType *type, AttributeDef *ad)
     }
 }
 
-static void do_Static_assert(void);
-
 /* enum/struct/union declaration. u is VT_ENUM/VT_STRUCT/VT_UNION */
 static void struct_decl(CType *type, int u)
 {
@@ -6027,6 +6026,13 @@ special_math_val:
 
         if (r & VT_SYM) {
             vtop->c.i = 0;
+#ifdef TCC_TARGET_PE
+            if (s->a.dllimport) {
+                mk_pointer(&vtop->type);
+                vtop->r |= VT_LVAL;
+                indir();
+            }
+#endif
         } else if (r == VT_CONST && IS_ENUM_VAL(s->type.t)) {
             vtop->c.i = s->enum_val;
         }

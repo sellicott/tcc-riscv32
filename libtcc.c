@@ -18,7 +18,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if !defined ONE_SOURCE || ONE_SOURCE
+#ifndef ONE_SOURCE
+# define ONE_SOURCE 1
+#endif
+
+#if ONE_SOURCE
 #include "tccpp.c"
 #include "tccgen.c"
 #include "tccdbg.c"
@@ -60,7 +64,6 @@
 #endif
 #endif /* ONE_SOURCE */
 
-#define TCC_SEM_IMPL 1
 #include "tcc.h"
 
 /********************************************************/
@@ -1189,12 +1192,14 @@ ST_FUNC int tcc_add_dll(TCCState *s, const char *filename, int flags)
 }
 
 /* find [cross-]libtcc1.a and tcc helper objects in library path */
-ST_FUNC void tcc_add_support(TCCState *s1, const char *filename)
+ST_FUNC int tcc_add_support(TCCState *s1, const char *filename)
 {
+#if CONFIG_TCC_CROSS
     char buf[100];
     if (CONFIG_TCC_CROSSPREFIX[0])
         filename = strcat(strcpy(buf, CONFIG_TCC_CROSSPREFIX), filename);
-    tcc_add_dll(s1, filename, AFF_PRINT_ERROR);
+#endif
+    return tcc_add_dll(s1, filename, AFF_PRINT_ERROR);
 }
 
 #if !defined TCC_TARGET_PE && !defined TCC_TARGET_MACHO
@@ -1229,6 +1234,11 @@ LIBTCCAPI int tcc_add_library(TCCState *s, const char *libraryname)
             return ret;
         ++pp;
     }
+#if CONFIG_TCC_CROSS
+    /* hack for '<cross>-tcc -nostdlib -ltcc1' to find <cross>-libtcc1.a  */
+    if (0 == strcmp(libraryname, "tcc1"))
+        return tcc_add_support(s, TCC_LIBTCC1);
+#endif
     return tcc_add_dll(s, libraryname, AFF_PRINT_ERROR);
 }
 
@@ -1750,7 +1760,7 @@ static const char dumpmachine_str[] =
     "openbsd"
 #elif TARGETOS_NetBSD
     "netbsd"
-#elif TCC_MUSL
+#elif CONFIG_TCC_MUSL
     "linux-musl"
 #else
     "linux-gnu"
@@ -1941,7 +1951,7 @@ dorun:
         enable_backtrace:
             s->do_backtrace = 1;
             s->do_debug = s->do_debug ? s->do_debug : 1;
-	    s->dwarf = DWARF_VERSION;
+	    s->dwarf = CONFIG_DWARF_VERSION;
             break;
 #ifdef CONFIG_TCC_BCHECK
         case TCC_OPTION_b:
@@ -1951,7 +1961,7 @@ dorun:
 #endif
         case TCC_OPTION_g:
             s->do_debug = 2;
-            s->dwarf = DWARF_VERSION;
+            s->dwarf = CONFIG_DWARF_VERSION;
             if (strstart("dwarf", &optarg)) {
                 s->dwarf = (*optarg) ? (0 - atoi(optarg)) : DEFAULT_DWARF_VERSION;
             } else if (isnum(*optarg)) {

@@ -90,6 +90,8 @@ ST_FUNC void tccelf_new(TCCState *s)
     }
 
 #if TCC_EH_FRAME
+    if (s->output_format != TCC_OUTPUT_FORMAT_ELF)
+        s->unwind_tables = 0;
     tcc_eh_frame_start(s);
 #endif
 
@@ -100,6 +102,13 @@ ST_FUNC void tccelf_new(TCCState *s)
         bounds_section = new_section(s, ".bounds", SHT_PROGBITS, shf_RELRO);
         lbounds_section = new_section(s, ".lbounds", SHT_PROGBITS, shf_RELRO);
     }
+#endif
+
+#ifdef TCC_TARGET_PE
+    /* to make sure that -ltcc1 -Wl,-e,_start will grab the startup code
+       from libtcc1.a (unless _start defined) */
+    if (s->elf_entryname)
+        set_global_sym(s, s->elf_entryname, NULL, 0); /* SHN_UNDEF */
 #endif
 }
 
@@ -2157,10 +2166,8 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
         } else {
             j = 0x700;
         }
-        if (s1->output_format != TCC_OUTPUT_FORMAT_ELF) {
-            if (j >= 0x700 || 0 == strncmp(s->name, ".eh_frame", 9))
-                s->sh_size = 0, j = 0x900;
-        }
+        if (j >= 0x700 && s1->output_format != TCC_OUTPUT_FORMAT_ELF)
+            s->sh_size = 0, j = 0x900;
 
         if (s->sh_type == SHT_SYMTAB || s->sh_type == SHT_DYNSYM) {
             k = 0x10;
@@ -3149,23 +3156,24 @@ invalid:
 	if (sh->sh_type == SHT_RELX)
 	  sh = &shdr[sh->sh_info];
         /* ignore sections types we do not handle (plus relocs to those) */
-        if (0 == strncmp(strsec + sh->sh_name, ".debug_", 7)
-         || 0 == strncmp(strsec + sh->sh_name, ".stab", 5)) {
+        sh_name = strsec + sh->sh_name;
+        if (0 == strncmp(sh_name, ".debug_", 7)
+         || 0 == strncmp(sh_name, ".stab", 5)) {
 	    if (!s1->do_debug || seencompressed)
 	        continue;
+        } else if (0 == strncmp(sh_name, ".eh_frame", 9)) {
+            if (NULL == eh_frame_section)
+                continue;
         } else
         if (sh->sh_type != SHT_PROGBITS &&
-#ifdef TCC_ARM_EABI
-            sh->sh_type != SHT_ARM_EXIDX &&
-#endif
-#if TARGETOS_OpenBSD || TARGETOS_FreeBSD || TARGETOS_NetBSD
-            sh->sh_type != SHT_X86_64_UNWIND &&
-#endif
             sh->sh_type != SHT_NOTE &&
             sh->sh_type != SHT_NOBITS &&
             sh->sh_type != SHT_PREINIT_ARRAY &&
             sh->sh_type != SHT_INIT_ARRAY &&
             sh->sh_type != SHT_FINI_ARRAY
+#ifdef TCC_ARM_EABI
+            && sh->sh_type != SHT_ARM_EXIDX
+#endif
             )
             continue;
 
@@ -3176,24 +3184,29 @@ invalid:
         /* find corresponding section, if any */
         for(j = 1; j < s1->nb_sections;j++) {
             s = s1->sections[j];
-            if (!strcmp(s->name, sh_name)) {
-                if (!strncmp(sh_name, ".gnu.linkonce",
-                             sizeof(".gnu.linkonce") - 1)) {
-                    /* if a 'linkonce' section is already present, we
-                       do not add it again. It is a little tricky as
-                       symbols can still be defined in
-                       it. */
-                    sm_table[i].link_once = 1;
-                    goto next;
-                }
-                if (stab_section) {
-                    if (s == stab_section)
-                        stab_index = i;
-                    if (s == stab_section->link)
-                        stabstr_index = i;
-                }
-                goto found;
+            if (strcmp(s->name, sh_name))
+                continue;
+            if (sh->sh_type != s->sh_type
+                && s != eh_frame_section
+                ) {
+                tcc_error_noabort("section type conflict: %s %02x <> %02x", s->name, sh->sh_type, s->sh_type);
+                goto the_end;
             }
+            if (!strncmp(sh_name, ".gnu.linkonce", 13)) {
+                /* if a 'linkonce' section is already present, we
+                   do not add it again. It is a little tricky as
+                   symbols can still be defined in
+                   it. */
+                sm_table[i].link_once = 1;
+                goto next;
+            }
+            if (stab_section) {
+                if (s == stab_section)
+                    stab_index = i;
+                if (s == stab_section->link)
+                    stabstr_index = i;
+            }
+            goto found;
         }
         /* not found: create new section */
         s = new_section(s1, sh_name, sh->sh_type, sh->sh_flags & ~SHF_GROUP);
@@ -3203,14 +3216,6 @@ invalid:
         s->sh_entsize = sh->sh_entsize;
         sm_table[i].new_section = 1;
     found:
-        if (sh->sh_type != s->sh_type
-#if TARGETOS_OpenBSD || TARGETOS_FreeBSD || TARGETOS_NetBSD
-            && strcmp (s->name, ".eh_frame")
-#endif
-            ) {
-            tcc_error_noabort("invalid section type");
-            goto the_end;
-        }
         /* align start of section */
         s->data_offset += -s->data_offset & (sh->sh_addralign - 1);
         if (sh->sh_addralign > s->sh_addralign)
@@ -3907,7 +3912,7 @@ static int ld_add_file(TCCState *s1, const char filename[])
 
 static int ld_add_file_list(TCCState *s1, const char *cmd, int as_needed)
 {
-    char filename[1024], libname[1024];
+    char filename[1024], libname[1016];
     int t, group, nblibs = 0, ret = 0;
     char **libs = NULL;
 

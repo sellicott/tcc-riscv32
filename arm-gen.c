@@ -34,8 +34,8 @@
 #define NB_REGS             9
 #endif
 
-#ifndef TCC_CPU_VERSION
-# define TCC_CPU_VERSION 5
+#ifndef CONFIG_TCC_CPUVER
+# define CONFIG_TCC_CPUVER 5
 #endif
 
 /* a register can belong to several classes. The classes must be

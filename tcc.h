@@ -212,7 +212,7 @@ extern long double strtold (const char *__nptr, char **__endptr);
     || defined TARGETOS_FreeBSD_kernel
 # define TARGETOS_BSD 1
 #elif !(defined TCC_TARGET_PE || defined TCC_TARGET_MACHO)
-# define TARGETOS_Linux 1
+# define TARGETOS_Linux 1 /* for tccdefs_.h */
 #endif
 
 #if defined TCC_TARGET_PE || defined TCC_TARGET_MACHO
@@ -229,6 +229,11 @@ extern long double strtold (const char *__nptr, char **__endptr);
 
 #ifdef CONFIG_TCC_PIE
 # define CONFIG_TCC_PIC 1
+#endif
+
+/* support using libtcc from threads */
+#ifndef CONFIG_TCC_SEMLOCK
+# define CONFIG_TCC_SEMLOCK 1
 #endif
 
 /* ------------ path configuration ------------ */
@@ -288,58 +293,26 @@ extern long double strtold (const char *__nptr, char **__endptr);
 
 /* name of ELF interpreter */
 #ifndef CONFIG_TCC_ELFINTERP
-# if TARGETOS_FreeBSD
-#  define CONFIG_TCC_ELFINTERP "/libexec/ld-elf.so.1"
-# elif TARGETOS_FreeBSD_kernel
-#  if defined(TCC_TARGET_X86_64)
-#   define CONFIG_TCC_ELFINTERP "/lib/ld-kfreebsd-x86-64.so.1"
-#  else
-#   define CONFIG_TCC_ELFINTERP "/lib/ld.so.1"
-#  endif
-# elif TARGETOS_DragonFly
-#  define CONFIG_TCC_ELFINTERP "/usr/libexec/ld-elf.so.2"
-# elif TARGETOS_NetBSD
-#  define CONFIG_TCC_ELFINTERP "/usr/libexec/ld.elf_so"
-# elif TARGETOS_OpenBSD
-#  define CONFIG_TCC_ELFINTERP "/usr/libexec/ld.so"
-# elif defined __GNU__
+# if defined __GNU__
 #  define CONFIG_TCC_ELFINTERP "/lib/ld.so"
 # elif defined(TCC_TARGET_PE)
 #  define CONFIG_TCC_ELFINTERP "-"
-# elif defined(TCC_UCLIBC)
-#  define CONFIG_TCC_ELFINTERP "/lib/ld-uClibc.so.0" /* is there a uClibc for x86_64 ? */
 # elif defined TCC_TARGET_ARM64
-#  if defined(TCC_MUSL)
-#   define CONFIG_TCC_ELFINTERP "/lib/ld-musl-aarch64.so.1"
-#  else
-#   define CONFIG_TCC_ELFINTERP "/lib/ld-linux-aarch64.so.1"
-#  endif
+#  define CONFIG_TCC_ELFINTERP "/lib/ld-linux-aarch64.so.1"
 # elif defined(TCC_TARGET_X86_64)
-#  if defined(TCC_MUSL)
-#   define CONFIG_TCC_ELFINTERP "/lib/ld-musl-x86_64.so.1"
-#  else
-#   define CONFIG_TCC_ELFINTERP "/lib64/ld-linux-x86-64.so.2"
-#  endif
+#  define CONFIG_TCC_ELFINTERP "/lib64/ld-linux-x86-64.so.2"
 # elif defined(TCC_TARGET_RISCV64)
 #  define CONFIG_TCC_ELFINTERP "/lib/ld-linux-riscv64-lp64d.so.1"
-# elif !defined(TCC_ARM_EABI)
-#  if defined(TCC_MUSL)
-#   if defined(TCC_TARGET_I386)
-#     define CONFIG_TCC_ELFINTERP "/lib/ld-musl-i386.so.1"
-#    else
-#     define CONFIG_TCC_ELFINTERP "/lib/ld-musl-arm.so.1"
-#    endif
-#  else
-#   define CONFIG_TCC_ELFINTERP "/lib/ld-linux.so.2"
-#  endif
+# elif defined(TCC_ARM_EABI)
+#  define DEFAULT_ELFINTERP(s) default_elfinterp(s)
+# else
+#  define CONFIG_TCC_ELFINTERP "/lib/ld-linux.so.2"
 # endif
 #endif
 
 /* var elf_interp dans *-gen.c */
-#ifdef CONFIG_TCC_ELFINTERP
+#ifndef DEFAULT_ELFINTERP
 # define DEFAULT_ELFINTERP(s) CONFIG_TCC_ELFINTERP
-#else
-# define DEFAULT_ELFINTERP(s) default_elfinterp(s)
 #endif
 
 /* (target specific) libtcc1.a */
@@ -347,13 +320,14 @@ extern long double strtold (const char *__nptr, char **__endptr);
 # define TCC_LIBTCC1 "libtcc1.a"
 #endif
 
-#ifndef CONFIG_TCC_CROSSPREFIX
-# define CONFIG_TCC_CROSSPREFIX ""
-#endif
-
 /* library to use with CONFIG_USE_LIBGCC instead of libtcc1.a */
 #if defined CONFIG_USE_LIBGCC && !defined TCC_LIBGCC
 #define TCC_LIBGCC USE_TRIPLET(CONFIG_SYSROOT "/" CONFIG_LDDIR) "/libgcc_s.so.1"
+#endif
+
+/* <cross-prefix-to->libtcc1.a */
+#ifndef CONFIG_TCC_CROSSPREFIX
+# define CONFIG_TCC_CROSSPREFIX ""
 #endif
 
 /* -------------------------------------------- */
@@ -370,12 +344,7 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #endif
 
 #ifndef ONE_SOURCE
-# define ONE_SOURCE 1
-#endif
-
-/* support using libtcc from threads */
-#ifndef CONFIG_TCC_SEMLOCK
-# define CONFIG_TCC_SEMLOCK 1
+# define ONE_SOURCE 0
 #endif
 
 #if ONE_SOURCE
@@ -1310,7 +1279,7 @@ ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
 ST_FUNC int tcc_add_crt(TCCState *s, const char *filename);
 #endif
 ST_FUNC int tcc_add_dll(TCCState *s, const char *filename, int flags);
-ST_FUNC void tcc_add_support(TCCState *s1, const char *filename);
+ST_FUNC int tcc_add_support(TCCState *s1, const char *filename);
 #ifdef CONFIG_TCC_BCHECK
 ST_FUNC void tcc_add_bcheck(TCCState *s1);
 #endif
@@ -1821,7 +1790,6 @@ ST_FUNC int pe_load_file(struct TCCState *s1, int fd, const char *filename);
 ST_FUNC int pe_output_file(TCCState * s1, const char *filename);
 ST_FUNC int pe_putimport(TCCState *s1, int dllindex, const char *name, addr_t value);
 #if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
-ST_FUNC SValue *pe_getimport(SValue *sv, SValue *v2);
 #endif
 #ifdef TCC_TARGET_X86_64
 ST_FUNC void pe_add_unwind_data(unsigned start, unsigned end, unsigned stack);
@@ -1924,8 +1892,8 @@ ST_FUNC void tcc_tcov_reset_ind(TCCState *s1);
 #endif
 
 /* default dwarf version for "-g". use 0 to emit stab debug infos */
-#ifndef DWARF_VERSION
-# define DWARF_VERSION 0 //DEFAULT_DWARF_VERSION
+#ifndef CONFIG_DWARF_VERSION
+# define CONFIG_DWARF_VERSION 0
 #endif
 
 #if defined TCC_TARGET_PE
@@ -1939,16 +1907,38 @@ ST_FUNC void tcc_tcov_reset_ind(TCCState *s1);
 /********************************************************/
 #if CONFIG_TCC_SEMLOCK
 #if defined _WIN32
-typedef struct { int init; CRITICAL_SECTION cr; } TCCSem;
+typedef struct { int init; CRITICAL_SECTION cs; } TCCSem;
+static inline void wait_sem(TCCSem *p) {
+    if (!p->init)
+        InitializeCriticalSection(&p->cs), p->init = 1;
+    EnterCriticalSection(&p->cs);
+}
+static inline void post_sem(TCCSem *p) {
+    LeaveCriticalSection(&p->cs);
+}
 #elif defined __APPLE__
 #include <dispatch/dispatch.h>
 typedef struct { int init; dispatch_semaphore_t sem; } TCCSem;
+static inline void wait_sem(TCCSem *p) {
+    if (!p->init)
+        p->sem = dispatch_semaphore_create(1), p->init = 1;
+    dispatch_semaphore_wait(p->sem, DISPATCH_TIME_FOREVER);
+}
+static inline void post_sem(TCCSem *p) {
+    dispatch_semaphore_signal(p->sem);
+}
 #else
 #include <semaphore.h>
 typedef struct { int init; sem_t sem; } TCCSem;
+static inline void wait_sem(TCCSem *p) {
+    if (!p->init)
+        sem_init(&p->sem, 0, 1), p->init = 1;
+    while (sem_wait(&p->sem) < 0 && errno == EINTR);
+}
+static inline void post_sem(TCCSem *p) {
+    sem_post(&p->sem);
+}
 #endif
-ST_FUNC void wait_sem(TCCSem *p);
-ST_FUNC void post_sem(TCCSem *p);
 #define TCC_SEM(s) TCCSem s
 #define WAIT_SEM wait_sem
 #define POST_SEM post_sem
@@ -2008,42 +1998,4 @@ PUB_FUNC void tcc_exit_state(TCCState *s1);
 # define TCC_STATE_VAR(sym) s1->sym
 # define TCC_SET_STATE(fn) (tcc_enter_state(s1),fn)
 # define _tcc_error use_tcc_error_noabort
-#endif
-
-#if CONFIG_TCC_SEMLOCK && TCC_SEM_IMPL
-#undef TCC_SEM_IMPL
-#if defined _WIN32
-ST_FUNC void wait_sem(TCCSem *p)
-{
-    if (!p->init)
-        InitializeCriticalSection(&p->cr), p->init = 1;
-    EnterCriticalSection(&p->cr);
-}
-ST_FUNC void post_sem(TCCSem *p)
-{
-    LeaveCriticalSection(&p->cr);
-}
-#elif defined __APPLE__
-ST_FUNC void wait_sem(TCCSem *p)
-{
-    if (!p->init)
-        p->sem = dispatch_semaphore_create(1), p->init = 1;
-    dispatch_semaphore_wait(p->sem, DISPATCH_TIME_FOREVER);
-}
-ST_FUNC void post_sem(TCCSem *p)
-{
-    dispatch_semaphore_signal(p->sem);
-}
-#else
-ST_FUNC void wait_sem(TCCSem *p)
-{
-    if (!p->init)
-        sem_init(&p->sem, 0, 1), p->init = 1;
-    while (sem_wait(&p->sem) < 0 && errno == EINTR);
-}
-ST_FUNC void post_sem(TCCSem *p)
-{
-    sem_post(&p->sem);
-}
-#endif
 #endif

@@ -105,14 +105,14 @@ static void win64_del_function_table(void *);
 #define PAGEALIGN(n) ((addr_t)n + (-(addr_t)n & (PAGESIZE-1)))
 
 #if !_WIN32 && !__APPLE__
-//#define HAVE_SELINUX 1
+//#define CONFIG_SELINUX 1
 #endif
 
 static int rt_mem(TCCState *s1, int size)
 {
     void *ptr;
     int ptr_diff = 0;
-#ifdef HAVE_SELINUX
+#ifdef CONFIG_SELINUX
     /* Using mmap instead of malloc */
     void *prw;
     char tmpfname[] = "/tmp/.tccrunXXXXXX";
@@ -185,7 +185,7 @@ ST_FUNC void tcc_run_free(TCCState *s1)
         return;
     st_unlink(s1);
     size = s1->run_size;
-#ifdef HAVE_SELINUX
+#ifdef CONFIG_SELINUX
     munmap(ptr, size);
 #else
     /* unprotect memory to make it usable for malloc again */
@@ -381,7 +381,7 @@ redo:
         if (copy == 2) { /* set permissions */
             if (n == 0) /* no data  */
                 continue;
-#ifdef HAVE_SELINUX
+#ifdef CONFIG_SELINUX
             if (k == 0) /* SHF_EXECINSTR has its own mapping */
                 continue;
 #endif

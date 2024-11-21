@@ -826,6 +826,7 @@ static void asm_parse_directive(TCCState *s1, int global)
         { 
             Sym *sym;
             const char *newtype;
+            int st_type;
 
             next();
             sym = get_asm_sym(tok, NULL);
@@ -840,11 +841,17 @@ static void asm_parse_directive(TCCState *s1, int global)
             }
 
             if (!strcmp(newtype, "function") || !strcmp(newtype, "STT_FUNC")) {
-                sym->type.t = (sym->type.t & ~VT_BTYPE) | VT_FUNC;
+                if (IS_ASM_SYM(sym))
+                    sym->type.t = (sym->type.t & ~VT_ASM) | VT_ASM_FUNC;
+                st_type = STT_FUNC;
+            set_st_type:
                 if (sym->c) {
                     ElfSym *esym = elfsym(sym);
-                    esym->st_info = ELFW(ST_INFO)(ELFW(ST_BIND)(esym->st_info), STT_FUNC);
+                    esym->st_info = ELFW(ST_INFO)(ELFW(ST_BIND)(esym->st_info), st_type);
                 }
+            } else if (!strcmp(newtype, "object") || !strcmp(newtype, "STT_OBJECT")) {
+                st_type = STT_OBJECT;
+                goto set_st_type;
             } else
                 tcc_warning_c(warn_unsupported)("change type of '%s' from 0x%x to '%s' ignored",
                     get_tok_str(sym->v, NULL), sym->type.t, newtype);
@@ -1381,7 +1388,7 @@ ST_FUNC void asm_global_instr(void)
         expect("';'");
     
 #ifdef ASM_DEBUG
-    printf("asm_global: \"%s\"\n", (char *)astr.data);
+    printf("asm_global: \"%s\"\n", (char *)astr->data);
 #endif
     cur_text_section = text_section;
     ind = cur_text_section->data_offset;

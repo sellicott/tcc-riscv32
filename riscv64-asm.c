@@ -1614,7 +1614,7 @@ ST_FUNC void asm_gen_code(ASMOperand *operands, int nb_operands,
                 /* push */
                 /* addi sp, sp, -offset */
                 gen_le32((4 << 2) | 3 |
-                        ENCODE_RD(2) | ENCODE_RS1(2) | -8 << 20);
+                        ENCODE_RD(2) | ENCODE_RS1(2) | (unsigned)-8 << 20);
                 if (REG_IS_FLOAT(reg)){
                     /* fsd reg, offset(sp) */
                     gen_le32( 0x27 | (3 << 12) |
