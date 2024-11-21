@@ -2791,6 +2791,13 @@ static int compare_types(CType *type1, CType *type2, int unqualified)
 {
     int bt1, t1, t2;
 
+    if (IS_ENUM(type1->t)) {
+        if (IS_ENUM(type2->t))
+            return type1->ref == type2->ref;
+        type1 = &type1->ref->type;
+    } else if (IS_ENUM(type2->t))
+        type2 = &type2->ref->type;
+
     t1 = type1->t & VT_TYPE;
     t2 = type2->t & VT_TYPE;
     if (unqualified) {
@@ -2824,10 +2831,6 @@ static int compare_types(CType *type1, CType *type2, int unqualified)
         return (type1->ref == type2->ref);
     } else if (bt1 == VT_FUNC) {
         return is_compatible_func(type1, type2);
-    } else if (IS_ENUM(type1->t) && IS_ENUM(type2->t)) {
-        /* If both are enums then they must be the same, if only one is then
-           t1 and t2 must be equal, which was checked above already.  */
-        return type1->ref == type2->ref;
     } else {
         return 1;
     }
@@ -3191,6 +3194,9 @@ static void gen_cast(CType *type)
     if (vtop->type.t & VT_BITFIELD)
         gv(RC_INT);
 
+    if (IS_ENUM(type->t) && type->ref->c < 0)
+        tcc_error("cast to incomplete type");
+
     dbt = type->t & (VT_BTYPE | VT_UNSIGNED);
     sbt = vtop->type.t & (VT_BTYPE | VT_UNSIGNED);
     if (sbt == VT_FUNC)
@@ -3312,9 +3318,6 @@ error:
         ss = btype_size(sbt_bt);
         if (ds == 0 || ss == 0)
             goto error;
-
-        if (IS_ENUM(type->t) && type->ref->c < 0)
-            tcc_error("cast to incomplete type");
 
         /* same size and no sign conversion needed */
         if (ds == ss && ds >= 4)
@@ -4343,7 +4346,7 @@ static void do_Static_assert(void);
 static void struct_decl(CType *type, int u)
 {
     int v, c, size, align, flexible;
-    int bit_size, bsize, bt;
+    int bit_size, bsize, bt, ut;
     Sym *s, *ss, **ps;
     AttributeDef ad, ad1;
     CType type1, btype;
@@ -4351,28 +4354,43 @@ static void struct_decl(CType *type, int u)
     memset(&ad, 0, sizeof ad);
     next();
     parse_attribute(&ad);
-    if (tok != '{') {
-        v = tok;
-        next();
+
+    v = 0;
+    if (tok >= TOK_IDENT) /* struct/enum tag */
+        v = tok, next();
+
+    bt = ut = 0;
+    if (u == VT_ENUM) {
+        ut = VT_INT;
+        if (tok == ':') { /* C2x enum : <type> ... */
+            next();
+            if (!parse_btype(&btype, &ad1, 0)
+             || !is_integer_btype(btype.t & VT_BTYPE))
+                expect("enum type");
+            bt = ut = btype.t & (VT_BTYPE|VT_LONG|VT_UNSIGNED|VT_DEFSIGN);
+        }
+    }
+
+    if (v) {
         /* struct already defined ? return it */
-        if (v < TOK_IDENT)
-            expect("struct/union/enum name");
         s = struct_find(v);
-        if (s && (s->sym_scope == local_scope || tok != '{')) {
+        if (s && (s->sym_scope == local_scope || (tok != '{' && tok != ';'))) {
             if (u == s->type.t)
                 goto do_decl;
-            if (u == VT_ENUM && IS_ENUM(s->type.t))
+            if (u == VT_ENUM && IS_ENUM(s->type.t)) /* XXX: check integral types */
                 goto do_decl;
-            tcc_error("redefinition of '%s'", get_tok_str(v, NULL));
+            tcc_error("redeclaration of '%s'", get_tok_str(v, NULL));
         }
     } else {
+        if (tok != '{')
+            expect("struct/union/enum name");
         v = anon_sym++;
     }
     /* Record the original enum/struct/union token.  */
-    type1.t = u == VT_ENUM ? u | VT_INT | VT_UNSIGNED : u;
+    type1.t = u | ut;
     type1.ref = NULL;
     /* we put an undefined size for struct/union */
-    s = sym_push(v | SYM_STRUCT, &type1, 0, -1);
+    s = sym_push(v | SYM_STRUCT, &type1, 0, bt ? 0 : -1);
     s->r = 0; /* default alignment is zero as gcc */
 do_decl:
     type->t = s->type.t;
@@ -4380,7 +4398,8 @@ do_decl:
 
     if (tok == '{') {
         next();
-        if (s->c != -1)
+        if (s->c != -1
+            && !(u == VT_ENUM && s->c == 0)) /* not yet defined typed enum */
             tcc_error("struct/union/enum already defined");
         s->c = -2;
         /* cannot be empty */
@@ -4392,6 +4411,8 @@ do_decl:
             t.ref = s;
             /* enum symbols have static storage */
             t.t = VT_INT|VT_STATIC|VT_ENUM_VAL;
+            if (bt)
+                t.t = bt|VT_STATIC|VT_ENUM_VAL;
             for(;;) {
                 v = tok;
                 if (v < TOK_UIDENT)
@@ -4421,6 +4442,13 @@ do_decl:
                     break;
             }
             skip('}');
+
+            if (bt) {
+                t.t = bt;
+                s->c = 2;
+                goto enum_done;
+            }
+
             /* set integral type of the enum */
             t.t = VT_INT;
             if (nl >= 0) {
@@ -4429,8 +4457,7 @@ do_decl:
                 t.t |= VT_UNSIGNED;
             } else if (pl != (int)pl || nl != (int)nl)
                 t.t = (LONG_SIZE==8 ? VT_LLONG|VT_LONG : VT_LLONG);
-            s->type.t = type->t = t.t | VT_ENUM;
-            s->c = 0;
+
             /* set type for enum members */
             for (ss = s->next; ss; ss = ss->next) {
                 ll = ss->enum_val;
@@ -4444,6 +4471,10 @@ do_decl:
                 ss->type.t = (ss->type.t & ~VT_BTYPE)
                     | (LONG_SIZE==8 ? VT_LLONG|VT_LONG : VT_LLONG);
             }
+            s->c = 1;
+        enum_done:
+            s->type.t = type->t = t.t | VT_ENUM;
+
         } else {
             c = 0;
             flexible = 0;
