@@ -498,7 +498,7 @@ ST_FUNC int tcc_tool_cross(TCCState *s1, char **argv, int option)
 #include <process.h>
 
 /* - Empty argument or with space/tab (not newline) requires quoting.
- * - Double-quotes at the value require '\'-escape, retardless of quoting.
+ * - Double-quotes at the value require '\'-escape, regardless of quoting.
  * - Consecutive (or 1) backslashes at the value all need '\'-escape only if
  *   followed by [escaped] double quote, else taken literally, e.g. <x\\y\>
  *   remains literal without quoting or esc, but <x\\"y\> becomes <x\\\\\"y\>.
@@ -517,7 +517,7 @@ static char *quote_win32(const char *s)
         if (*s == '\\' || *s == '"')
             *o++ = '\\';
         else
-            o -= cbs;  /* undo cbs escpaes, if any (not followed by DQ) */
+            o -= cbs;  /* undo cbs escapes, if any (not followed by DQ) */
         cbs = *s == '\\' ? cbs + 1 : 0;
     }
     if (quoted) {
