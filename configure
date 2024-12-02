@@ -379,8 +379,9 @@ case $targetos in
     default libdir "${tccdir}/libtcc"
     # set tccdir at runtime from executable path
     test "$tccdir" = "$bindir" && tccdir_auto="yes"
-    # avoid mingw dependencies such as 'libgcc_s_dw2-1.dll'
-    test "$cc_name" = "gcc" && default LDFLAGS "-static"
+    # chech $cc to avoid mingw gcc dependencies such as 'libgcc_s_dw2-1.dll'
+    # (no confirmed $cc_name yet, and also will never have if cross compiling)
+    test "${cc%gcc*}" = "$cc" || default LDFLAGS "-static"
     LIBSUF=".lib"
     EXESUF=".exe"
     DLLSUF=".dll"
