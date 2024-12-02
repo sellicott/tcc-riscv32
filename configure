@@ -163,7 +163,9 @@ for opt do
   ;;
   --tcc-switches=*) assign_opt "$opt" tcc_switches
   ;;
-  --config-mingw32*) mingw32=$(echo "$opt=yes" | cut -d '=' -f 2)
+  --config-mingw32) mingw32=yes
+  ;;
+  --config-mingw32=*) assign_opt "$opt" mingw32
   ;;
   --config-*) confvars_set "${opt#--config-}"; suggest="no"
   ;;
@@ -217,7 +219,7 @@ Advanced options (experts only):
   --tcc-switches=...       specify implicit switches passed to tcc
 
   --config-uClibc,-musl    enable system specific configurations
-  --config-mingw32         build on windows using msys, busybox, etc.
+  --config-mingw32[=yes|no] build on windows using msys, busybox, etc.
   --config-backtrace=no    disable stack backtraces (with -run or -bt)
   --config-bcheck=no       disable bounds checker (-b)
   --config-predefs=no      do not compile tccdefs.h, instead just include
