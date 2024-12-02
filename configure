@@ -206,17 +206,14 @@ EOF
 exit 1
 }
 
-default() # set variable unless already set
+default() # set variable unless already set and not empty
 {
-    local v
-    eval v=\"\$$1\"
-    test -z "$v" && test -n "$2" && eval $1=\"$2\"
+    test -n "$2" && eval : \${$1:=\$2}  # ': ${foo:=$2}'
 }
 
 default_conf() # add to confvars unless already present
 {
-    local v=${1%=*}
-    test "${confvars%$v*}" = "${confvars}" && confvars="$confvars $1"
+    test "${confvars%${1%=*}*}" = "${confvars}" && confvars="$confvars $1"
 }
 
 if test -z "${source_path#.}" ; then
@@ -565,20 +562,20 @@ else
      echo 'TOPSRC=$(TOP)' >>config.mak
 fi
 
+# $1: macro name, $2: val to set - quoted [, $3: non-empty for #ifndef]
 print_str() {
-  local v="$2"
-  if test -n "$v"; then
+  if test -n "$2"; then
     test -n "$3" && echo "#ifndef $1" >> $TMPH
-    echo "#define $1 \"$v\"" >> $TMPH
+    echo "#define $1 \"$2\"" >> $TMPH
     test -n "$3" && echo "#endif" >> $TMPH
   fi
 }
 
+# $1: macro name, $2: val to set [, $3: non-empty for #ifndef]
 print_num() {
-  local v="$2"
-  if test -n "$v"; then
+  if test -n "$2"; then
      test -n "$3" && echo "#ifndef $1" >> $TMPH
-     echo "#define $1 $v" >> $TMPH
+     echo "#define $1 $2" >> $TMPH
      test -n "$3" && echo "#endif" >> $TMPH
   fi
 }
