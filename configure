@@ -64,58 +64,64 @@ test -z "$CFLAGS" && CFLAGS="-Wall -O2"
 source_path=${0%configure}
 source_path=${source_path%/}
 
+# $1: --OPTNAME=VALUE [, $2: NAME to assign-to instead of OPTNAME]
+assign_opt() {
+  set -- "${2:-${1%%=*}}" "${1#*=}"  # [--OPT]NAME VALUE
+  eval ${1#--}=\$2  # no risk of IFS/glob in [OPT]NAME
+}
+
 for opt do
   eval opt=\"$opt\"
   case "$opt" in
-  --prefix=*) prefix=`echo $opt | cut -d '=' -f 2-`
+  --prefix=*) assign_opt "$opt"
   ;;
-  --exec-prefix=*) execprefix=`echo $opt | cut -d '=' -f 2-`
+  --exec-prefix=*) assign_opt "$opt" execprefix
   ;;
-  --tccdir=*) tccdir=`echo $opt | cut -d '=' -f 2-`
+  --tccdir=*) assign_opt "$opt"
   ;;
-  --bindir=*) bindir=`echo $opt | cut -d '=' -f 2-`
+  --bindir=*) assign_opt "$opt"
   ;;
-  --libdir=*) libdir=`echo $opt | cut -d '=' -f 2-`
+  --libdir=*) assign_opt "$opt"
   ;;
-  --includedir=*) includedir=`echo $opt | cut -d '=' -f 2-`
+  --includedir=*) assign_opt "$opt"
   ;;
-  --sharedir=*) sharedir=`echo $opt | cut -d '=' -f 2-`
+  --sharedir=*) assign_opt "$opt"
   ;;
-  --mandir=*) mandir=`echo $opt | cut -d '=' -f 2-`
+  --mandir=*) assign_opt "$opt"
   ;;
-  --infodir=*) infodir=`echo $opt | cut -d '=' -f 2-`
+  --infodir=*) assign_opt "$opt"
   ;;
-  --docdir=*) docdir=`echo $opt | cut -d '=' -f 2-`
+  --docdir=*) assign_opt "$opt"
   ;;
-  --sysroot=*) sysroot=`echo $opt | cut -d '=' -f 2-`
+  --sysroot=*) assign_opt "$opt"
   ;;
-  --targetos=*) targetos=`echo $opt | cut -d '=' -f 2-`
+  --targetos=*) assign_opt "$opt"
   ;;
-  --source-path=*) source_path=`echo $opt | cut -d '=' -f 2-`
+  --source-path=*) assign_opt "$opt" source_path
   ;;
-  --cross-prefix=*) cross_prefix=`echo $opt | cut -d '=' -f 2-`
+  --cross-prefix=*) assign_opt "$opt" cross_prefix
   ;;
-  --cc=*) cc=`echo $opt | cut -d '=' -f 2-`
+  --cc=*) assign_opt "$opt"
   ;;
-  --ar=*) ar=`echo $opt | cut -d '=' -f 2-` ; ar_set="yes"
+  --ar=*) assign_opt "$opt" ; ar_set="yes"
   ;;
-  --extra-cflags=*) CFLAGS="${opt#--extra-cflags=}"
+  --extra-cflags=*) assign_opt "$opt" CFLAGS
   ;;
-  --extra-ldflags=*) LDFLAGS="${opt#--extra-ldflags=}"
+  --extra-ldflags=*) assign_opt "$opt" LDFLAGS
   ;;
-  --extra-libs=*) extralibs="${opt#--extra-libs=}"
+  --extra-libs=*) assign_opt "$opt" extralibs
   ;;
-  --sysincludepaths=*) tcc_sysincludepaths=`echo $opt | cut -d '=' -f 2-`
+  --sysincludepaths=*) assign_opt "$opt" tcc_sysincludepaths
   ;;
-  --libpaths=*) tcc_libpaths=`echo $opt | cut -d '=' -f 2-`
+  --libpaths=*) assign_opt "$opt" tcc_libpaths
   ;;
-  --crtprefix=*) tcc_crtprefix=`echo $opt | cut -d '=' -f 2-`
+  --crtprefix=*) assign_opt "$opt" tcc_crtprefix
   ;;
-  --elfinterp=*) tcc_elfinterp=`echo $opt | cut -d '=' -f 2-`
+  --elfinterp=*) assign_opt "$opt" tcc_elfinterp
   ;;
-  --triplet=*) triplet=`echo $opt | cut -d '=' -f 2-`
+  --triplet=*) assign_opt "$opt"
   ;;
-  --cpu=*) cpu=`echo $opt | cut -d '=' -f 2-`
+  --cpu=*) assign_opt "$opt"
   ;;
   --dwarf=*) confvars="$confvars dwarf=${opt#*=}"
   ;;
@@ -133,7 +139,7 @@ for opt do
   ;;
   --with-selinux) confvars="$confvars selinux"
   ;;
-  --tcc-switches=*) tcc_switches=`echo $opt | cut -d '=' -f 2-`
+  --tcc-switches=*) assign_opt "$opt" tcc_switches
   ;;
   --config-mingw32*) mingw32=$(echo "$opt=yes" | cut -d '=' -f 2)
   ;;
