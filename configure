@@ -70,6 +70,10 @@ assign_opt() {
   eval ${1#--}=\$2  # no risk of IFS/glob in [OPT]NAME
 }
 
+confvars_set() {
+  confvars="$confvars $*"
+}
+
 for opt do
   eval opt=\"$opt\"
   case "$opt" in
@@ -123,27 +127,27 @@ for opt do
   ;;
   --cpu=*) assign_opt "$opt"
   ;;
-  --dwarf=*) confvars="$confvars dwarf=${opt#*=}"
+  --dwarf=*) confvars_set "dwarf=${opt#*=}"
   ;;
-  --enable-cross) confvars="$confvars cross"
+  --enable-cross) confvars_set cross
   ;;
-  --disable-static) confvars="$confvars static=no"
+  --disable-static) confvars_set static=no
   ;;
-  --enable-static) confvars="$confvars static"
+  --enable-static) confvars_set static
   ;;
-  --disable-rpath) confvars="$confvars rpath=no"
+  --disable-rpath) confvars_set rpath=no
   ;;
-  --debug) confvars="$confvars debug"
+  --debug) confvars_set debug
   ;;
-  --with-libgcc) confvars="$confvars libgcc"
+  --with-libgcc) confvars_set libgcc
   ;;
-  --with-selinux) confvars="$confvars selinux"
+  --with-selinux) confvars_set selinux
   ;;
   --tcc-switches=*) assign_opt "$opt" tcc_switches
   ;;
   --config-mingw32*) mingw32=$(echo "$opt=yes" | cut -d '=' -f 2)
   ;;
-  --config-*) confvars="$confvars ${opt#--config-}"; suggest="no"
+  --config-*) confvars_set "${opt#--config-}"; suggest="no"
   ;;
   --help|-h) show_help="yes"
   ;;
@@ -219,7 +223,7 @@ default() # set variable unless already set and not empty
 
 default_conf() # add to confvars unless already present
 {
-    test "${confvars%${1%=*}*}" = "${confvars}" && confvars="$confvars $1"
+    test "${confvars%${1%=*}*}" = "${confvars}" && confvars_set "$1"
 }
 
 if test -z "${source_path#.}" ; then
@@ -326,7 +330,7 @@ esac
 
 case $targetos in
   Darwin)
-    confvars="$confvars OSX dwarf=4"
+    confvars_set OSX dwarf=4
     default_conf "codesign"
     DLLSUF=".dylib"
     if test -z "$build_cross"; then
@@ -337,7 +341,7 @@ case $targetos in
           # if new_macho was not specified and (known) ver <= 10, use old (=no)
           osxver=$(sw_vers -productVersion 2>/dev/null)  # X.Y.Z
           osxver=${osxver%%.*}  # major version (or empty on sw_vers error)
-          [ "${osxver:-11}" -ge 11 ] || confvars="$confvars new_macho=no"
+          [ "${osxver:-11}" -ge 11 ] || confvars_set new_macho=no
       fi
     fi
     # on OSX M1 with --cpu=x86_64, build a tcc to run under rosetta entirely
@@ -347,7 +351,7 @@ case $targetos in
     fi
     ;;
   DragonFly|OpenBSD|FreeBSD|NetBSD)
-    confvars="$confvars BSD ldl=no"
+    confvars_set BSD ldl=no
     ;;
   Android|Termux)
     if test "$targetos" = "Termux"; then
@@ -357,8 +361,8 @@ case $targetos in
       default sysroot "/usr"
     fi
     default prefix "${sysroot}"
-    confvars="$confvars Android new_dtags rpath=no"
-    test "${cpu}" != "i386" && confvars="$confvars pie"
+    confvars_set Android new_dtags rpath=no
+    test "${cpu}" != "i386" && confvars_set pie
     default_conf "static=no"
     if test "${cpu}" = "arm"; then
       default triplet "arm-linux-androideabi"
@@ -375,7 +379,7 @@ case $targetos in
     ;;
   WIN32)
     mingw32="yes"
-    confvars="WIN32 $confvars"
+    confvars="WIN32 $confvars"  # WIN32 intentionally first (commit 729918ef)
     default prefix "C:/Program Files/tcc"
     default tccdir "${prefix}"
     default bindir "${tccdir}"
@@ -464,21 +468,21 @@ else
 fi
 
 if test "$bigendian" = "yes" ; then
-  confvars="$confvars BIGENDIAN"
+  confvars_set BIGENDIAN
 fi
 
 if test "$cpu" = "arm"; then
   if test "${triplet%eabihf}" != "$triplet" ; then
-    confvars="$confvars arm_eabihf arm_vfp"
+    confvars_set arm_eabihf arm_vfp
   elif test "${triplet%eabi}" != "$triplet" ; then
-    confvars="$confvars arm_eabi arm_vfp"
+    confvars_set arm_eabi arm_vfp
   elif test -z "$build_cross"; then
     if test "${_triplet%eabihf}" != "$_triplet" ; then
-      confvars="$confvars arm_eabihf arm_vfp"
+      confvars_set arm_eabihf arm_vfp
     elif test "${_triplet%eabi}" != "$_triplet" ; then
-      confvars="$confvars arm_eabi arm_vfp"
+      confvars_set arm_eabi arm_vfp
     elif grep -s -q "^Features.* \(vfp\|iwmmxt\) " /proc/cpuinfo ; then
-      confvars="$confvars arm_vfp"
+      confvars_set arm_vfp
     fi
   fi
 fi
