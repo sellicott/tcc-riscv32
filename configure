@@ -210,7 +210,7 @@ default() # set variable unless already set
 {
     local v
     eval v=\"\$$1\"
-    test -z "$v" -a -n "$2" && eval $1=\"$2\"
+    test -z "$v" && test -n "$2" && eval $1=\"$2\"
 }
 
 default_conf() # add to confvars unless already present
@@ -219,7 +219,7 @@ default_conf() # add to confvars unless already present
     test "${confvars%$v*}" = "${confvars}" && confvars="$confvars $1"
 }
 
-if test -z "$source_path" -o "$source_path" = "." ; then
+if test -z "${source_path#.}" ; then
   source_path=$(pwd)
   source_path_used="no"
 else
@@ -254,9 +254,10 @@ fi
 default cpu "$cpu_sys"
 
 # check for crpss build
-if test "$cpu" != "$cpu_sys" \
-  -o "$targetos" != "$buildos" \
-  -o -n "$cross_prefix" ; then
+if test "$cpu" != "$cpu_sys" ||
+   test "$targetos" != "$buildos" ||
+   test -n "$cross_prefix"
+then
   build_cross="yes"
   cc="${cross_prefix}${cc}"
   ar="${cross_prefix}${ar}"
@@ -337,7 +338,7 @@ case $targetos in
       fi
     fi
     # on OSX M1 with --cpu=x86_64, build a tcc to run under rosetta entirely
-    if test "$cpu" = "x86_64" -a "$cpu_sys" = "arm64"; then
+    if test "$cpu" = x86_64 && test "$cpu_sys" = arm64; then
         CFLAGS="$CFLAGS -arch $cpu"
         LDFLAGS="$LDFLAGS -arch $cpu"
     fi
@@ -422,17 +423,17 @@ if test -z "$build_cross"; then
     _triplet="$($CONFTEST triplet)"
   fi
   if test "$mingw32" = "no" ; then
-      if test -z "$triplet" -a -n "$_triplet"; then
+      if test -z "$triplet" && test -n "$_triplet"; then
         if test -f "/usr/lib/$_triplet/crti.o"; then
           triplet="$_triplet"
         fi
       fi
       if test -z "$triplet"; then
-        if test $cpu = "x86_64" -o $cpu = "arm64" -o $cpu = "riscv64" ; then
+        case $cpu in x86_64|arm64|riscv64)
           if test -f "/usr/lib64/crti.o" ; then
             tcc_lddir="lib64"
           fi
-        fi
+        esac
       fi
       if test "$suggest" = "yes"; then
         if test -f "/lib/ld-uClibc.so.0" ; then
