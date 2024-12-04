@@ -1909,6 +1909,7 @@ static void pe_add_runtime(TCCState *s1, struct pe_info *pe)
         const char * const *pp, *p;
         if (TCC_LIBTCC1[0])
             tcc_add_support(s1, TCC_LIBTCC1);
+        s1->static_link = 0; /* no static crt for tcc */
         for (pp = libs; 0 != (p = *pp); ++pp) {
             if (*p)
                 tcc_add_library(s1, p);

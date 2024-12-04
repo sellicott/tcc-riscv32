@@ -582,17 +582,24 @@ version_add (TCCState *s1)
     for (sym_index = 1; sym_index < end_sym; ++sym_index) {
         int dllindex, verndx;
         sym = &((ElfW(Sym) *)symtab->data)[sym_index];
-        if (sym->st_shndx != SHN_UNDEF)
-            continue; /* defined symbol doesn't need library version */
         name = (char *) symtab->link->data + sym->st_name;
         dllindex = find_elf_sym(s1->dynsymtab_section, name);
         verndx = (dllindex && dllindex < nb_sym_to_version)
                  ? sym_to_version[dllindex] : -1;
-        if (verndx >= 0) {
+        if (verndx >= 0
+            /* XXX: on android, clang refuses to link with a libtcc.so made by tcc
+               when defined symbols have a version > 1 or when the version is '0'.
+               Whereas version '1' for example for 'signal' in an exe defeats
+               bcheck's signal_redir. */
+            && (sym->st_shndx == SHN_UNDEF || (s1->output_type & TCC_OUTPUT_EXE))
+            ) {
             if (!sym_versions[verndx].out_index)
               sym_versions[verndx].out_index = nb_versions++;
             versym[sym_index] = sym_versions[verndx].out_index;
+        } else {
+            versym[sym_index] = 1; /* (*global*) */
         }
+        //printf("SYM %d %s\n", versym[sym_index], name);
     }
     /* generate verneed section, but not when it will be empty.  Some
        dynamic linkers look at their contents even when DTVERNEEDNUM and
@@ -631,6 +638,7 @@ version_add (TCCState *s1)
                     sv->out_index = -2;
                     vna->vna_name = put_elf_str(verneed_section->link, sv->version);
                     vna->vna_next = sizeof (*vna);
+                    //printf("LIB %d %s %s\n", vna->vna_other, sv->lib, verneed_section->link->data + vna->vna_name);
                     n_same_libs++;
                 }
                 if (prev >= 0)

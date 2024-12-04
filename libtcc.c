@@ -1194,11 +1194,9 @@ ST_FUNC int tcc_add_dll(TCCState *s, const char *filename, int flags)
 /* find [cross-]libtcc1.a and tcc helper objects in library path */
 ST_FUNC int tcc_add_support(TCCState *s1, const char *filename)
 {
-#if CONFIG_TCC_CROSS
     char buf[100];
     if (CONFIG_TCC_CROSSPREFIX[0])
         filename = strcat(strcpy(buf, CONFIG_TCC_CROSSPREFIX), filename);
-#endif
     return tcc_add_dll(s1, filename, AFF_PRINT_ERROR);
 }
 
@@ -1234,11 +1232,6 @@ LIBTCCAPI int tcc_add_library(TCCState *s, const char *libraryname)
             return ret;
         ++pp;
     }
-#if CONFIG_TCC_CROSS
-    /* hack for '<cross>-tcc -nostdlib -ltcc1' to find <cross>-libtcc1.a  */
-    if (0 == strcmp(libraryname, "tcc1"))
-        return tcc_add_support(s, TCC_LIBTCC1);
-#endif
     return tcc_add_dll(s, libraryname, AFF_PRINT_ERROR);
 }
 
@@ -1343,6 +1336,12 @@ static int link_option(const char *str, const char *val, const char **ptr)
     return ret;
 }
 
+static int link_arg(const char *opt, const char *str)
+{
+    int l = strlen(opt);
+    return 0 == strncmp(opt, str, l) && (str[l] == '\0' || str[l] == ',');
+}
+
 static const char *skip_linker_arg(const char **str)
 {
     const char *s1 = *str;
@@ -1410,10 +1409,10 @@ static int tcc_set_linker(TCCState *s, const char *option)
             if (strstart("elf32-", &p)) {
 #endif
                 s->output_format = TCC_OUTPUT_FORMAT_ELF;
-            } else if (!strcmp(p, "binary")) {
+            } else if (link_arg("binary", p)) {
                 s->output_format = TCC_OUTPUT_FORMAT_BINARY;
 #ifdef TCC_TARGET_COFF
-            } else if (!strcmp(p, "coff")) {
+            } else if (link_arg("coff", p)) {
                 s->output_format = TCC_OUTPUT_FORMAT_COFF;
 #endif
             } else
@@ -1446,24 +1445,24 @@ static int tcc_set_linker(TCCState *s, const char *option)
             s->pe_stack_size = strtoul(p, &end, 10);
         } else if (link_option(option, "subsystem=", &p)) {
 #if defined(TCC_TARGET_I386) || defined(TCC_TARGET_X86_64)
-            if (strstart("native", &p)) {
+            if (link_arg("native", p)) {
                 s->pe_subsystem = 1;
-            } else if (strstart("console", &p)) {
+            } else if (link_arg("console", p)) {
                 s->pe_subsystem = 3;
-            } else if (strstart("gui", &p) || strstart("windows", &p)) {
+            } else if (link_arg("gui", p) || link_arg("windows", p)) {
                 s->pe_subsystem = 2;
-            } else if (strstart("posix", &p)) {
+            } else if (link_arg("posix", p)) {
                 s->pe_subsystem = 7;
-            } else if (strstart("efiapp", &p)) {
+            } else if (link_arg("efiapp", p)) {
                 s->pe_subsystem = 10;
-            } else if (strstart("efiboot", &p)) {
+            } else if (link_arg("efiboot", p)) {
                 s->pe_subsystem = 11;
-            } else if (strstart("efiruntime", &p)) {
+            } else if (link_arg("efiruntime", p)) {
                 s->pe_subsystem = 12;
-            } else if (strstart("efirom", &p)) {
+            } else if (link_arg("efirom", p)) {
                 s->pe_subsystem = 13;
 #elif defined(TCC_TARGET_ARM)
-            if (strstart("wince", &p)) {
+            if (link_arg("wince", p)) {
                 s->pe_subsystem = 9;
 #endif
             } else

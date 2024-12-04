@@ -384,12 +384,12 @@ case $targetos in
     confvars_set Android new_dtags rpath=no
     test "${cpu}" != "i386" && confvars_set pie
     default_conf "static=no"
-    if test "${cpu}" = "arm"; then
-      default triplet "arm-linux-androideabi"
-      cpuver=7
-    else
-      default triplet "${cpu}-linux-android"
-    fi
+    case "$cpu" in
+      arm) default triplet "arm-linux-androideabi"; cpuver=7 ;;
+      arm64) default triplet "aarch64-linux-android" ;;
+      x86_64) default triplet "x86_64-linux-android" ;;
+      i386) default triplet "i686-linux-android" ;;
+    esac
     test "${cpu%64}" != "${cpu}" && S="64" || S=""
     default tcc_sysincludepaths "{B}/include:{R}/include:{R}/include/${triplet}"
     default tcc_libpaths "{B}:{R}/lib:/system/lib${S}"
@@ -438,17 +438,27 @@ if test x"$show_help" = "xyes" ; then
     show_help
 fi
 
-if test -z "$build_cross"; then
-  CONFTEST=./conftest$EXESUF
-  if ! $cc -o $CONFTEST "$source_path/conftest.c" ; then
+CONFTEST=./conftest$EXESUF
+if test -z "$cross_prefix" \
+    && $cc -o $CONFTEST "$source_path/conftest.c" \
+    && $CONFTEST 2>/dev/null; then
+  cc_name="$($CONFTEST compiler)"
+  gcc_major="$($CONFTEST version)"
+  gcc_minor="$($CONFTEST minor)"
+else
+  if test -z "$build_cross"; then
     echo "configure: error: '$cc' failed to compile conftest.c."
-  else
-    cc_name="$($CONFTEST compiler)"
-    gcc_major="$($CONFTEST version)"
-    gcc_minor="$($CONFTEST minor)"
-    bigendian="$($CONFTEST bigendian)"
-    _triplet="$($CONFTEST triplet)"
   fi
+  if test "${cc%tcc*}" != "$cc"; then
+    cc_name="tcc"
+  elif test "${cc%clang*}" != "$cc"; then
+    cc_name="clang"
+  fi
+fi
+
+if test -z "$build_cross"; then
+  bigendian="$($CONFTEST bigendian)"
+  _triplet="$($CONFTEST triplet)"
   if test "$mingw32" = "no" ; then
       if test -z "$triplet" && test -n "$_triplet"; then
         if test -f "/usr/lib/$_triplet/crti.o"; then
@@ -473,11 +483,6 @@ if test -z "$build_cross"; then
   fi
 else
   # can only make guesses about compiler and target
-  if test "${cc%tcc*}" != "$cc"; then
-    cc_name="tcc"
-  elif test "${cc%clang*}" != "$cc"; then
-    cc_name="clang"
-  fi
   case $cpu in
     ppc|mips|s390)  bigendian=yes;;
   esac
@@ -619,7 +624,8 @@ cat >$TMPH <<EOF
 #define GCC_MAJOR $gcc_major
 #define GCC_MINOR $gcc_minor
 
-#if !CONFIG_TCC_CROSS
+#if !(TCC_TARGET_I386 || TCC_TARGET_X86_64 || TCC_TARGET_ARM\
+ || TCC_TARGET_ARM64 || TCC_TARGET_RISCV64 || TCC_TARGET_C67)
 EOF
 
 predefs=1

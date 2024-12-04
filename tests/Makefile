@@ -318,7 +318,7 @@ CROSS-TGTS = \
 
 define CROSS-COMPILE
  @echo " . $(1)"
- $(TCC) $(DEF-$1) -DCONFIG_TCC_CROSS -DTCC_CROSS_TEST -run $(TOPSRC)/tcc.c \
+ $(TCC) $(DEF-$1) -DTCC_CROSS_TEST -run $(TOPSRC)/tcc.c \
     -c $(if $(findstring c67,$1),$(filter %/ex3.c,$^),$<) -w $(TCCFLAGS)
 
 endef

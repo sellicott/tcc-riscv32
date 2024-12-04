@@ -169,7 +169,6 @@ DEFINES += $(DEF-$(or $(findstring win,$T),unx))
 
 ifneq ($(X),)
 $(if $(DEF-$T),,$(error error: unknown target: '$T'))
-DEF-$T += -DCONFIG_TCC_CROSS
 DEF-$(NATIVE_TARGET) =
 DEF-$T += -DCONFIG_TCC_CROSSPREFIX="\"$X\""
 ifneq ($(CONFIG_WIN32),yes)
@@ -234,7 +233,9 @@ LIBTCC_INC = $(filter %.h %-gen.c %-link.c,$($T_FILES))
 TCC_FILES = $(X)tcc.o $(LIBTCC_OBJ)
 $(X)tccpp.o : $(TCCDEFS_H)
 $(X)libtcc.o : DEFINES += -DONE_SOURCE=0
+$(CROSS_TARGET)-tcc.o : DEFINES += -DONE_SOURCE=0
 endif
+# native tcc always made from tcc.o and libtcc.[so|a]
 tcc.o : DEFINES += -DONE_SOURCE=0
 DEFINES += -I$(TOP)
 
@@ -464,7 +465,7 @@ tcov-tes% : tcc_c$(EXESUF)
 tcc_c$(EXESUF): $($T_FILES)
 	$S$(TCC) tcc.c -o $@ -ftest-coverage $(DEFINES) $(LIBS)
 # test the installed tcc instead
-test-install: tccdefs_.h
+test-install: $(TCCDEFS_H)
 	@$(MAKE) -C tests TESTINSTALL=yes #_all
 
 clean:

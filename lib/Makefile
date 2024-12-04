@@ -16,7 +16,7 @@ XCC = $(XTCC)
 XAR = $(XTCC) -ar
 XFLAGS-unx = -B$(TOPSRC)
 XFLAGS-win = -B$(TOPSRC)/win32 -I$(TOPSRC)/include
-XFLAGS = $(XFLAGS$(XCFG)) -I$(TOP)
+XFLAGS = $(XFLAGS$(XCFG))
 BFLAGS = -bt
 
 # in order to use gcc, type: make <target>-libtcc1-usegcc=yes
@@ -91,7 +91,7 @@ $(X)%.o : %.S $(TCC)
 $(TOP)/%.o : %.c $(TCC)
 	$S$(XCC) -c $< -o $@ $(XFLAGS)
 
-$(TOP)/bcheck.o : XFLAGS += $(BFLAGS)
+$(TOP)/bcheck.o : XFLAGS += $(BFLAGS) -I$(TOP)
 $(TOP)/bt-exe.o : $(TOP)/tccrun.c
 
 $(X)crt1w.o : crt1.c
