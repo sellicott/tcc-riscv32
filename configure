@@ -710,6 +710,7 @@ rm -f $TMPN* $CONFTEST
 # ---------------------------------------------------------------------------
 # build tree in object directory if source path is different from current one
 
+use_cp=
 fn_makelink()
 {
     tgt=$1/$2
@@ -726,7 +727,9 @@ fn_makelink()
 	 ;;
     esac
 
-    ln -sfn "$tgt" $2 || ( echo "ln failed. Using cp instead."; cp -f "$1/$2" $2 )
+    test -n "$use_cp" || ln -sfn "$tgt" $2 ||
+        { use_cp=yes; echo "ln failed. Using cp instead."; }
+    test -z "$use_cp" || cp -f "$1/$2" $2
 }
 
 if test "$source_path_used" = "yes" ; then
