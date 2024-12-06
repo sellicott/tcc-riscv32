@@ -92,7 +92,8 @@ $(TOP)/%.o : %.c $(TCC)
 	$S$(XCC) -c $< -o $@ $(XFLAGS)
 
 $(TOP)/bcheck.o : XFLAGS += $(BFLAGS) -I$(TOP)
-$(TOP)/bt-exe.o : $(TOP)/tccrun.c
+# includes tccrun.c, $(TOP) for config.h  (tccrun.c prerequisite via $(TCC))
+$(TOP)/bt-exe.o : XFLAGS += -I$(TOP)
 
 $(X)crt1w.o : crt1.c
 $(X)wincrt1w.o : wincrt1.c
