@@ -3169,9 +3169,11 @@ invalid:
          || 0 == strncmp(sh_name, ".stab", 5)) {
 	    if (!s1->do_debug || seencompressed)
 	        continue;
+#if !(TARGETOS_OpenBSD || TARGETOS_FreeBSD || TARGETOS_NetBSD)
         } else if (0 == strncmp(sh_name, ".eh_frame", 9)) {
             if (NULL == eh_frame_section)
                 continue;
+#endif
         } else
         if (sh->sh_type != SHT_PROGBITS &&
             sh->sh_type != SHT_NOTE &&
@@ -3181,6 +3183,9 @@ invalid:
             sh->sh_type != SHT_FINI_ARRAY
 #ifdef TCC_ARM_EABI
             && sh->sh_type != SHT_ARM_EXIDX
+#endif
+#if TARGETOS_OpenBSD || TARGETOS_FreeBSD || TARGETOS_NetBSD
+            && sh->sh_type != SHT_X86_64_UNWIND
 #endif
             )
             continue;
@@ -3195,7 +3200,7 @@ invalid:
             if (strcmp(s->name, sh_name))
                 continue;
             if (sh->sh_type != s->sh_type
-                && s != eh_frame_section
+                && strcmp (s->name, ".eh_frame")
                 ) {
                 tcc_error_noabort("section type conflict: %s %02x <> %02x", s->name, sh->sh_type, s->sh_type);
                 goto the_end;
