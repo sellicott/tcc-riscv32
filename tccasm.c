@@ -971,6 +971,15 @@ static void asm_parse_directive(TCCState *s1, int global)
         }
         break;
 #endif
+    /* TODO: Implement symvar support. FreeBSD >= 14 needs this */
+    case TOK_ASMDIR_symver:
+	next();
+	next();
+        skip(',');
+	next();
+        skip('@');
+	next();
+	break;
     default:
         tcc_error("unknown assembler directive '.%s'", get_tok_str(tok, NULL));
         break;

@@ -412,6 +412,7 @@
  DEF_ASMDIR(short)
  DEF_ASMDIR(long)
  DEF_ASMDIR(int)
+ DEF_ASMDIR(symver)
  DEF_ASMDIR(section)    /* must be last directive */
 
 #if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
