@@ -378,8 +378,9 @@ redo:
                 first_file = f->name;
             ret = tcc_add_file(s, f->name);
         }
-        done = ret || ++n >= s->nb_files;
-    } while (!done && (s->output_type != TCC_OUTPUT_OBJ || s->option_r));
+    } while (++n < s->nb_files
+            && 0 == ret
+            && (s->output_type != TCC_OUTPUT_OBJ || s->option_r));
 
     if (s->do_bench)
         end_time = getclock_ms();
@@ -406,13 +407,17 @@ redo:
     done = 1;
     if (t)
         done = 0; /* run more tests with -dt -run */
-    else if (ret)
-        ret = 1;
-    else if (n < s->nb_files)
+    else if (ret) {
+        if (s->nb_errors)
+            ret = 1;
+        /* else keep the original exit code from tcc_run() */
+    } else if (n < s->nb_files)
         done = 0; /* compile more files with -c */
     else if (s->do_bench)
         tcc_print_stats(s, end_time - start_time);
+
     tcc_delete(s);
+
     if (!done)
         goto redo;
     if (ppfp && ppfp != stdout)

@@ -197,6 +197,8 @@ ST_FUNC void tcc_run_free(TCCState *s1)
 #endif
 }
 
+#define RT_EXIT_ZERO 0xE0E00E0E /* passed from longjmp instead of '0' */
+
 /* launch the compiled program with the given arguments */
 LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
 {
@@ -238,7 +240,7 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
     ret = tcc_setjmp(s1, main_jb, tcc_get_symbol(s1, top_sym));
     if (0 == ret)
         ret = prog_main(argc, argv, envp);
-    else if (256 == ret)
+    else if (RT_EXIT_ZERO == ret)
         ret = 0;
 
     if (s1->dflag & 16 && ret) /* tcc -dt -run ... */
@@ -596,7 +598,7 @@ static void rt_exit(rt_frame *f, int code)
     rt_post_sem();
     if (s && s->run_lj) {
         if (code == 0)
-            code = 256;
+            code = RT_EXIT_ZERO;
         ((void(*)(void*,int))s->run_lj)(s->run_jb, code);
     }
     exit(code);
