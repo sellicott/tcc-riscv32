@@ -409,9 +409,9 @@ ST_FUNC void gfunc_call(int nb_args)
     args_size = 0;
     for(i = 0;i < nb_args; i++) {
         if ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
-			/* fetch cpu flag before generating any code */
-			if ((vtop->r & VT_VALMASK) == VT_CMP)
-				gv(RC_INT);
+            /* fetch cpu flag before generating any code */
+            if ((vtop->r & VT_VALMASK) == VT_CMP)
+                gv(RC_INT);
             size = type_size(&vtop->type, &align);
             /* align to stack align size */
             size = (size + 3) & ~3;
