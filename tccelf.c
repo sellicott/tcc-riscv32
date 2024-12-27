@@ -3245,6 +3245,11 @@ invalid:
         } else {
             s->data_offset += size;
         }
+        /* align end of section */
+        /* This is needed if we compile a c file after this */
+        if (s == text_section || s == data_section || s == rodata_section ||
+            s == bss_section || s == common_section)
+            s->data_offset += -s->data_offset & (s->sh_addralign - 1);
     next: ;
     }
 
