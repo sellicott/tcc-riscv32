@@ -7,4 +7,6 @@ int main() {
   printf("%d\n", (int)-2147483648.0);
   d = -2147483648.0;
   printf("%d\n", (int)d);
+
+  printf("%llu\n", (unsigned long long)1e19);
 }
