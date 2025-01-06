@@ -1929,31 +1929,35 @@ ST_FUNC void preprocess(int is_bof)
         break;
 
     case TOK_LINE:
+        parse_flags &= ~PARSE_FLAG_TOK_NUM;
         next();
-        if (tok != TOK_CINT) {
+        parse_flags |= PARSE_FLAG_TOK_NUM;
+        if (tok != TOK_PPNUM) {
     _line_err:
             tcc_error("wrong #line format");
         }
-        n = tokc.i;
         goto _line_num;
     case TOK_PPNUM:
         if (parse_flags & PARSE_FLAG_ASM_FILE)
             goto ignore;
+    _line_num:
         for (n = 0, q = tokc.str.data; *q; ++q) {
             if (!isnum(*q))
                 goto _line_err;
             n = n * 10 + *q - '0';
         }
-    _line_num:
+        parse_flags &= ~PARSE_FLAG_TOK_STR;
         next();
-        if (tok == TOK_STR) {
-            tccpp_putfile(tokc.str.data);
+        parse_flags |= PARSE_FLAG_TOK_STR;
+        if (tok == TOK_PPSTR && tokc.str.data[0] == '"') {
+            tokc.str.data[tokc.str.size - 2] = 0;
+            tccpp_putfile(tokc.str.data + 1);
             n--;
+            if (macro_ptr && *macro_ptr == 0)
+                macro_stack->save_line_num = n;
         }
         else if (tok != TOK_LINEFEED)
             goto _line_err;
-        if (macro_ptr && *macro_ptr == 0)
-            macro_stack->save_line_num = n;
         if (file->fd > 0)
             total_lines += file->line_num - n;
         file->line_ref += file->line_num - n;
