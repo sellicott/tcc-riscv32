@@ -802,6 +802,7 @@ struct TCCState {
     char *tcc_lib_path; /* CONFIG_TCCDIR or -B option */
     char *soname; /* as specified on the command line (-soname) */
     char *rpath; /* as specified on the command line (-Wl,-rpath=) */
+    char *elfint; /* -Wl,-I on command line, LD_SO in environment, or DEFAULT_ELFINTERP(this) */
     char *elf_entryname; /* "_start" unless set */
     char *init_symbol; /* symbols to call at load-time (not used currently) */
     char *fini_symbol; /* symbols to call at unload-time (not used currently) */

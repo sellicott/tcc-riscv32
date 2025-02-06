@@ -1428,6 +1428,13 @@ static int tcc_set_linker(TCCState *s, const char *option)
             s->rdynamic = 1;
         } else if (link_option(option, "rpath=", &p)) {
             copy_linker_arg(&s->rpath, p, ':');
+        } else if (link_option(option, "dynamic-linker=", &p)
+                || link_option(option, "I=", &p)) {
+            copy_linker_arg(&s->elfint, p, 0);
+        } else if (strncmp("-I/", option, 3) == 0
+                || strncmp("-I.", option, 3) == 0) {
+            p = option;
+            copy_linker_arg(&s->elfint, option + 2, 0);
         } else if (link_option(option, "enable-new-dtags", &p)) {
             s->enable_new_dtags = 1;
         } else if (link_option(option, "section-alignment=", &p)) {

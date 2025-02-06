@@ -360,6 +360,11 @@ Generate an object file combining all input files.
 @item -Wl,-rpath=path
 Put custom search path for dynamic libraries into executable.
 
+@item -Wl,-Ipath
+@item -Wl,--dynamic-linker=path
+Set the ELF interpreter (dynamic linker). This defaults to the value of the
+environment variable @env{LD_SO} if set, or a compiled-in default.
+
 @item -Wl,--enable-new-dtags
 When putting a custom search path for dynamic libraries into the executable,
 create the new ELF dynamic tag DT_RUNPATH instead of the old legacy DT_RPATH.
