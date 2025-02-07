@@ -924,7 +924,8 @@ LIBTCCAPI int tcc_set_output_type(TCCState *s, int output_type)
         return 0;
     }
 
-    tcc_add_library_path(s, CONFIG_TCC_LIBPATHS);
+    if (!s->nostdlib_paths)
+        tcc_add_library_path(s, CONFIG_TCC_LIBPATHS);
 
 #ifdef TCC_TARGET_PE
 # ifdef TCC_IS_NATIVE
@@ -1383,7 +1384,7 @@ static int tcc_set_linker(TCCState *s, const char *option)
         if (link_option(option, "Bsymbolic", &p)) {
             s->symbolic = 1;
         } else if (link_option(option, "nostdlib", &p)) {
-            s->nostdlib = 1;
+            s->nostdlib_paths = 1;
         } else if (link_option(option, "e=", &p)
                ||  link_option(option, "entry=", &p)) {
             copy_linker_arg(&s->elf_entryname, p, 0);

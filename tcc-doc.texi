@@ -333,9 +333,6 @@ Link your program with dynamic library libxxx.so or static library
 libxxx.a. The library is searched in the paths specified by the
 @option{-L} option and @env{LIBRARY_PATH} variable.
 
-@item -nostdlib
-Don't implicitly link with libc, the C runtime files, and libtcc1.
-
 @item -Bdir
 Set the path where the tcc internal libraries (and include files) can be
 found (default is @file{PREFIX/lib/tcc}).
@@ -356,6 +353,14 @@ opened with @code{dlopen()} needs to access executable symbols.
 
 @item -r
 Generate an object file combining all input files.
+
+@item -nostdlib
+Don't implicitly link with libc, the C runtime files, and libtcc1.
+
+@item -Wl,-nostdlib
+Don't search the default paths for libraries (@file{/usr/local/lib},
+@file{/usr/lib} and @file{/lib}). Only the paths specified with @option{-L}
+and @env{LIBRARY_PATH} are searched.
 
 @item -Wl,-rpath=path
 Put custom search path for dynamic libraries into executable.
