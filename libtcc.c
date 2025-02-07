@@ -1212,26 +1212,37 @@ ST_FUNC int tcc_add_crt(TCCState *s1, const char *filename)
 /* the library name is the same as the argument of the '-l' option */
 LIBTCCAPI int tcc_add_library(TCCState *s, const char *libraryname)
 {
+    static const char * const libs[] = {
 #if defined TCC_TARGET_PE
-    static const char * const libs[] = { "%s/%s.def", "%s/lib%s.def", "%s/%s.dll", "%s/lib%s.dll", "%s/lib%s.a", NULL };
-    const char * const *pp = s->static_link ? libs + 4 : libs;
+        "%s/%s.def", "%s/lib%s.def", "%s/%s.dll", "%s/lib%s.dll",
 #elif defined TCC_TARGET_MACHO
-    static const char * const libs[] = { "%s/lib%s.dylib", "%s/lib%s.tbd", "%s/lib%s.a", NULL };
-    const char * const *pp = s->static_link ? libs + 2 : libs;
+        "%s/lib%s.dylib", "%s/lib%s.tbd",
 #elif defined TARGETOS_OpenBSD
-    static const char * const libs[] = { "%s/lib%s.so.*", "%s/lib%s.a", NULL };
-    const char * const *pp = s->static_link ? libs + 1 : libs;
+        "%s/lib%s.so.*",
 #else
-    static const char * const libs[] = { "%s/lib%s.so", "%s/lib%s.a", NULL };
-    const char * const *pp = s->static_link ? libs + 1 : libs;
+        "%s/lib%s.so",
 #endif
-    int flags = s->filetype & AFF_WHOLE_ARCHIVE;
-    while (*pp) {
-        int ret = tcc_add_library_internal(s, *pp,
-            libraryname, flags, s->library_paths, s->nb_library_paths);
-        if (ret != FILE_NOT_FOUND)
-            return ret;
-        ++pp;
+        "%s/lib%s.a",
+        NULL
+    };
+
+    const char * const *pp = s->static_link
+                             ? libs + sizeof(libs) / sizeof(*libs) - 2
+                             : libs;
+
+    /* if libraryname begins with a colon, it means search lib paths for
+       exactly the following file, without lib prefix or anything */
+    if (*libraryname == ':')
+        libraryname++;
+    else {
+        int flags = s->filetype & AFF_WHOLE_ARCHIVE;
+        while (*pp) {
+            int ret = tcc_add_library_internal(s, *pp,
+                libraryname, flags, s->library_paths, s->nb_library_paths);
+            if (ret != FILE_NOT_FOUND)
+                return ret;
+            ++pp;
+        }
     }
     return tcc_add_dll(s, libraryname, AFF_PRINT_ERROR);
 }
