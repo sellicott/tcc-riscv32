@@ -83,7 +83,7 @@ usage: tcc [options] [@var{infile1} @var{infile2}@dots{}] [@option{-run} @var{in
 
 @noindent
 @c man begin DESCRIPTION
-TCC options are a very much like gcc options. The main difference is that TCC
+TCC options are very much like gcc options. The main difference is that TCC
 can also execute directly the resulting program and give it runtime
 arguments.
 
@@ -185,6 +185,16 @@ Show included files.  As sole argument, print search dirs.  -vvv shows tries too
 @item -bench
 Display compilation statistics.
 
+@item -pthread
+Preprocess with @option{-D_REENTRANT}, link with @option{-lpthread}.
+
+@item -On
+Pretend to optimise: set @option{-D__OPTIMIZE__} to the numeric value of n.
+Note that TCC performs no additional optimisation.
+
+@item -dt
+With @option{-run}/@option{-E}: auto-define 'test_...' macros
+
 @end table
 
 Preprocessor options:
@@ -199,6 +209,16 @@ include paths are: @file{/usr/local/include}, @file{/usr/include}
 and @file{PREFIX/lib/tcc/include}. (@file{PREFIX} is usually
 @file{/usr} or @file{/usr/local}).
 
+@item -isystem dir
+Specify a system include path to be added to the defaults.
+
+@item -nostdinc
+Do not search the default system include paths; only search include paths
+provided on the command line.
+
+@item -include file
+Include @option{file} above each input file.
+
 @item -Dsym[=val]
 Define preprocessor symbol @samp{sym} to
 val. If val is not present, its value is @samp{1}. Function-like macros can
@@ -209,6 +229,18 @@ Undefine preprocessor symbol @samp{sym}.
 
 @item -E
 Preprocess only, to stdout or file (with -o).
+
+@item -P
+Do not output @code{#line} directives.
+
+@item -P1
+Output alternative @code{#line} directives.
+
+@item -dD, -dM
+Output @code{#define} directives.
+
+@item -Wp,-opt
+Same as @option{-opt}.
 
 @end table
 
@@ -238,6 +270,15 @@ behaves like an unnamed one.
 @item -fdollars-in-identifiers
 Allow dollar signs in identifiers
 
+@item -freverse-funcargs
+Evaluate function arguments right to left.
+
+@item -fgnu89-inline
+@code{extern inline} is like @code{static inline}.
+
+@item -fasynchronous-unwind-tables
+Create eh_frame section [on]
+
 @item -ftest-coverage
 Create code coverage code. After running the resulting code an executable.tcov
 or sofile.tcov file is generated with code coverage.
@@ -257,7 +298,10 @@ Note: each of the following warning options has a negative form beginning with
 
 @table @option
 @item -Wimplicit-function-declaration
-Warn about implicit function declaration.
+Warn about implicit function declaration (missing prototype).
+
+@item -Wdiscarded-qualifiers
+Warn when const is dropped.
 
 @item -Wunsupported
 Warn about unsupported GCC features that are ignored by TCC.
@@ -272,7 +316,8 @@ the specified warning and turn it into an error, for example
 @option{-Werror=unsupported}.
 
 @item -Wall 
-Activate some useful warnings.
+Activate some useful warnings (@option{-Wimplicit-function-declaration},
+@option{-Wdiscard-qualifiers}).
 
 @end table
 
@@ -287,6 +332,9 @@ default library paths are @file{/usr/local/lib}, @file{/usr/lib} and @file{/lib}
 Link your program with dynamic library libxxx.so or static library
 libxxx.a. The library is searched in the paths specified by the
 @option{-L} option and @env{LIBRARY_PATH} variable.
+
+@item -nostdlib
+Don't implicitly link with libc, the C runtime files, and libtcc1.
 
 @item -Bdir
 Set the path where the tcc internal libraries (and include files) can be
@@ -376,6 +424,13 @@ Misc options:
 
 @table @option
 
+@item -std=version
+Define @code{__STDC_VERSION__}: @code{201112} if @option{version} is c11 or
+gnu11; @code{199901} otherwise.
+
+@item -x[c|a|b|n]
+Specify content of next input file: respectively C, assembly, binary, or none.
+
 @item -M
 Just output makefile fragment with dependencies
 
@@ -418,8 +473,7 @@ Pass command line to the i386/x86_64 cross compiler.
 
 @end table
 
-Note: GCC options @option{-Ox}, @option{-fx} and @option{-mx} are
-ignored.
+Note: GCC options @option{-fx} and @option{-mx} are ignored.
 @c man end
 
 @c man begin ENVIRONMENT
