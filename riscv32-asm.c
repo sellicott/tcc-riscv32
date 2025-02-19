@@ -442,10 +442,9 @@ static void asm_binary_opcode( TCCState *s1, int token )
         case TOK_ASM_la:
             label.type.t = VT_VOID | VT_STATIC;
             // hacky method to generate relocation entries at the correct offsets (ind)
-            /* ind_bak = ind; */
             greloc(cur_text_section, ops[1].e.sym, ind, R_RISCV_PCREL_HI20);
             /* generate_symbol_reallocation( &ops[ 1 ], R_RISCV_PCREL_HI20 ); */
-            /* ind = ind + 4; */
+            // See RV-ABI 1.0 §8.4.9
             put_extern_sym(&label, cur_text_section, ind, 0);
             /* generate_symbol_reallocation( &ops[ 1 ], R_RISCV_PCREL_LO12_I ); */
             greloc(cur_text_section, &label, ind + 4, R_RISCV_PCREL_LO12_I);
