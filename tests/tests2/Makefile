@@ -64,6 +64,14 @@ ifeq ($(ARCH),riscv32)
  SKIP += 22_floating_point.test
  SKIP += 23_type_coercion.test
  SKIP += 24_math_library.test
+ SKIP += 49_bracket_evaluation.test
+ SKIP += 70_floating_point_literals.test
+ SKIP += 73_arm64.test # contains floating stuff
+ SKIP += 83_utf8_in_identifiers.test # contains floating stuff
+endif
+
+ifeq ($(CONFIG_cross), yes)
+    SKIP += 60_errors_and_warnings.test # require -run
 endif
 
 # Some tests might need arguments
@@ -143,10 +151,21 @@ all test tests2.all: $(filter-out $(SKIP),$(TESTS))
 	@$(call T1,$<) $(T3)
 
 T1 = $(TCC) $(FLAGS) $(T2) $(ARGS)
-T2 = $(if $(NORUN),$1 -o a.exe && ./a.exe,-run $1)
+# Cross compiler does not support -run and compiler warnings
+# should be record
+ifeq ($(CONFIG_cross), yes)
+RUN_PREFIX :=qemu-riscv32 -L /opt/riscv32-gnu-toolchain-glibc-bin-32/sysroot
+T2 = $1 -o a.exe 2>$*.output && $(RUN_PREFIX) ./a.exe
+T3 = $(FILTER) >>$*.output 2>&1 || true \
+     && diff -Nbu $(filter %.expect,$^) $*.output \
+     && rm -f $*.output $(filter $*.expect,$(GEN-ALWAYS))
+else
+T2 = $(if $(NORUN),$1 -o $(basename $@).exe && ./$(basename $@).exe,-run $1)
 T3 = $(FILTER) >$*.output 2>&1 || true \
      && diff -Nbu $(filter %.expect,$^) $*.output \
      && rm -f $*.output $(filter $*.expect,$(GEN-ALWAYS))
+endif
+
 
 # run single test and update .expect file, e.g. "make tests2.37+"
 tests2.%+:
