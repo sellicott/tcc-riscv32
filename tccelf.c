@@ -1099,7 +1099,8 @@ ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
             if (sym_bind == STB_WEAK)
                 sym->st_value = 0;
             else
-                tcc_error_noabort("undefined symbol '%s'", name);
+                tcc_error_noabort("undefined symbol '%s' %s:%d",
+                                  name, s1->current_filename, file->line_num);
 
         } else if (sh_num < SHN_LORESERVE) {
             /* add section base */
@@ -1975,7 +1976,8 @@ static void bind_exe_dynsyms(TCCState *s1)
                 } else if (find_defsym(s1, name, sym)) {
                     /* Exists in -Wl,--defsym=NAME=ADDR */
                 } else {
-                    tcc_error_noabort("undefined symbol '%s'", name);
+                    tcc_error_noabort("undefined symbol '%s' %s:%d",
+                                      name, s1->current_filename, file->line_num);
                 }
             }
         }
