@@ -5436,6 +5436,7 @@ ST_FUNC void unary(void)
                 if (!(type.t & VT_ARRAY))
                     r |= VT_LVAL;
                 memset(&ad, 0, sizeof(AttributeDef));
+                printf("[decl]: abstract type for sym '%s'\n", get_tok_str(0, NULL));
                 decl_initializer_alloc(&type, &ad, r, 1, 0, 0);
             } else {
                 if (sizeof_caller) {
@@ -8048,7 +8049,7 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
 	    put_extern_sym(sym, sec, addr, size);
         } else {
             /* push global reference */
-            printf("[decl_designator]: hello!\n");
+            printf("[decl_initializer_alloc]: hello!\n");
             vpush_ref(type, sec, addr, size);
             sym = vtop->sym;
 	    vtop->r |= r;
@@ -8533,6 +8534,8 @@ static int decl(int l)
                         else if (l == VT_CONST)
                             /* uninitialized global variables may be overridden */
                             type.t |= VT_EXTERN;
+
+                        printf("[decl]: for sym '%s'\n", get_tok_str(v, NULL));
                         decl_initializer_alloc(&type, &ad, r, has_init, v, l == VT_CONST);
                     }
                 }
