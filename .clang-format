@@ -3,7 +3,6 @@
 BasedOnStyle: Microsoft
 AccessModifierOffset: -4
 AlwaysBreakTemplateDeclarations: 'Yes'
-AlignTrailingComments: 'true'
 AllowAllParametersOfDeclarationOnNextLine: 'false'
 BreakBeforeBinaryOperators: None
 BreakBeforeBraces: Stroustrup  
@@ -32,14 +31,15 @@ NamespaceIndentation: None
 # Alignment Rules
 AlignAfterOpenBracket: DontAlign
 AlignOperands: AlignAfterOperator
-AlignConsecutiveAssignments: false
-AlignConsecutiveMacros: false
-AlignTrailingComments: false
+AlignConsecutiveAssignments: 'false'
+AlignConsecutiveMacros: 'false'
+AlignTrailingComments:
+  Kind: Always
 AlignEscapedNewlines: Left
 
 # Single Line rules
 AllowShortBlocksOnASingleLine: Always
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortFunctionsOnASingleLine: Empty
-AllowShortCaseLabelsOnASingleLine: true
-AllowShortLoopsOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: 'true'
+AllowShortLoopsOnASingleLine: 'true'
