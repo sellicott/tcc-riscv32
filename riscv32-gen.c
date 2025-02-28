@@ -10,13 +10,13 @@
 #define NB_ASM_REGS 32
 #define CONFIG_TCC_ASM
 
-#define TREG_R( x ) ( x ) // x = 0..7
+#define TREG_R( x ) ( x )     // x = 0..7
 #define TREG_F( x ) ( x + 8 ) // x = 0..7
 
 // Register classes sorted from more general to more precise:
 #define RC_INT ( 1 << 0 )
 #define RC_FLOAT ( 1 << 1 )
-#define RC_R( x ) ( 1 << ( 2 + ( x ) ) ) // x = 0..7
+#define RC_R( x ) ( 1 << ( 2 + ( x ) ) )  // x = 0..7
 #define RC_F( x ) ( 1 << ( 10 + ( x ) ) ) // x = 0..7
 
 #define RC_IRET ( RC_R( 0 ) ) // int return register class
@@ -112,7 +112,8 @@ static int is_freg( int r )
 #endif
 }
 
-// ---------------------- opcode helper functions ------------------------------------------------//
+// ---------------------- opcode helper functions
+// ------------------------------------------------//
 
 ST_FUNC void o( unsigned int opcode )
 {
@@ -154,9 +155,9 @@ static void ES( uint32_t opcode, uint32_t func3, uint32_t rs1, uint32_t rs2, uin
 static int load_symofs( int r, SValue *sv, int forstore )
 {
     int doload = 0;
-    int t0 = 5; // t0 = x5 = 5
-    int rd; // return register
-    int sv_constant = sv->c.i; // stack value constant
+    int t0 = 5;                           // t0 = x5 = 5
+    int rd;                               // return register
+    int sv_constant = sv->c.i;            // stack value constant
     int stack_value = sv->r & VT_VALMASK; // stack value
 
     rd = is_ireg( r ) ? ireg( r ) : t0; // default register is t0
@@ -178,16 +179,19 @@ static int load_symofs( int r, SValue *sv, int forstore )
         if( sv->sym->type.t & VT_STATIC ) { // XXX do this per linker relax
             addend = sv_constant;
             sv->c.i = 0;
-            // offset is probably loaded already, we don't need to generate a load in this case 
-            doload = 0; 
+            // offset is probably loaded already, we don't need to generate a load in
+            // this case
+            doload = 0;
         }
+
+        printf( "[load_symofs]: for symbol '%s'\n", get_tok_str( sv->sym->v, NULL ) );
 
         // generate a relocation entry with the generated offset
         greloca( cur_text_section, sv->sym, ind, R_RISCV_PCREL_HI20, addend );
-
         put_extern_sym( &label, cur_text_section, ind, 0 );
+
         // immediate value is 0 so that the linker can load values into it
-        emit_AUIPC( rd, 0 ); 
+        emit_AUIPC( rd, 0 );
 
         type = ( doload || !forstore ) ? R_RISCV_PCREL_LO12_I : R_RISCV_PCREL_LO12_S;
         greloca( cur_text_section, &label, ind, type, 0 );
@@ -229,18 +233,19 @@ static void load_large_constant( int rr, int fc, uint32_t pi )
 }
 
 /*
- * Similar to load this takes a stack value (sv) and stores it into a register (r)
- * However, we know that the thing on the stack is an lvalue (it has a name) and therefore
- * in order to move it to a register we need to get the address of the named thing
+ * Similar to load this takes a stack value (sv) and stores it into a register
+ * (r) However, we know that the thing on the stack is an lvalue (it has a name)
+ * and therefore in order to move it to a register we need to get the address of
+ * the named thing
  */
 static void load_lvalue( int r, SValue *sv )
 {
     // get the actual physical register we want to store stuff into
     int dest_reg = is_ireg( r ) ? ireg( r ) : freg( r ); // rr
-    int lvar_offset = sv->c.i; // fc
-    int stack_type = sv->type.t & VT_BTYPE; // bt
-    int stack_reg = sv->r; // fr
-    int masked_stack_reg = stack_reg & VT_VALMASK; // v
+    int lvar_offset = sv->c.i;                           // fc
+    int stack_type = sv->type.t & VT_BTYPE;              // bt
+    int stack_reg = sv->r;                               // fr
+    int masked_stack_reg = stack_reg & VT_VALMASK;       // v
     int align, rs1;
 
     int size = type_size( &sv->type, &align );
@@ -255,6 +260,7 @@ static void load_lvalue( int r, SValue *sv )
     }
 
     if( masked_stack_reg == VT_LOCAL || ( stack_reg & VT_SYM ) ) {
+        printf( "[load_lvalue]: get offset for sym %s\n", get_tok_str( tok, NULL ) );
         rs1 = load_symofs( r, sv, 0 );
         lvar_offset = sv->c.i;
     }
@@ -296,19 +302,21 @@ static void load_lvalue( int r, SValue *sv )
 }
 
 /*
- * load a stack value into a register meaning we need to put the thing stored in sv into r
- * r is the register we want to load stuff into, and sv is the tcc stack value
+ * load a stack value into a register meaning we need to put the thing stored in
+ * sv into r r is the register we want to load stuff into, and sv is the tcc
+ * stack value
  *
  * this function also handles generating comparison and branch instructions
- * we need to check what the type of stack value we have is since we might need to do drastically
- * different things depending on whether sv is an lvalue (i.e. a pointer to the thing we want)
+ * we need to check what the type of stack value we have is since we might need
+ * to do drastically different things depending on whether sv is an lvalue (i.e.
+ * a pointer to the thing we want)
  */
 ST_FUNC void load( int r, SValue *sv )
 {
     int dest_reg = is_ireg( r ) ? ireg( r ) : freg( r );
-    int lvar_offset = sv->c.i; // fc
-    int stack_type = sv->type.t & VT_BTYPE; // bt
-    int stack_reg = sv->r; // fr
+    int lvar_offset = sv->c.i;                     // fc
+    int stack_type = sv->type.t & VT_BTYPE;        // bt
+    int stack_reg = sv->r;                         // fr
     int masked_stack_reg = stack_reg & VT_VALMASK; // v
 
     // loading to an lvalue i.e. pointer into register
@@ -351,12 +359,13 @@ ST_FUNC void load( int r, SValue *sv )
 
         if( LARGE_IMM( lvar_offset ) ) {
             rs1 = dest_reg;
-            // add 0x800 so when the lower (sign extended) bits get added, they don't ruin things
-            emit_LUI( dest_reg, IMM_HIGH( lvar_offset + 0x800 )  );
+            // add 0x800 so when the lower (sign extended) bits get added, they don't
+            // ruin things
+            emit_LUI( dest_reg, IMM_HIGH( lvar_offset + 0x800 ) );
         }
         if( lvar_offset || ( dest_reg != rs1 ) || do32bit || ( stack_reg & VT_SYM ) ) {
-            // EI(0x13 | do32bit, 0, rd, rs1, lvar_offset << 20 >> 20); // addi[w] R, x0|R,
-            // lvar_offset
+            // EI(0x13 | do32bit, 0, rd, rs1, lvar_offset << 20 >> 20); // addi[w] R,
+            // x0|R, lvar_offset
             emit_ADDI( dest_reg, rs1, IMM_LOW( lvar_offset ) );
         }
         if( zext ) {
@@ -385,7 +394,8 @@ ST_FUNC void load( int r, SValue *sv )
             tcc_error( "Floating point not implemented in riscv32" );
         }
     }
-    // Value is stored in the CPU flag from a comparison operation. Put it in a safe place.
+    // Value is stored in the CPU flag from a comparison operation. Put it in a
+    // safe place.
     else if( masked_stack_reg == VT_CMP ) {
         int op = vtop->cmp_op;
         int a = vtop->cmp_r & 0xff;
@@ -411,7 +421,8 @@ ST_FUNC void load( int r, SValue *sv )
                     b = t;
                     inv ^= 1;
                 }
-                //ER( 0x33, ( op > TOK_UGT ) ? 2 : 3, dest_reg, a, b, 0 ); // slt[u] d, a, b
+                // ER( 0x33, ( op > TOK_UGT ) ? 2 : 3, dest_reg, a, b, 0 ); // slt[u] d,
+                // a, b
                 if( op > TOK_UGT ) {
                     emit_SLT( dest_reg, a, b );
                 }
@@ -425,8 +436,8 @@ ST_FUNC void load( int r, SValue *sv )
             case TOK_NE:
             case TOK_EQ:
                 // we only need to subtract if the comparison isn't already against zero
-                // we check if the comparison is against zero by checking if the two source registers
-                // are different from the destination
+                // we check if the comparison is against zero by checking if the two
+                // source registers are different from the destination
                 if( dest_reg != a || b ) {
                     emit_SUB( dest_reg, a, b ); // sub d, a, b
                 }
@@ -502,7 +513,7 @@ ST_FUNC void store( int r, SValue *sv )
             offset &= 0xff;
         }
         else {
-            //lui RR, upper(fc)
+            // lui RR, upper(fc)
             emit_LUI( loc_reg, IMM_HIGH( offset ) );
             offset = IMM_LOW( offset );
         }
@@ -929,7 +940,7 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
     func_sub_sp_offset = ind;
     ind += 5 * 4;
 
-    areg[ 0 ] = 0; 
+    areg[ 0 ] = 0;
     areg[ 1 ] = 0;
     addr = 0;
     /* if the function returns by reference, then add an
@@ -983,8 +994,8 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
                     emit_SW( s0, t0, loc + i * 4 );
                 }
                 else if( prc[ 1 + i ] == RC_FLOAT ) {
-                    // emit_S(0x22, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc +
-                    // (fieldofs[i+1] >> 4)); // fs[wd] FAi, loc(s0)
+                    // emit_S(0x22, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc
+                    // + (fieldofs[i+1] >> 4)); // fs[wd] FAi, loc(s0)
                     tcc_error( "unimp: floating point support" );
                 }
                 else {
@@ -1063,11 +1074,9 @@ ST_FUNC void gfunc_epilog( void )
     loc = ( loc - num_va_regs * PTR_SIZE );
     d = v = ( -loc + 15 ) & -16;
 
-
     if( v >= ( 1 << 11 ) ) {
         d = 16;
-        emit_LI(t0, v)
-        emit_ADD( sp, sp, t0 );
+        emit_LI( t0, v ) emit_ADD( sp, sp, t0 );
     }
 
     emit_LW( ra, sp, d - PTR_SIZE - ( num_va_regs * PTR_SIZE ) );
@@ -1084,9 +1093,9 @@ ST_FUNC void gfunc_epilog( void )
     saved_ind = ind;
 
     ind = func_sub_sp_offset;
-    emit_ADDI(sp, sp, -d);
-    emit_SW(sp, ra, d - PTR_SIZE - num_va_regs * PTR_SIZE);
-    emit_SW(sp, s0, d - 2*PTR_SIZE - num_va_regs * PTR_SIZE);
+    emit_ADDI( sp, sp, -d );
+    emit_SW( sp, ra, d - PTR_SIZE - num_va_regs * PTR_SIZE );
+    emit_SW( sp, s0, d - 2 * PTR_SIZE - num_va_regs * PTR_SIZE );
 
     if( v < ( 1 << 11 ) )
         emit_ADDI( s0, sp, d - num_va_regs * PTR_SIZE );
@@ -1113,35 +1122,38 @@ ST_FUNC void gen_fill_nops( int bytes )
     }
 }
 
-// Patch all branches in list "pointed to" by branch_list_offset to branch to target_offset:
+// Patch all branches in list "pointed to" by branch_list_offset to branch to
+// target_offset:
 ST_FUNC void gsym_addr( int branch_list_offset, int target_offset )
 {
     uint32_t next_branch_offset = branch_list_offset;
     uint32_t target_offset_uint = target_offset;
 
     // hack so that we can use emmit_<opcode> macros to generate code
-    // turn on code generation, but save the state so we can turn it off again if necessary
+    // turn on code generation, but save the state so we can turn it off again if
+    // necessary
     int nocode_wanted_old = nocode_wanted; // save the old no code state
     int original_ind = ind;                // save the current pointer location
     nocode_wanted &= ~0x20000000;          // copy code from the NO_CODE macro (move to tcc.h?)
 
     while( next_branch_offset ) {
         int32_t rel_jmp;
-        // set the current branch offset (the offset from the data section to write to).
-        // Note that the ind variable is a global variable used to set the write location in the 
-        // generation code it is the offset from cur_text_section->data
-        ind = next_branch_offset; 
+        // set the current branch offset (the offset from the data section to write
+        // to). Note that the ind variable is a global variable used to set the
+        // write location in the generation code it is the offset from
+        // cur_text_section->data
+        ind = next_branch_offset;
         // rel_jmp can have up to a +-1MiB range (20bits 0 to 0x1fffff)
         rel_jmp = target_offset_uint - ind;
         // get the location that we need to write our next value to.
-        next_branch_offset = read32le(cur_text_section->data + ind);
+        next_branch_offset = read32le( cur_text_section->data + ind );
         if( ( rel_jmp + ( 1 << 21 ) ) & ~( ( 1U << 22 ) - 2 ) ) {
-            tcc_error("out-of-range branch chain (> +-1MiB): %#03x", rel_jmp);
+            tcc_error( "out-of-range branch chain (> +-1MiB): %#03x", rel_jmp );
         }
         // generate the jmp table
         if( rel_jmp == 4 ) {
-            // we just need a nop as PC will increment by 4 for us (this will need to be updated
-            // once compressed instructions are added)
+            // we just need a nop as PC will increment by 4 for us (this will need to
+            // be updated once compressed instructions are added)
             emit_NOP();
         }
         else {
@@ -1173,7 +1185,7 @@ ST_FUNC void gjmp_addr( int a )
         // far jump
         uint32_t t0 = 5;
         emit_LUI( t0, IMM_HIGH( rel_jmp + 0x800 ) );
-        emit_JALR( 0, t0, IMM_LOW( rel_jmp ) << 20 >> 20); // sign extend masked value
+        emit_JALR( 0, t0, IMM_LOW( rel_jmp ) << 20 >> 20 ); // sign extend masked value
     }
     else {
         // near jump
@@ -1242,7 +1254,8 @@ static void gen_opil( int op, int ll )
 {
     int a, b, d;
 
-    // handle the case where one of the values is a constant, use an immediate value if we can
+    // handle the case where one of the values is a constant, use an immediate
+    // value if we can
     if( ( vtop->r & ( VT_VALMASK | VT_LVAL | VT_SYM ) ) == VT_CONST ) {
         int fc = vtop->c.i;
         if( fc == vtop->c.i && !( ( (unsigned)fc + ( 1 << 11 ) ) >> 12 ) ) {
@@ -1289,10 +1302,9 @@ static void gen_opil( int op, int ll )
     }
 }
 
-// generate instructions for binary operations where one of the values is a constant
-// fc is the immediate constant
-// returns 1 if we need to "fall through" and use the register generating code instead
-// otherwise returns 0
+// generate instructions for binary operations where one of the values is a
+// constant fc is the immediate constant returns 1 if we need to "fall through"
+// and use the register generating code instead otherwise returns 0
 static int gen_opi_immediate( int op, int fc, int ll )
 {
     // get values from the main stack
@@ -1351,11 +1363,10 @@ static int gen_opi_immediate( int op, int fc, int ll )
             emit_SRA( rd, a, fc );
             break;
 
-
         case TOK_UGE: /* -> TOK_ULT */
         case TOK_UGT: /* -> TOK_ULE */
-        case TOK_GE: /* -> TOK_LT */
-        case TOK_GT: /* -> TOK_LE */
+        case TOK_GE:  /* -> TOK_LT */
+        case TOK_GT:  /* -> TOK_LE */
             gen_opil( op - 1, 0 );
             vtop->cmp_op ^= 1;
             return 0;
@@ -1372,9 +1383,10 @@ static int gen_opi_immediate( int op, int fc, int ll )
             return 0;
         default:
             /*
-              default case means we have to bail, since otherwise we're pretending we handled it properly
-              as an example, '*' will hit this if RHS is an immediate since RV32M doesn't have MULI,
-              so we used to just... not actually compile a multiplication instruction in at all
+              default case means we have to bail, since otherwise we're pretending we
+              handled it properly as an example, '*' will hit this if RHS is an
+              immediate since RV32M doesn't have MULI, so we used to just... not
+              actually compile a multiplication instruction in at all
             */
             return 1;
     }
@@ -1556,7 +1568,7 @@ ST_FUNC void gen_vla_alloc( CType *type, int align )
     else
 #endif
         EI( 0x13, 0, rr, rr, 15 ); // addi RR, RR, 15
-    EI( 0x13, 7, rr, rr, -16 ); // andi, RR, RR, -16
+    EI( 0x13, 7, rr, rr, -16 );    // andi, RR, RR, -16
     ER( 0x33, 0, 2, 2, rr, 0x20 ); // sub sp, sp, rr
     vpop();
 #if defined( CONFIG_TCC_BCHECK )

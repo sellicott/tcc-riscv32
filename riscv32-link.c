@@ -21,7 +21,7 @@
 
 #include <assert.h>
 
-//#define DEBUG_RELOC
+// #define DEBUG_RELOC
 #include "riscv_utils.h"
 #include "tcc.h"
 
@@ -120,12 +120,13 @@ ST_FUNC void relocate_plt( TCCState *s1 )
 
     end_offset = s1->plt->data_offset;
 
-    // for our general opcode generation functions to work we need to make the section we are
-    // writing to into current_text_section->data and set the ind variable to 0 offset
-    // using these functions will increment ind
-    // We assume since we are filling in the plt, we are done with code generation and
+    // for our general opcode generation functions to work we need to make the
+    // section we are writing to into current_text_section->data and set the ind
+    // variable to 0 offset using these functions will increment ind We assume
+    // since we are filling in the plt, we are done with code generation and
     // cur_text_section is NULL, so we can just overwrite it
-    // current_text_section->data and ind, then replace them with p and 0 respectively
+    // current_text_section->data and ind, then replace them with p and 0
+    // respectively
 
     tcc_state = s1;
     assert( cur_text_section == NULL );
@@ -137,12 +138,12 @@ ST_FUNC void relocate_plt( TCCState *s1 )
     // copy code from the NO_CODE macro (move to tcc.h?)
     nocode_wanted = 0;
 
-
     if( ind < end_offset ) {
         uint64_t plt = s1->plt->sh_addr;
         uint64_t got = s1->got->sh_addr;
 
-        // Define constants for the register values (see the riscv assembly manual for values)
+        // Define constants for the register values (see the riscv assembly manual
+        // for values)
         const uint32_t t0 = 5;
         const uint32_t t1 = 6;
         const uint32_t t2 = 7;
@@ -166,7 +167,8 @@ ST_FUNC void relocate_plt( TCCState *s1 )
         emit_LW( t3, t2, IMM_LOW( got - plt ) );
         emit_ADDI( t1, t1, -( 32 + 12 ) );
         emit_ADDI( t0, t2, IMM_LOW( got - plt ) );
-        emit_SRLI( t1, t1, 4 - 2 ); // srli t1, t1, log2(16/PTRSIZE) -> log2(16) - log2(PTRSIZE)
+        // srli t1, t1, log2(16/PTRSIZE) -> log2(16) - log2(PTRSIZE)
+        emit_SRLI( t1, t1, 4 - 2 );
         emit_LW( t0, t0, PTR_SIZE );
         emit_JR( t3 );
 
@@ -209,6 +211,8 @@ void relocate( TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr, addr_t
     uint32_t off32;
     int sym_index = ELFW( R_SYM )( rel->r_info ), esym_index;
     ElfW( Sym ) *sym = &( (ElfW( Sym ) *)symtab_section->data )[ sym_index ];
+
+    printf( "[relocate]: hello!\n" );
 
     switch( type ) {
         case R_RISCV_ALIGN:
@@ -313,6 +317,7 @@ void relocate( TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr, addr_t
             return;
 
         case R_RISCV_32:
+            printf( "[relocate]: R_RISCV_32 gen\n" );
             if( s1->output_type == TCC_OUTPUT_DLL ) {
                 /* XXX: this logic may depend on TCC's codegen
                    now TCC uses R_RISCV_RELATIVE even for a 64bit pointer */

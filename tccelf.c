@@ -1099,8 +1099,7 @@ ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
             if (sym_bind == STB_WEAK)
                 sym->st_value = 0;
             else
-                tcc_error_noabort("undefined symbol '%s' %s:%d",
-                                  name, s1->current_filename, file->line_num);
+                tcc_error_noabort("[relocate_syms] undefined symbol '%s'", name);
 
         } else if (sh_num < SHN_LORESERVE) {
             /* add section base */
@@ -1472,6 +1471,7 @@ redo:
 	        if (pass != 1)
                     continue;
                 reloc_type = R_GLOB_DAT;
+                printf("[put_got_entries]: added R_GLOB_DAT\n");
             }
 
             if (!s1->got)
@@ -1976,8 +1976,8 @@ static void bind_exe_dynsyms(TCCState *s1)
                 } else if (find_defsym(s1, name, sym)) {
                     /* Exists in -Wl,--defsym=NAME=ADDR */
                 } else {
-                    tcc_error_noabort("undefined symbol '%s' %s:%d",
-                                      name, s1->current_filename, file->line_num);
+                    tcc_error_noabort("[bind_exe_dynsyms] undefined symbol '%s'", name);
+
                 }
             }
         }

@@ -50,17 +50,22 @@ ST_DATA SValue *vtop;
 static SValue _vstack[1 + VSTACK_SIZE];
 #define vstack (_vstack + 1)
 
-ST_DATA int const_wanted; /* true if constant wanted */
+ST_DATA int const_wanted;  /* true if constant wanted */
 ST_DATA int nocode_wanted; /* no code generation wanted */
-#define unevalmask 0xffff /* unevaluated subexpression */
-#define NODATA_WANTED (nocode_wanted > 0) /* no static data output wanted either */
-#define DATA_ONLY_WANTED 0x80000000 /* ON outside of functions and for static initializers */
+#define unevalmask 0xffff  /* unevaluated subexpression */
+#define NODATA_WANTED                                                          \
+  (nocode_wanted > 0) /* no static data output wanted either */
+#define DATA_ONLY_WANTED                                                       \
+  0x80000000 /* ON outside of functions and for static initializers */
 #define CODE_OFF() (nocode_wanted |= 0x20000000)
 #define CODE_ON() (nocode_wanted &= ~0x20000000)
 
-ST_DATA int global_expr;  /* true if compound literals must be allocated globally (used during initializers parsing */
-ST_DATA CType func_vt; /* current function return type (used by return instruction) */
-ST_DATA int func_var; /* true if current function is variadic (used by return instruction) */
+ST_DATA int global_expr; /* true if compound literals must be allocated globally
+                            (used during initializers parsing */
+ST_DATA CType
+    func_vt; /* current function return type (used by return instruction) */
+ST_DATA int func_var; /* true if current function is variadic (used by return
+                         instruction) */
 ST_DATA int func_vc;
 ST_DATA int func_ind;
 ST_DATA const char *funcname;
@@ -475,6 +480,7 @@ ST_FUNC void put_extern_sym2(Sym *sym, int sh_num,
     char buf1[256];
 
     if (!sym->c) {
+        char *reloc_type_str = "";
         name = get_tok_str(sym->v, NULL);
         t = sym->type.t;
         if ((t & VT_BTYPE) == VT_FUNC) {
@@ -492,8 +498,13 @@ ST_FUNC void put_extern_sym2(Sym *sym, int sh_num,
             sym_bind = STB_GLOBAL;
         other = 0;
 
+        if (sym_type == R_RISCV_32) {
+        reloc_type_str = "R_RISCV_32 ";
+        }
+        printf("[put_extern_sym2]: %srelocation for sym '%s'\n", reloc_type_str, name);
+
 #ifdef TCC_TARGET_PE
-        if (sym_type == STT_FUNC && sym->type.ref) {
+    if (sym_type == STT_FUNC && sym->type.ref) {
             Sym *ref = sym->type.ref;
             if (ref->a.nodecorate) {
                 can_add_underscore = 0;
@@ -3036,8 +3047,7 @@ static void force_charshort_cast(void)
     vtop->type.t = dbt;
 }
 
-static void gen_cast_s(int t)
-{
+static void gen_cast_s(int t) {
     CType type;
     type.t = t;
     type.ref = NULL;
@@ -7589,10 +7599,13 @@ static void init_putv(init_params *p, CType *type, unsigned long c)
                 break;
             case VT_PTR:
             case VT_INT:
-	        if (vtop->r & VT_SYM)
-	          greloc(sec, vtop->sym, c, R_DATA_PTR);
-	        write32le(ptr, val);
-	        break;
+            if (vtop->r & VT_SYM) {
+                printf("[init_putv]: relocation for 'sym' %s\n",
+                   get_tok_str(vtop->sym->v, NULL));
+                greloc(sec, vtop->sym, c, R_DATA_PTR);
+            }
+            write32le(ptr, val);
+            break;
 #endif
 	    default:
                 //tcc_internal_error("unexpected type");
