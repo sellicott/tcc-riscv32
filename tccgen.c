@@ -1028,6 +1028,7 @@ ST_FUNC Sym *get_sym_ref(CType *type, Section *sec, unsigned long offset, unsign
     v = anon_sym++;
     sym = sym_push(v, type, VT_CONST | VT_SYM, 0);
     sym->type.t |= VT_STATIC;
+    printf("[get_sym_ref]: for symbol '%s'\n", get_tok_str(sym->v, NULL));
     put_extern_sym(sym, sec, offset, size);
     return sym;
 }
@@ -1035,6 +1036,7 @@ ST_FUNC Sym *get_sym_ref(CType *type, Section *sec, unsigned long offset, unsign
 /* push a reference to a section offset by adding a dummy symbol */
 static void vpush_ref(CType *type, Section *sec, unsigned long offset, unsigned long size)
 {
+    printf("[vpush_ref]: hello!\n");
     vpushsym(type, get_sym_ref(type, sec, offset, size));  
 }
 
@@ -7413,8 +7415,10 @@ static int decl_designator(init_params *p, CType *type, unsigned long c,
             t1.t = VT_STRUCT, t1.ref = &aref;
             type = &t1;
         }
-        if (p->sec)
+        if (p->sec) {
+            printf("[decl_initializer_alloc]: hello!\n");
             vpush_ref(type, p->sec, c, elem_size);
+        }
         else
 	    vset(type, VT_LOCAL|VT_LVAL, c);
         for (i = 1; i < nb_elems; i++) {
@@ -8044,6 +8048,7 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
 	    put_extern_sym(sym, sec, addr, size);
         } else {
             /* push global reference */
+            printf("[decl_designator]: hello!\n");
             vpush_ref(type, sec, addr, size);
             sym = vtop->sym;
 	    vtop->r |= r;
