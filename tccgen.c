@@ -8049,7 +8049,7 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
 	    put_extern_sym(sym, sec, addr, size);
         } else {
             /* push global reference */
-            printf("[decl_initializer_alloc]: hello!\n");
+            printf("[decl_initializer_alloc]: for sym '%s'\n", get_tok_str(v, NULL));
             vpush_ref(type, sec, addr, size);
             sym = vtop->sym;
 	    vtop->r |= r;
