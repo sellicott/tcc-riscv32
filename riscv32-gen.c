@@ -184,11 +184,11 @@ static int load_symofs( int r, SValue *sv, int forstore )
 
         // generate a relocation entry with the generated offset
         greloca( cur_text_section, sv->sym, ind, R_RISCV_PCREL_HI20, addend );
+
         if( !nocode_wanted ) {
             put_extern_sym( &label, cur_text_section, ind, 0 );
         }
 
-        put_extern_sym( &label, cur_text_section, ind, 0 );
         // immediate value is 0 so that the linker can load values into it
         emit_AUIPC( rd, 0 );
 
