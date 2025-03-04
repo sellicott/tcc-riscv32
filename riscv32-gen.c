@@ -1318,10 +1318,10 @@ static void gen_carry_addsub( int op )
             gv2( RC_INT, RC_INT );
 
             tcc_cf = get_reg( RC_INT );
-            gv( RC_INT );
+            // gv( RC_INT );
             vpushv( vtop );
             vtop[ 0 ].r = tcc_cf;
-            tcc_cf = ireg( vtop[ 0 ].r );
+            cf = ireg( vtop[ 0 ].r );
             a = ireg( vtop[ -1 ].r );
             // mov CF <- L1
             load( vtop[ 0 ].r, &vtop[ -1 ] );
@@ -1331,21 +1331,21 @@ static void gen_carry_addsub( int op )
             vrotb( 3 );
             vrotb( 3 );
             // H1 H2 CF L2 L1 <- stack top
-            tcc_cf = ireg( vtop[ -2 ].r );
+            cf = ireg( vtop[ -2 ].r );
             b = ireg( vtop[ -1 ].r );
             a = ireg( vtop[ 0 ].r );
 
             if( op == TOK_ADDC1 ) {
-                emit_ADD( b, a, b );
-                emit_SLTU( tcc_cf, b, tcc_cf );
+                emit_ADD( a, a, b );
+                emit_SLTU( cf, a, cf );
             }
             else {
-                emit_SUB( b, a, b );
-                emit_SLTU( tcc_cf, tcc_cf, b );
-                emit_XORI( tcc_cf, tcc_cf, 1 );
+                emit_SUB( a, a, b );
+                emit_SLTU( cf, cf, a );
             }
             // printf( "[gen_carry_addsub]: overflow test\n" );
-            //  pop L1 off the stack
+            vswap();
+            //  pop L2 off the stack
             vtop--;
             // H1 H2 CF AL <- stack top
             vrotb( 4 );
