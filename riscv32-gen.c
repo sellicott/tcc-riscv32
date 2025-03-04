@@ -88,9 +88,9 @@ static int ireg( int r )
     if( r == TREG_SP )
         return 2; // sp
 
-    if ( r < 0 || r >= 8 ){
-            tcc_error("internal error: unexpected register value %d\n", r);
-            assert( r >= 0 && r < 8 );
+    if( r < 0 || r >= 8 ) {
+        tcc_error( "internal error: unexpected register value %d\n", r );
+        assert( r >= 0 && r < 8 );
     }
     return r + 10; // tccrX --> aX == x(10+X)
 }
@@ -1241,7 +1241,7 @@ ST_FUNC int gjmp_append( int n, int t )
     return t;
 }
 
-static void gen_carry_addsub(int op);
+static void gen_carry_addsub( int op );
 static int gen_opi_immediate( int op, int fc, int ll );
 
 // ll is set to 1 when generating 'long' code (64-bit stuff)
@@ -1262,14 +1262,12 @@ static void gen_opil( int op, int ll )
         }
     }
     // check if we are doing one of the carry add/sub operations
-    switch (op) {
+    switch( op ) {
         default: break;
         case TOK_ADDC1:
         case TOK_SUBC1:
         case TOK_ADDC2:
-        case TOK_SUBC2:
-            gen_carry_addsub(op);
-            return;
+        case TOK_SUBC2: gen_carry_addsub( op ); return;
     }
     gv2( RC_INT, RC_INT );
     a = ireg( vtop[ -1 ].r );
@@ -1306,12 +1304,12 @@ static void gen_opil( int op, int ll )
     }
 }
 
-static void gen_carry_addsub(int op) {
-    int tcc_cf; // tcc register name
+static void gen_carry_addsub( int op )
+{
+    int tcc_cf;   // tcc register name
     int a, b, cf; // risc-v register name
-    switch (op) {
-        default: tcc_error("unexpected operation: %s", get_tok_str(op, NULL));
-            break;
+    switch( op ) {
+        default: tcc_error( "unexpected operation: %s", get_tok_str( op, NULL ) ); break;
         case TOK_ADDC1:
         case TOK_SUBC1:
             // for these we need to add L1 and L2 and put the stack into the following state
@@ -1324,40 +1322,40 @@ static void gen_carry_addsub(int op) {
             vswap();
             // H1 H2 L2 L1 <- stack top
             // force the top two stack values to be in registers
-            gv2(RC_INT, RC_INT);
+            gv2( RC_INT, RC_INT );
 
-            tcc_cf = get_reg(RC_INT);
-            gv(RC_INT);
-            vpushv(vtop);
-            vtop[0].r = tcc_cf;
-            tcc_cf = ireg( vtop[0].r );
-            a = ireg( vtop[-1].r );
+            tcc_cf = get_reg( RC_INT );
+            gv( RC_INT );
+            vpushv( vtop );
+            vtop[ 0 ].r = tcc_cf;
+            tcc_cf = ireg( vtop[ 0 ].r );
+            a = ireg( vtop[ -1 ].r );
             // mov CF <- L1
-            load( vtop[0].r, &vtop[-1] );
+            load( vtop[ 0 ].r, &vtop[ -1 ] );
             // H1 H2 L2 L1 CF <- stack top
 
             // rotate so that L1 and L2 are on the top of the stack
-            vrotb(3);
-            vrotb(3);
+            vrotb( 3 );
+            vrotb( 3 );
             // H1 H2 CF L2 L1 <- stack top
             tcc_cf = ireg( vtop[ -2 ].r );
             b = ireg( vtop[ -1 ].r );
             a = ireg( vtop[ 0 ].r );
-            printf("a: %d, b: %d, cf: %d\n", a, b, tcc_cf);
+            // printf( "a: %d, b: %d, cf: %d\n", a, b, tcc_cf );
 
-            if(op == TOK_ADDC1){
-                emit_ADD(b, a, b);
+            if( op == TOK_ADDC1 ) {
+                emit_ADD( b, a, b );
             }
             else {
-                emit_SUB(b, a, b);
+                emit_SUB( b, a, b );
             }
-            emit_SLTU(tcc_cf, a, b);
+            emit_SLTU( tcc_cf, a, b );
             // pop L2 off the stack
             vtop--;
             // H1 H2 CF AL <- stack top
-            vrotb(4);
-            vrotb(4);
-            vrotb(4);
+            vrotb( 4 );
+            vrotb( 4 );
+            vrotb( 4 );
             // AL H1 H2 CF <- stack top
             break;
         case TOK_ADDC2:
@@ -1367,24 +1365,24 @@ static void gen_carry_addsub(int op) {
             // we expect tcc to run two vrotb(3) calls after TOK_SUBC1
             gv2( RC_INT, RC_INT );
             a = ireg( vtop[ -1 ].r );
-            b = ireg(vtop[ 0 ].r );
+            b = ireg( vtop[ 0 ].r );
             vtop--;
-            if(op == TOK_ADDC2)
-                emit_ADD(a, a, b);
+            if( op == TOK_ADDC2 )
+                emit_ADD( a, a, b );
             else
-                emit_SUB(a, a, b);
+                emit_SUB( a, a, b );
             // AL CF AH <- stack top
             vswap();
             // AL AH CF <- stack top
 
             gv2( RC_INT, RC_INT );
             cf = ireg( vtop[ 0 ].r );
-            a = ireg(vtop[ -1 ].r );
+            a = ireg( vtop[ -1 ].r );
             vtop--;
-            if(op == TOK_ADDC2)
-                emit_ADD(a, a, cf);
+            if( op == TOK_ADDC2 )
+                emit_ADD( a, a, cf );
             else
-                emit_SUB(a, a, cf);
+                emit_SUB( a, a, cf );
             // AL AH <- stack top
             break;
     }
