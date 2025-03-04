@@ -1337,12 +1337,12 @@ static void gen_carry_addsub( int op )
 
             if( op == TOK_ADDC1 ) {
                 emit_ADD( b, a, b );
-                emit_SLTU( tcc_cf, a, b );
+                emit_SLTU( tcc_cf, b, tcc_cf );
             }
             else {
                 emit_SUB( b, a, b );
-                emit_SLTU( tcc_cf, b, a );
-                emit_XORI( tcc_cf, tcc_cf, a );
+                emit_SLTU( tcc_cf, tcc_cf, b );
+                emit_XORI( tcc_cf, tcc_cf, 1 );
             }
             // printf( "[gen_carry_addsub]: overflow test\n" );
             //  pop L1 off the stack
