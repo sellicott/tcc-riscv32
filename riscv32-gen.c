@@ -1310,6 +1310,7 @@ static void gen_carry_addsub(int op) {
             break;
         case TOK_ADDC1:
         case TOK_SUBC1:
+            printf("[gen_carry_addsub] C1 op\n");
             // for these we need to add L1 and L2 and put the stack into the following state
             // AL H1 H2 CF <- stack top
             // where CF is a newly allocated register and AL is the same register as L1
@@ -1320,6 +1321,10 @@ static void gen_carry_addsub(int op) {
             vswap();
             // H1 H2 L2 L1 <- stack top
             tcc_cf = get_reg(RC_INT);
+            printf("tcc_cf: %d\n", tcc_cf);
+            vpushv(vtop);
+            load(tcc_cf, vtop);
+            vtop->r = tcc_cf;
             // H1 H2 L2 L1 CF <- stack top
 
             // force the top two stack values to be in registers
@@ -1351,6 +1356,7 @@ static void gen_carry_addsub(int op) {
             break;
         case TOK_ADDC2:
         case TOK_SUBC2:
+            printf("[gen_carry_addsub] C2 op\n");
             // for these we need to add L1 and L2 and put the stack into the following state
             // AL CF H1 H2 <- stack top
             // we expect tcc to run two vrotb(3) calls after TOK_SUBC1
