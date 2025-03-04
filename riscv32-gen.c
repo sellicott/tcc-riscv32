@@ -1341,7 +1341,6 @@ static void gen_carry_addsub( int op )
             tcc_cf = ireg( vtop[ -2 ].r );
             b = ireg( vtop[ -1 ].r );
             a = ireg( vtop[ 0 ].r );
-            // printf( "a: %d, b: %d, cf: %d\n", a, b, tcc_cf );
 
             if( op == TOK_ADDC1 ) {
                 emit_ADD( b, a, b );
