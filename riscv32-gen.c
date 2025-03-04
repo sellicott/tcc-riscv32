@@ -1323,7 +1323,7 @@ static void gen_carry_addsub(int op) {
             // H1 H2 L1 L2 <- stack top
             vswap();
             // H1 H2 L2 L1 <- stack top
-            // make sure the 4 values on top of the stack are in registers
+            // force the top two stack values to be in registers
             gv2(RC_INT, RC_INT);
 
             tcc_cf = get_reg(RC_INT);
@@ -1332,26 +1332,28 @@ static void gen_carry_addsub(int op) {
             vtop[0].r = tcc_cf;
             tcc_cf = ireg( vtop[0].r );
             a = ireg( vtop[-1].r );
+            // mov CF <- L1
             load( vtop[0].r, &vtop[-1] );
             // H1 H2 L2 L1 CF <- stack top
 
             // rotate so that L1 and L2 are on the top of the stack
             vrotb(3);
             vrotb(3);
-            // H1 H2 CF L1 L2 <- stack top
+            // H1 H2 CF L2 L1 <- stack top
+            tcc_cf = ireg( vtop[ -2 ].r );
+            b = ireg( vtop[ -1 ].r );
+            a = ireg( vtop[ 0 ].r );
+            printf("a: %d, b: %d, cf: %d\n", a, b, tcc_cf);
 
-            // force the top two stack values to be in registers
-            a = ireg( vtop[ -1 ].r );
-            b = ireg( vtop[ 0 ].r );
-            // pop the top of the stack
-            vtop--;
             if(op == TOK_ADDC1){
-                emit_ADD(a, a, b);
+                emit_ADD(b, a, b);
             }
             else {
-                emit_SUB(a, a, b);
+                emit_SUB(b, a, b);
             }
             emit_SLTU(tcc_cf, a, b);
+            // pop L2 off the stack
+            vtop--;
             // H1 H2 CF AL <- stack top
             vrotb(4);
             vrotb(4);
