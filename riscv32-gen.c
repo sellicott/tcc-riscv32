@@ -400,35 +400,15 @@ ST_FUNC void load( int r, SValue *sv )
         int inv = 0;
         // TODO cleanup this code so that it uses more of the pseudo operation
         switch( op ) {
-            case TOK_ULT:
-            case TOK_UGE:
             case TOK_ULE:
-            case TOK_UGT:
+            case TOK_ULT: emit_SLTU( dest_reg, a, b ); break;
+            case TOK_UGE:
+            case TOK_UGT: emit_SLTU( dest_reg, b, a ); break;
             case TOK_LT:
-            case TOK_GE:
+            case TOK_GE: emit_SLT( dest_reg, a, b ); break;
             case TOK_LE:
-            case TOK_GT:
-                if( op & 1 ) { // remove [U]GE,GT
-                    inv = 1;
-                    op--;
-                }
-                if( ( op & 7 ) == 6 ) { // [U]LE
-                    int t = a;
-                    a = b;
-                    b = t;
-                    inv ^= 1;
-                }
-                // ER( 0x33, ( op > TOK_UGT ) ? 2 : 3, dest_reg, a, b, 0 ); // slt[u] d, a, b
-                if( op > TOK_UGT ) {
-                    emit_SLT( dest_reg, a, b );
-                }
-                else {
-                    emit_SLTU( dest_reg, a, b );
-                }
-                if( inv ) {
-                    emit_XORI( dest_reg, dest_reg, 1 );
-                } // xori d, d, 1
-                break;
+            case TOK_GT: emit_SLT( dest_reg, b, a ); break;
+
             case TOK_NE:
             case TOK_EQ:
                 // we only need to subtract if the comparison isn't already against zero
@@ -444,6 +424,13 @@ ST_FUNC void load( int r, SValue *sv )
                     emit_SEQZ( dest_reg, dest_reg ); // sltiu d, d, 1 == seqz d,d
                 }
                 break;
+        }
+        switch( op ) {
+            default: break;
+            case TOK_ULE:
+            case TOK_UGT:
+            case TOK_LE:
+            case TOK_GT: emit_XORI( dest_reg, dest_reg, 1 ); break;
         }
     }
     else if( ( masked_stack_reg & ~1 ) == VT_JMP ) {
