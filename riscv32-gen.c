@@ -38,7 +38,6 @@
 
 #else
 #define USING_GLOBALS
-#define PROMOTE_RET
 #include "riscv_utils.h"
 #include "tcc.h"
 #include <assert.h>
