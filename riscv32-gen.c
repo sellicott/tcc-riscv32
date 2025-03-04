@@ -394,10 +394,10 @@ ST_FUNC void load( int r, SValue *sv )
     }
     // Value is stored in the CPU flag from a comparison operation. Put it in a safe place.
     else if( masked_stack_reg == VT_CMP ) {
+        // printf( "[load] comparison op\n" );
         int op = vtop->cmp_op;
         int a = vtop->cmp_r & 0xff;
         int b = ( vtop->cmp_r >> 8 ) & 0xff;
-        int inv = 0;
         // TODO cleanup this code so that it uses more of the pseudo operation
         switch( op ) {
             case TOK_ULE:
@@ -424,13 +424,17 @@ ST_FUNC void load( int r, SValue *sv )
                     emit_SEQZ( dest_reg, dest_reg ); // sltiu d, d, 1 == seqz d,d
                 }
                 break;
+            default: printf( "[load] unknown comparison\n" ); break;
         }
         switch( op ) {
             default: break;
             case TOK_ULE:
             case TOK_UGT:
             case TOK_LE:
-            case TOK_GT: emit_XORI( dest_reg, dest_reg, 1 ); break;
+            case TOK_GT:
+                emit_XORI( dest_reg, dest_reg, 1 );
+                // printf( "[load] comparison generated xori\n" );
+                break;
         }
     }
     else if( ( masked_stack_reg & ~1 ) == VT_JMP ) {
@@ -1211,6 +1215,7 @@ ST_FUNC int gjmp_cond( int op, int t )
         case TOK_NE: op = 1; break;
         case TOK_EQ: op = 0; break;
     }
+    // printf( "[gjmp_cond] generated operation '%d'\n", op );
     o( 0x63 | ( op ^ 1 ) << 12 | a << 15 | b << 20 | 8 << 7 ); // bOP a,b,+4
     return gjmp( t );
 }
@@ -1267,6 +1272,7 @@ static void gen_opil( int op, int ll )
     switch( op ) {
         default:
             if( op >= TOK_ULT && op <= TOK_GT ) {
+                // printf( "[gen_opil]: set comparison op '%d'\n", op );
                 vset_VT_CMP( op );
                 vtop->cmp_r = a | b << 8;
                 break;
@@ -1331,12 +1337,15 @@ static void gen_carry_addsub( int op )
 
             if( op == TOK_ADDC1 ) {
                 emit_ADD( b, a, b );
+                emit_SLTU( tcc_cf, a, b );
             }
             else {
                 emit_SUB( b, a, b );
+                emit_SLTU( tcc_cf, b, a );
+                emit_XORI( tcc_cf, tcc_cf, a );
             }
-            emit_SLTU( tcc_cf, a, b );
-            // pop L2 off the stack
+            // printf( "[gen_carry_addsub]: overflow test\n" );
+            //  pop L1 off the stack
             vtop--;
             // H1 H2 CF AL <- stack top
             vrotb( 4 );
@@ -1346,7 +1355,7 @@ static void gen_carry_addsub( int op )
             break;
         case TOK_ADDC2:
         case TOK_SUBC2:
-            // for these we need to add L1 and L2 and put the stack into the following state
+            // for these we need to add H1 and H2 and put the stack into the following state
             // AL CF H1 H2 <- stack top
             // we expect tcc to run two vrotb(3) calls after TOK_SUBC1
             gv2( RC_INT, RC_INT );
@@ -1364,11 +1373,12 @@ static void gen_carry_addsub( int op )
             gv2( RC_INT, RC_INT );
             cf = ireg( vtop[ 0 ].r );
             a = ireg( vtop[ -1 ].r );
-            vtop--;
             if( op == TOK_ADDC2 )
                 emit_ADD( a, a, cf );
             else
                 emit_SUB( a, a, cf );
+            // pop CF off the stack
+            vtop--;
             // AL AH <- stack top
             break;
     }
@@ -1441,6 +1451,7 @@ static int gen_opi_immediate( int op, int fc, int ll )
         case TOK_UGT: /* -> TOK_ULE */
         case TOK_GE:  /* -> TOK_LT */
         case TOK_GT:  /* -> TOK_LE */
+            // printf( "[gen_opi_immediate]: op '%d'\n", op );
             gen_opil( op - 1, 0 );
             vtop->cmp_op ^= 1;
             return 0;
@@ -1468,6 +1479,7 @@ static int gen_opi_immediate( int op, int fc, int ll )
     // push the value to the stack (general case)
     --vtop;
     if( op >= TOK_ULT && op <= TOK_GT ) {
+        // printf( "[gen_opi_immediate]: flip '%d'\n", op );
         vset_VT_CMP( TOK_NE );
         vtop->cmp_r = ireg( d ) | 0 << 8;
     }
