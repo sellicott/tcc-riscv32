@@ -3,7 +3,7 @@
 // Number of registers available to allocator:
 #ifdef TCC_TARGET_RISCV32_ilp32
 // TODO add temporary and saved registers here once I figure out how TCC works
-#define NB_REGS 11 // a0-a7, sp (?), ra, sp
+#define NB_REGS 10 // a0-a7, ra, sp
 #else
 #define NB_REGS 19 // a0-a7, fa0-fa7, xxx, ra, sp
 #endif
@@ -87,7 +87,11 @@ static int ireg( int r )
         return 1; // ra
     if( r == TREG_SP )
         return 2; // sp
-    assert( r >= 0 && r < 8 );
+
+    if ( r < 0 || r >= 8 ){
+            tcc_error("internal error: unexpected register value %d\n", r);
+            assert( r >= 0 && r < 8 );
+    }
     return r + 10; // tccrX --> aX == x(10+X)
 }
 
@@ -1310,7 +1314,6 @@ static void gen_carry_addsub(int op) {
             break;
         case TOK_ADDC1:
         case TOK_SUBC1:
-            printf("[gen_carry_addsub] C1 op\n");
             // for these we need to add L1 and L2 and put the stack into the following state
             // AL H1 H2 CF <- stack top
             // where CF is a newly allocated register and AL is the same register as L1
@@ -1320,34 +1323,35 @@ static void gen_carry_addsub(int op) {
             // H1 H2 L1 L2 <- stack top
             vswap();
             // H1 H2 L2 L1 <- stack top
+            // make sure the 4 values on top of the stack are in registers
+            gv2(RC_INT, RC_INT);
+
             tcc_cf = get_reg(RC_INT);
-            printf("tcc_cf: %d\n", tcc_cf);
+            gv(RC_INT);
             vpushv(vtop);
-            load(tcc_cf, vtop);
-            vtop->r = tcc_cf;
+            vtop[0].r = tcc_cf;
+            tcc_cf = ireg( vtop[0].r );
+            a = ireg( vtop[-1].r );
+            load( vtop[0].r, &vtop[-1] );
             // H1 H2 L2 L1 CF <- stack top
 
-            // force the top two stack values to be in registers
-            gv2( RC_INT, RC_INT );
-            cf = ireg(vtop[ 0 ].r );
-            a = ireg( vtop[ -1 ].r );
-            emit_MV( cf, a);
-            // H1 H2 L2 L1 CF <- stack top
             // rotate so that L1 and L2 are on the top of the stack
             vrotb(3);
-            vswap();
+            vrotb(3);
             // H1 H2 CF L1 L2 <- stack top
 
             // force the top two stack values to be in registers
-            gv2( RC_INT, RC_INT );
             a = ireg( vtop[ -1 ].r );
             b = ireg( vtop[ 0 ].r );
             // pop the top of the stack
             vtop--;
-            if(op == TOK_ADDC1)
+            if(op == TOK_ADDC1){
                 emit_ADD(a, a, b);
-            else
+            }
+            else {
                 emit_SUB(a, a, b);
+            }
+            emit_SLTU(tcc_cf, a, b);
             // H1 H2 CF AL <- stack top
             vrotb(4);
             vrotb(4);
@@ -1356,7 +1360,6 @@ static void gen_carry_addsub(int op) {
             break;
         case TOK_ADDC2:
         case TOK_SUBC2:
-            printf("[gen_carry_addsub] C2 op\n");
             // for these we need to add L1 and L2 and put the stack into the following state
             // AL CF H1 H2 <- stack top
             // we expect tcc to run two vrotb(3) calls after TOK_SUBC1
