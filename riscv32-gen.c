@@ -628,7 +628,7 @@ static void reg_pass_rec( CType *type, int *rc, int *fieldofs, int ofs )
         rc[ 0 ] = -1;
     else if( !rc[ 0 ] || rc[ 1 ] == RC_FLOAT || is_float( type->t ) ) {
         rc[ ++rc[ 0 ] ] = is_float( type->t ) ? RC_FLOAT : RC_INT;
-        fieldofs[ rc[ 0 ] ] =
+        fieldofs[ rc[ 0 ] ] = // [3:0] is type [31:4] is offset // FIXME: ptr is not longlong on rv32
             ( ofs << 4 ) | ( ( type->t & VT_BTYPE ) == VT_PTR ? VT_LLONG : type->t & VT_BTYPE );
     }
     else
@@ -637,20 +637,27 @@ static void reg_pass_rec( CType *type, int *rc, int *fieldofs, int ofs )
 
 static void reg_pass( CType *type, int *prc, int *fieldofs, int named )
 {
+    /*
+     * prc[0] the number of required registers, -1 means argument can't be stroed in register
+     * prc[1/2] the type of first/second register
+     */
     prc[ 0 ] = 0;
+    /*
+     * fieldofs[0] not used
+     * fieldofs[1/2] [3:0] is type, other is offset
+    */
     reg_pass_rec( type, prc, fieldofs, 0 );
     if( prc[ 0 ] <= 0 || !named ) {
         int align, size = type_size( type, &align );
-        prc[ 0 ] = ( size + 7 ) >> 3;
+        prc[ 0 ] = (size + 3) >> 2;
+        assert(size <= 8); // We can't handle more than 8 bytes
         prc[ 1 ] = prc[ 2 ] = RC_INT;
         fieldofs[ 1 ] = ( 0 << 4 ) | ( size <= 1     ? VT_BYTE
                                          : size <= 2 ? VT_SHORT
-                                         : size <= 4 ? VT_INT
-                                                     : VT_LLONG );
-        fieldofs[ 2 ] = ( 8 << 4 ) | ( size <= 9      ? VT_BYTE
-                                         : size <= 10 ? VT_SHORT
-                                         : size <= 12 ? VT_INT
-                                                      : VT_LLONG );
+                                                     : VT_INT );
+        fieldofs[ 2 ] = ( 8 << 4 ) | ( size <= 5      ? VT_BYTE
+                                          : size <= 6 ? VT_SHORT
+                                                      : VT_INT );
     }
 }
 
@@ -659,8 +666,8 @@ ST_FUNC void gfunc_call( int nb_args )
     int i, align, size, areg[ 2 ];
     int *info = tcc_malloc( ( nb_args + 1 ) * sizeof( int ) );
     int stack_adj = 0, tempspace = 0, stack_add, ofs, splitofs = 0;
-    SValue *sv;
-    Sym *sa;
+    SValue *sv; // Point to the argument on the vstack
+    Sym *sa; // Link list of function arguments defined by prototype
     const uint32_t t0 = 5;
     const uint32_t sp = 2;
 
@@ -687,11 +694,11 @@ ST_FUNC void gfunc_call( int nb_args )
             size = align = 8;
             byref = 64 | ( tempofs << 7 );
         }
-        reg_pass( &sv->type, prc, fieldofs, sa != 0 );
+        reg_pass( &sv->type, prc, fieldofs, sa != 0 ); // is sa!= 0 means 'last argument' ?
         if( !sa && align == 2 * XLEN && size <= 2 * XLEN ) {
             areg[ 0 ] = ( areg[ 0 ] + 1 ) & ~1;
         }
-        nregs = prc[ 0 ];
+        nregs = prc[ 0 ]; // Regs required to transfer this arg
         if( size == 0 ) {
             info[ i ] = 0;
         }
