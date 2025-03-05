@@ -224,7 +224,7 @@ static int load_symofs( int r, SValue *sv, int forstore )
 
 static void load_large_constant( int rr, int fc, uint32_t pi )
 {
-    tcc_error("don't call this on rv32'");
+    tcc_error( "don't call this on rv32'" );
     if( fc < 0 )
         pi++;
     emit_LUI( rr, IMM_HIGH( pi ) );
@@ -314,17 +314,17 @@ static void load_lvalue( int r, SValue *sv )
 ST_FUNC void load( int r, SValue *sv )
 {
     int dest_reg = is_ireg( r ) ? ireg( r ) : freg( r ); // rr
-    int lvar_offset = sv->c.i;                     // fc
-    int stack_type = sv->type.t & VT_BTYPE;        // bt
-    int stack_reg = sv->r;                         // fr
-    int masked_stack_reg = stack_reg & VT_VALMASK; // v
+    int lvar_offset = sv->c.i;                           // fc
+    int stack_type = sv->type.t & VT_BTYPE;              // bt
+    int stack_reg = sv->r;                               // fr
+    int masked_stack_reg = stack_reg & VT_VALMASK;       // v
 
     // loading to an lvalue i.e. pointer into register
     if( stack_reg & VT_LVAL ) {
         load_lvalue( r, sv );
     }
     else if( masked_stack_reg == VT_CONST ) {
-        int rs1 = 0, zext = 0;
+        int rs1 = 0; // For addi, default to x0
 
         // only handle integer types
         if( is_float( sv->type.t ) ) {
@@ -338,60 +338,16 @@ ST_FUNC void load( int r, SValue *sv )
             lvar_offset = sv->c.i;
         }
 
-        // load large constant
-        // constant is greater than 0x7FFF_FFFF
-        // At this point lvar_offset can be:
-        // 1. The address of it(is this really true?) if sv is a symbol
-        // 2. The value of a constant if sv is a plain constant
-        // Notice that lvar_offset is signed and narrower than sv->c.i
-        // So a implicit promotion hides here
-    #if 0
-        if( lvar_offset != sv->c.i ) {
-            int64_t si = sv->c.i;
-            si >>= 32;
-            // constant is greater than 0xFFFF_FFFF
-            // FIXME: for rv32 this should NOT happen WITHOUT
-            // stack_type being longlong
-            if( si != 0 ) {
-                load_large_constant( dest_reg, lvar_offset, si );
-                lvar_offset &= 0xff;
-                rs1 = dest_reg;
-                do32bit = 0;
-            }
-            else if( stack_type == VT_LLONG ) {
-                /* A 32bit unsigned constant for a 64bit type.
-                   lui always sign extends, so we need to do an explicit zext.*/
-                // FIXME: above is for rv64 only.
-                // lui on rv32 does not sign extends
-                // TODO: this should be ignored since
-                // tcc will split longlong into two load
-                zext = 1;
-            }
-        }
-#endif
-
-        printf("Trying to load %x\n", lvar_offset);
         if( LARGE_IMM( lvar_offset ) ) {
-            /* printf("IMM HIGH is %.8x\n", IMM_HIGH(lvar_offset)); */
-            printf("LUI a large imm %.8x to reg %d\n", IMM_HIGH_LEXT(lvar_offset),dest_reg);
-            printf("Which is %.x\n",(IMM_HIGH_LEXT(lvar_offset)) << 12);
-            printf(":: %.x\n",IMM_HIGH(lvar_offset)+ ((lvar_offset >> 11)& 0x1));
             rs1 = dest_reg;
-            // add 0x800 so when the lower (sign extended) bits get added, they don't ruin things
-            emit_LUI( dest_reg, IMM_HIGH_LEXT( lvar_offset )  );
+            emit_LUI( dest_reg, IMM_HIGH_LEXT( lvar_offset ) );
         }
         if( lvar_offset || ( dest_reg != rs1 ) || ( stack_reg & VT_SYM ) ) {
-            // EI(0x13 | do32bit, 0, rd, rs1, lvar_offset << 20 >> 20); // addi[w] R, x0|R,
-            printf("ADDI a imm %.8x to reg %d based on reg %d\n", IMM_LOW(lvar_offset ),dest_reg,rs1);
             emit_ADDI( dest_reg, rs1, IMM_LOW( lvar_offset ) );
-        }else{
-            tcc_internal_error("Unexpect situation");
         }
-        /* if( zext ) { */
-        /*     emit_SLLI( dest_reg, dest_reg, 31 ); */
-        /*     emit_SRLI( dest_reg, dest_reg, 31 ); */
-        /*     tcc_internal_error( "I think this code is broken" ); */
-        /* } */
+        else {
+            tcc_internal_error( "Unexpect situation" );
+        }
     }
     else if( masked_stack_reg == VT_LOCAL ) {
         int br = load_symofs( r, sv, 0 );
