@@ -36,7 +36,7 @@
 
 #define CHAR_IS_UNSIGNED
 
-//#else
+#else
 #define USING_GLOBALS
 #include "riscv_utils.h"
 #include "tcc.h"
