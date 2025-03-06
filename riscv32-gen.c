@@ -218,9 +218,8 @@ static int load_symofs( int r, SValue *sv, int forstore )
             tcc_error( "unimp: store(giant local off) (0x%lx)", (long)sv->c.i );
         }
         if( LARGE_IMM( sv_constant ) ) {
-            sv->c.i = IMM_LOW( sv_constant );
-            emit_LUI( rd, IMM_HIGH( sv_constant + 0x800 ) );
-            emit_ADD( rd, rd, s0 );
+            // sv->c.i = IMM_LOW( sv_constant );
+            emit_LI( rd, sv_constant );
         }
     }
     else {
@@ -231,7 +230,7 @@ static int load_symofs( int r, SValue *sv, int forstore )
 
 static void load_large_constant( int rr, int fc, uint32_t pi )
 {
-    tcc_error( "don't call this on rv32'" );
+    // tcc_error( "don't call this on rv32'" );
     if( fc < 0 )
         pi++;
     emit_LUI( rr, IMM_HIGH( pi ) );
@@ -296,11 +295,12 @@ static void load_lvalue( int r, SValue *sv )
         int64_t si = sv->c.i;
         si >>= 32;
         if( si != 0 ) {
-            printf( "[load] 64-bit constant\n" );
+            printf( "[load_lvalue] 64-bit constant\n" );
             load_large_constant( dest_reg, lvar_offset, si );
             lvar_offset &= 0xff;
         }
         else {
+            // handle constant loads here
             emit_LUI( dest_reg, IMM_HIGH( lvar_offset ) );
             lvar_offset = IMM_LOW( lvar_offset );
         }
@@ -313,8 +313,11 @@ static void load_lvalue( int r, SValue *sv )
     switch( size ) {
         case 1: emit_LB( dest_reg, rs1, lvar_offset ); break;
         case 2: emit_LH( dest_reg, rs1, lvar_offset ); break;
-        case 8: printf( "[load_lvalue]: hack! try just using LW\n" );
         case 4: emit_LW( dest_reg, rs1, lvar_offset ); break;
+        case 8:
+            emit_NOP();
+            printf( "[load_lvalue]: 64-bit load, emit nop\n" );
+            break;
         default: tcc_error( "unexpected load size: %d", size );
     }
 }
@@ -353,6 +356,7 @@ ST_FUNC void load( int r, SValue *sv )
             rs1 = load_symofs( r, sv, 0 );
             lvar_offset = sv->c.i;
         }
+
 
         if( LARGE_IMM( lvar_offset ) ) {
             rs1 = dest_reg;
