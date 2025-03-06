@@ -36,7 +36,7 @@
 
 #define CHAR_IS_UNSIGNED
 
-#else
+//#else
 #define USING_GLOBALS
 #include "riscv_utils.h"
 #include "tcc.h"
@@ -755,14 +755,14 @@ ST_FUNC void gfunc_call( int nb_args )
         gv( RC_INT );
 
     if( stack_add ) {
-        if( stack_add >= 0x1000 ) {
+        if( LARGE_IMM(stack_add) ) {
             emit_LUI( t0, IMM_HIGH( -stack_add ) );
             emit_ADDI( t0, t0, IMM_LOW( -stack_add ) );
             emit_ADD( sp, sp, t0 );
         }
         else {
             emit_ADDI( sp, sp, IMM_LOW( -stack_add ) );
-        }
+        } // TODO: craft something to test this path
         for( i = ofs = 0; i < nb_args; i++ ) {
             if( info[ i ] & ( 64 | 32 ) ) {
                 vrotb( nb_args - i );
@@ -809,7 +809,7 @@ ST_FUNC void gfunc_call( int nb_args )
     }
     for( i = 0; i < nb_args; i++ ) {
         int ii = info[ nb_args - 1 - i ], r = ii, r2 = r;
-        if( !( r & 32 ) ) {
+        if( !( r & 32 ) ) { // TODO: why test 5th bit of info?
             CType origtype;
             int loadt;
             r &= 15;
