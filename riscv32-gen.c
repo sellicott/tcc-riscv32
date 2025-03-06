@@ -256,7 +256,7 @@ static void load_lvalue( int r, SValue *sv )
     int stack_type = sv->type.t & VT_BTYPE;              // bt
     int stack_reg = sv->r;                               // fr
     int masked_stack_reg = stack_reg & VT_VALMASK;       // v
-    int align, rs1;
+    int align, rs1, dest_reg2 = 0;
 
     int size = type_size( &sv->type, &align );
 
@@ -264,11 +264,17 @@ static void load_lvalue( int r, SValue *sv )
     if( stack_type == VT_FUNC ) { /* XXX should be done in generic code */
         size = PTR_SIZE;
     }
+    // what do we do with 64-bit values
+    // else if( stack_type == VT_LLONG ) {
+    //    int r2 = sv->r2;
+    //    dest_reg2 = is_ireg( r2 ) ? ireg( r2 ) : freg( r2 );
+    //}
 
     if( is_float( sv->type.t ) ) {
         tcc_internal_error( "floating point not implemented" );
     }
 
+    // offset is on the stack
     if( masked_stack_reg == VT_LOCAL || ( stack_reg & VT_SYM ) ) {
         rs1 = load_symofs( r, sv, 0 );
         lvar_offset = sv->c.i;
@@ -278,6 +284,7 @@ static void load_lvalue( int r, SValue *sv )
         rs1 = ireg( masked_stack_reg );
         lvar_offset = 0; // XXX store ofs in LVAL(reg)
     }
+    // lvalue, offset on the stack
     else if( masked_stack_reg == VT_LLOCAL ) {
         rs1 = load_symofs( r, sv, 0 );
         lvar_offset = sv->c.i;
@@ -289,6 +296,7 @@ static void load_lvalue( int r, SValue *sv )
         int64_t si = sv->c.i;
         si >>= 32;
         if( si != 0 ) {
+            printf( "[load] 64-bit constant\n" );
             load_large_constant( dest_reg, lvar_offset, si );
             lvar_offset &= 0xff;
         }
@@ -305,6 +313,7 @@ static void load_lvalue( int r, SValue *sv )
     switch( size ) {
         case 1: emit_LB( dest_reg, rs1, lvar_offset ); break;
         case 2: emit_LH( dest_reg, rs1, lvar_offset ); break;
+        case 8: printf( "[load_lvalue]: hack! try just using LW\n" );
         case 4: emit_LW( dest_reg, rs1, lvar_offset ); break;
         default: tcc_error( "unexpected load size: %d", size );
     }
@@ -353,7 +362,7 @@ ST_FUNC void load( int r, SValue *sv )
             emit_ADDI( dest_reg, rs1, IMM_LOW( lvar_offset ) );
         }
         else {
-            tcc_internal_error( "Unexpect situation" );
+            tcc_internal_error( "[riscv32-backend load] Unexpected situation" );
         }
     }
     else if( masked_stack_reg == VT_LOCAL ) {
