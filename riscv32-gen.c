@@ -155,6 +155,10 @@ static void ES( uint32_t opcode, uint32_t func3, uint32_t rs1, uint32_t rs2, uin
         ( ( imm >> 5 ) << 25 ) );
 }
 
+/*
+ * loads symbol offsets from the symbol on the value stack and puts it in register r.
+ * The register is a
+ */
 static int load_symofs( int r, SValue *sv, int forstore )
 {
     int doload = 0;
@@ -163,9 +167,11 @@ static int load_symofs( int r, SValue *sv, int forstore )
     int sv_constant = sv->c.i;            // stack value constant
     int stack_value = sv->r & VT_VALMASK; // stack value
 
-    rd = is_ireg( r ) ? ireg( r ) : t0; // default register is t0
+    // get the riscv register
+    rd = ireg( is_ireg( r ) ? r : get_reg( RC_INT ) );
 
-    // check if we are dealing with a named symbol
+    // check if we are dealing with a named symbol. If we are, we need to generate a
+    // relocation entry that loads the value into our local register.
     if( sv->r & VT_SYM ) {
         addr_t addend = 0; // offset value when generating a relocation entry
         int type;
@@ -203,6 +209,7 @@ static int load_symofs( int r, SValue *sv, int forstore )
             emit_ADDI( rd, rd, 0 ); // lw RR, 0(RR)
         }
     }
+    // if the stack value is a pointer
     else if( stack_value == VT_LOCAL || stack_value == VT_LLOCAL ) {
         int s0;
         s0 = 8; // s0
@@ -339,7 +346,8 @@ ST_FUNC void load( int r, SValue *sv )
             do32bit = 0;
         }
 
-        // load large constant
+        // load 64-bit immediate constant
+        // (this should probably be split into two registers)
         if( lvar_offset != sv->c.i ) {
             int64_t si = sv->c.i;
             si >>= 32;
