@@ -231,6 +231,7 @@ static int load_symofs( int r, SValue *sv, int forstore )
 
 static void load_large_constant( int rr, int fc, uint32_t pi )
 {
+    tcc_error( "don't call this on rv32'" );
     if( fc < 0 )
         pi++;
     emit_LUI( rr, IMM_HIGH( pi ) );
@@ -319,19 +320,18 @@ static void load_lvalue( int r, SValue *sv )
  */
 ST_FUNC void load( int r, SValue *sv )
 {
-    int dest_reg = is_ireg( r ) ? ireg( r ) : freg( r );
-    int lvar_offset = sv->c.i;                     // fc
-    int stack_type = sv->type.t & VT_BTYPE;        // bt
-    int stack_reg = sv->r;                         // fr
-    int masked_stack_reg = stack_reg & VT_VALMASK; // v
+    int dest_reg = is_ireg( r ) ? ireg( r ) : freg( r ); // rr
+    int lvar_offset = sv->c.i;                           // fc
+    int stack_type = sv->type.t & VT_BTYPE;              // bt
+    int stack_reg = sv->r;                               // fr
+    int masked_stack_reg = stack_reg & VT_VALMASK;       // v
 
     // loading to an lvalue i.e. pointer into register
     if( stack_reg & VT_LVAL ) {
         load_lvalue( r, sv );
     }
     else if( masked_stack_reg == VT_CONST ) {
-        int rs1 = 0, zext = 0;
-        int do32bit = 32;
+        int rs1 = 0; // For addi, default to x0
 
         // only handle integer types
         if( is_float( sv->type.t ) ) {
@@ -343,41 +343,17 @@ ST_FUNC void load( int r, SValue *sv )
         if( stack_reg & VT_SYM ) {
             rs1 = load_symofs( r, sv, 0 );
             lvar_offset = sv->c.i;
-            do32bit = 0;
-        }
-
-        // load 64-bit immediate constant
-        // (this should probably be split into two registers)
-        if( lvar_offset != sv->c.i ) {
-            int64_t si = sv->c.i;
-            si >>= 32;
-            if( si != 0 ) {
-                load_large_constant( dest_reg, lvar_offset, si );
-                lvar_offset &= 0xff;
-                rs1 = dest_reg;
-                do32bit = 0;
-            }
-            else if( stack_type == VT_LLONG ) {
-                /* A 32bit unsigned constant for a 64bit type.
-                   lui always sign extends, so we need to do an explicit zext.*/
-                zext = 1;
-            }
         }
 
         if( LARGE_IMM( lvar_offset ) ) {
             rs1 = dest_reg;
-            // add 0x800 so when the lower (sign extended) bits get added, they don't ruin things
-            emit_LUI( dest_reg, IMM_HIGH( lvar_offset + 0x800 ) );
+            emit_LUI( dest_reg, IMM_HIGH_LEXT( lvar_offset ) );
         }
-        if( lvar_offset || ( dest_reg != rs1 ) || do32bit || ( stack_reg & VT_SYM ) ) {
-            // EI(0x13 | do32bit, 0, rd, rs1, lvar_offset << 20 >> 20); // addi[w] R, x0|R,
-            // lvar_offset
+        if( lvar_offset || ( dest_reg != rs1 ) || ( stack_reg & VT_SYM ) ) {
             emit_ADDI( dest_reg, rs1, IMM_LOW( lvar_offset ) );
         }
-        if( zext ) {
-            emit_SLLI( dest_reg, dest_reg, 31 );
-            emit_SRLI( dest_reg, dest_reg, 31 );
-            tcc_internal_error( "I think this code is broken" );
+        else {
+            tcc_internal_error( "Unexpect situation" );
         }
     }
     else if( masked_stack_reg == VT_LOCAL ) {
@@ -659,7 +635,8 @@ static void reg_pass_rec( CType *type, int *rc, int *fieldofs, int ofs )
         rc[ 0 ] = -1;
     else if( !rc[ 0 ] || rc[ 1 ] == RC_FLOAT || is_float( type->t ) ) {
         rc[ ++rc[ 0 ] ] = is_float( type->t ) ? RC_FLOAT : RC_INT;
-        fieldofs[ rc[ 0 ] ] =
+        fieldofs[ rc[ 0 ] ] = // [3:0] is type [31:4] is offset // FIXME: ptr is not longlong on
+                              // rv32
             ( ofs << 4 ) | ( ( type->t & VT_BTYPE ) == VT_PTR ? VT_LLONG : type->t & VT_BTYPE );
     }
     else
@@ -668,20 +645,23 @@ static void reg_pass_rec( CType *type, int *rc, int *fieldofs, int ofs )
 
 static void reg_pass( CType *type, int *prc, int *fieldofs, int named )
 {
+    /*
+     * prc[0] the number of required registers, -1 means argument can't be stroed in register
+     * prc[1/2] the type of first/second register
+     */
     prc[ 0 ] = 0;
+    /*
+     * fieldofs[0] not used
+     * fieldofs[1/2] [3:0] is type, other is offset
+     */
     reg_pass_rec( type, prc, fieldofs, 0 );
     if( prc[ 0 ] <= 0 || !named ) {
         int align, size = type_size( type, &align );
-        prc[ 0 ] = ( size + 7 ) >> 3;
+        prc[ 0 ] = ( size + 3 ) >> 2;
+        assert( size <= 8 ); // We can't handle more than 8 bytes
         prc[ 1 ] = prc[ 2 ] = RC_INT;
-        fieldofs[ 1 ] = ( 0 << 4 ) | ( size <= 1     ? VT_BYTE
-                                         : size <= 2 ? VT_SHORT
-                                         : size <= 4 ? VT_INT
-                                                     : VT_LLONG );
-        fieldofs[ 2 ] = ( 8 << 4 ) | ( size <= 9      ? VT_BYTE
-                                         : size <= 10 ? VT_SHORT
-                                         : size <= 12 ? VT_INT
-                                                      : VT_LLONG );
+        fieldofs[ 1 ] = ( 0 << 4 ) | ( size <= 1 ? VT_BYTE : size <= 2 ? VT_SHORT : VT_INT );
+        fieldofs[ 2 ] = ( 8 << 4 ) | ( size <= 5 ? VT_BYTE : size <= 6 ? VT_SHORT : VT_INT );
     }
 }
 
@@ -690,8 +670,8 @@ ST_FUNC void gfunc_call( int nb_args )
     int i, align, size, areg[ 2 ];
     int *info = tcc_malloc( ( nb_args + 1 ) * sizeof( int ) );
     int stack_adj = 0, tempspace = 0, stack_add, ofs, splitofs = 0;
-    SValue *sv;
-    Sym *sa;
+    SValue *sv; // Point to the argument on the vstack
+    Sym *sa;    // Link list of function arguments defined by prototype
     const uint32_t t0 = 5;
     const uint32_t sp = 2;
 
@@ -718,11 +698,11 @@ ST_FUNC void gfunc_call( int nb_args )
             size = align = 8;
             byref = 64 | ( tempofs << 7 );
         }
-        reg_pass( &sv->type, prc, fieldofs, sa != 0 );
+        reg_pass( &sv->type, prc, fieldofs, sa != 0 ); // is sa!= 0 means 'last argument' ?
         if( !sa && align == 2 * XLEN && size <= 2 * XLEN ) {
             areg[ 0 ] = ( areg[ 0 ] + 1 ) & ~1;
         }
-        nregs = prc[ 0 ];
+        nregs = prc[ 0 ]; // Regs required to transfer this arg
         if( size == 0 ) {
             info[ i ] = 0;
         }
