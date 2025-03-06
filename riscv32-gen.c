@@ -517,6 +517,10 @@ ST_FUNC void store( int r, SValue *sv )
         case 1: emit_SB( loc_reg, src_reg, offset ); break;
         case 2: emit_SH( loc_reg, src_reg, offset ); break;
         case 4: emit_SW( loc_reg, src_reg, offset ); break;
+        case 8:
+            emit_NOP();
+            printf( "[store] 64-bit store skip and nop\n" );
+            break;
         default: tcc_error( "unexpected store size: %d", size );
     }
 }
@@ -703,15 +707,15 @@ ST_FUNC void gfunc_call( int nb_args )
         sv = &vtop[ 1 + i - nb_args ];
         sv->type.t &= ~VT_ARRAY; // XXX this should be done in tccgen.c
         size = type_size( &sv->type, &align );
-        if( size > 16 ) {
+        if( size > 2 * PTR_SIZE ) {
             align = ( align < XLEN ) ? align : XLEN;
             tempspace = ( tempspace + align - 1 ) & -align;
             tempofs = tempspace;
             tempspace += size;
-            size = align = 8;
+            size = align = PTR_SIZE;
             byref = 64 | ( tempofs << 7 );
         }
-        reg_pass( &sv->type, prc, fieldofs, sa != 0 ); // is sa!= 0 means 'last argument' ?
+        reg_pass( &sv->type, prc, fieldofs, sa != NULL ); // is sa!= 0 means 'last argument' ?
         if( !sa && align == 2 * XLEN && size <= 2 * XLEN ) {
             areg[ 0 ] = ( areg[ 0 ] + 1 ) & ~1;
         }
@@ -785,7 +789,8 @@ ST_FUNC void gfunc_call( int nb_args )
                     vswap();
                     vstore();
                     vpop();
-                    size = align = 8;
+                    // size = align = 8;
+                    size = align = 2 * PTR_SIZE;
                 }
                 if( info[ i ] & 32 ) {
                     if( align < XLEN )
@@ -810,12 +815,15 @@ ST_FUNC void gfunc_call( int nb_args )
             else if( info[ i ] & 16 ) {
                 assert( !splitofs );
                 splitofs = ofs;
-                ofs += 4;
+                ofs += PTR_SIZE;
             }
         }
     }
     for( i = 0; i < nb_args; i++ ) {
-        int ii = info[ nb_args - 1 - i ], r = ii, r2 = r;
+        // start working on the argument from back to front
+        int ii = info[ nb_args - 1 - i ];
+        int r = ii;
+        int r2 = r;
         if( !( r & 32 ) ) {
             CType origtype;
             int loadt;
@@ -835,7 +843,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 assert( !r2 );
                 r2 = 1 + TREG_RA;
             }
-            if( loadt == VT_LDOUBLE ) {
+            if( loadt == VT_LLONG ) {
                 assert( r2 );
                 r2--;
             }
@@ -847,7 +855,7 @@ ST_FUNC void gfunc_call( int nb_args )
             gv( r < 8 ? RC_R( r ) : RC_F( r - 8 ) );
             vtop->type = origtype;
 
-            if( r2 && loadt != VT_LDOUBLE ) {
+            if( r2 && loadt != VT_LLONG ) {
                 r2--;
                 assert( r2 < 16 || r2 == TREG_RA );
                 vswap();
@@ -869,6 +877,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 if( loadt == VT_STRUCT ) {
                     loadt = ( ii >> 16 ) & VT_BTYPE;
                 }
+
                 save_reg_upstack( r2, 1 );
                 vtop->type.t = loadt | ( vtop->type.t & VT_UNSIGNED );
                 load( r2, vtop );
@@ -881,7 +890,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 emit_SW( ireg( vtop->r2 ), 5, splitofs );
                 vtop->r2 = VT_CONST;
             }
-            else if( loadt == VT_LDOUBLE && vtop->r2 != r2 ) {
+            else if( loadt == VT_LLONG && vtop->r2 != r2 ) {
                 assert( vtop->r2 <= 7 && r2 <= 7 );
                 /* XXX we'd like to have 'gv' move directly into
                    the right class instead of us fixing it up.  */
