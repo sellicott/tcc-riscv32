@@ -314,10 +314,6 @@ static void load_lvalue( int r, SValue *sv )
         case 1: emit_LB( dest_reg, rs1, lvar_offset ); break;
         case 2: emit_LH( dest_reg, rs1, lvar_offset ); break;
         case 4: emit_LW( dest_reg, rs1, lvar_offset ); break;
-        case 8:
-            emit_NOP();
-            printf( "[load_lvalue]: 64-bit load, emit nop\n" );
-            break;
         default: tcc_error( "unexpected load size: %d", size );
     }
 }
@@ -517,10 +513,6 @@ ST_FUNC void store( int r, SValue *sv )
         case 1: emit_SB( loc_reg, src_reg, offset ); break;
         case 2: emit_SH( loc_reg, src_reg, offset ); break;
         case 4: emit_SW( loc_reg, src_reg, offset ); break;
-        case 8:
-            emit_NOP();
-            printf( "[store] 64-bit store skip and nop\n" );
-            break;
         default: tcc_error( "unexpected store size: %d", size );
     }
 }
