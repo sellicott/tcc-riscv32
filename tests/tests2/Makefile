@@ -52,6 +52,31 @@ ifneq (,$(filter OpenBSD FreeBSD NetBSD,$(TARGETOS)))
  SKIP += 114_bound_signal.test # libc problem signal/fork
  SKIP += 116_bound_setjmp2.test # No TLS_FUNC/TLS_VAR in bcheck.c
 endif
+ifeq ($(ARCH),riscv32)
+ SKIP += 22_floating_point.test
+ SKIP += 23_type_coercion.test
+ SKIP += 24_math_library.test
+ SKIP += 49_bracket_evaluation.test
+ SKIP += 70_floating_point_literals.test
+ SKIP += 73_arm64.test # contains floating stuff
+ SKIP += 83_utf8_in_identifiers.test # contains floating stuff
+ SKIP += 93_integer_promotion.test # do we follow gcc on x86_64 or riscv?
+ SKIP += 94_generic.test # contains floating stuff
+ SKIP += 95_bitfields.test # more bitfield nonsense
+ SKIP += 95_bitfields_ms.test # more bitfield nonsense
+ SKIP += 96_nodata_wanted.test # floating point
+ SKIP += 101_cleanup.test # floating point
+ SKIP += 107_stack_safe.test # floating point
+ SKIP += 109_float_struct_calling.test # floating point
+ SKIP += 110_average.test # floating point
+ SKIP += 111_conversion.test # floating point
+ SKIP += 112_backtrace.test # no bounds checking
+ SKIP += 113_btdll.test # need to build those libraries still
+ SKIP += 114_bound_signal.test # no bounds checking
+ SKIP += 115_bound_setjmp.test # no bounds checking
+ SKIP += 116_bound_setjmp2.test # no bounds checking
+ SKIP += 117_builtins.test # no bounds checking
+endif
 
 # Some tests might need arguments
 ARGS =
@@ -140,6 +165,7 @@ T2 = $(if $(NORUN),$1 -o $(basename $@).exe && ./$(basename $@).exe,-run $1)
 T3 = $(FILTER) >$*.output 2>&1 || true \
      && diff -Nbu $(filter %.expect,$^) $*.output \
      && rm -f $*.output $(filter $*.expect,$(GEN-ALWAYS))
+
 
 # run single test and update .expect file, e.g. "make tests2.37+"
 tests2.%+:
