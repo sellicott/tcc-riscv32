@@ -1853,7 +1853,7 @@ ST_FUNC int gv(int rc)
 
         bt = vtop->type.t & VT_BTYPE;
 
-#ifdef TCC_TARGET_RISCV64
+#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
         /* XXX mega hack */
         if (bt == VT_LDOUBLE && rc == RC_FLOAT)
           rc = RC_INT;
@@ -3134,7 +3134,7 @@ static void gen_cvt_itof1(int t)
 }
 #endif
 
-#if defined TCC_TARGET_ARM64 || defined TCC_TARGET_RISCV64
+#if defined TCC_TARGET_ARM64 || defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
 #define gen_cvt_ftoi1 gen_cvt_ftoi
 #else
 /* generic ftoi for unsigned long long case */
@@ -5776,7 +5776,7 @@ ST_FUNC void unary(void)
 #ifdef TCC_TARGET_ARM
                 vpushi(2*PTR_SIZE);
                 gen_op('+');
-#elif defined TCC_TARGET_RISCV64
+#elif defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
                 vpushi(PTR_SIZE);
                 gen_op('-');
 #else
@@ -5788,7 +5788,7 @@ ST_FUNC void unary(void)
             }
         }
         break;
-#ifdef TCC_TARGET_RISCV64
+#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
     case TOK_builtin_va_start:
         parse_builtin_params(0, "ee");
         r = vtop->r & VT_VALMASK;
@@ -6191,7 +6191,7 @@ special_math_val:
 
             if (ret_nregs < 0) {
                 vsetc(&ret.type, ret.r, &ret.c);
-#ifdef TCC_TARGET_RISCV64
+#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
                 arch_transfer_ret_regs(1);
 #endif
             } else {

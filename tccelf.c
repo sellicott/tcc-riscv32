@@ -1185,7 +1185,7 @@ static int prepare_dynamic_rel(TCCState *s1, Section *sr)
     int count = 0;
 #if defined(TCC_TARGET_I386) || defined(TCC_TARGET_X86_64) || \
     defined(TCC_TARGET_ARM) || defined(TCC_TARGET_ARM64) || \
-    defined(TCC_TARGET_RISCV64)
+    defined(TCC_TARGET_RISCV64) || defined(TCC_TARGET_RISCV32)
     ElfW_Rel *rel;
     for_each_elem(sr, 0, rel, ElfW_Rel) {
         int sym_index = ELFW(R_SYM)(rel->r_info);
@@ -1212,6 +1212,8 @@ static int prepare_dynamic_rel(TCCState *s1, Section *sr)
 #elif defined(TCC_TARGET_RISCV64)
         case R_RISCV_32:
         case R_RISCV_64:
+#elif defined(TCC_TARGET_RISCV32)
+        case R_RISCV_32:
 #endif
             count++;
             break;
@@ -1825,7 +1827,7 @@ static void tcc_add_linker_symbols(TCCState *s1)
 #if TARGETOS_OpenBSD
     set_global_sym(s1, "__executable_start", NULL, ELF_START_ADDR);
 #endif
-#ifdef TCC_TARGET_RISCV64
+#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
     /* XXX should be .sdata+0x800, not .data+0x800 */
     set_global_sym(s1, "__global_pointer$", data_section, 0x800);
 #endif
@@ -2582,9 +2584,14 @@ static int tcc_output_elf(TCCState *s1, FILE *f, int phnum, ElfW(Phdr) *phdr)
         ? EF_ARM_VFP_FLOAT : EF_ARM_SOFT_FLOAT;
 #elif defined TCC_TARGET_ARM
     ehdr.e_ident[EI_OSABI] = ELFOSABI_ARM;
-#elif defined TCC_TARGET_RISCV64
-    /* XXX should be configurable */
+#elif defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
+#ifdef TCC_RISCV_ilp32
+    ehdr.e_flags = EF_RISCV_RVC;
+#elif defined TCC_TARGET_RISCV32
+    ehdr.e_flags = EF_RISCV_FLOAT_ABI_DOUBLE | EF_RISCV_RVC;
+#else
     ehdr.e_flags = EF_RISCV_FLOAT_ABI_DOUBLE;
+#endif
 #endif
 
     if (file_type == TCC_OUTPUT_OBJ) {
@@ -3350,7 +3357,7 @@ invalid:
                 if (!sym_index && !sm_table[sh->sh_info].link_once
 #ifdef TCC_TARGET_ARM
                     && type != R_ARM_V4BX
-#elif defined TCC_TARGET_RISCV64
+#elif defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
                     && type != R_RISCV_ALIGN
                     && type != R_RISCV_RELAX
 #endif

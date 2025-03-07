@@ -38,6 +38,7 @@ X86_64_O = libtcc1.o alloca.o alloca-bt.o $(COMMON_O)
 ARM_O = libtcc1.o armeabi.o alloca.o armflush.o $(COMMON_O)
 ARM64_O = lib-arm64.o $(COMMON_O)
 RISCV64_O = lib-arm64.o $(COMMON_O)
+RISCV32_O = lib-arm64.o $(COMMON_O)
 COMMON_O = stdatomic.o atomic.o builtin.o
 WIN_O = crt1.o crt1w.o wincrt1.o wincrt1w.o dllcrt1.o dllmain.o
 LIN_O = dsohandle.o
@@ -71,6 +72,7 @@ OBJ-arm-eabi = $(OBJ-arm)
 OBJ-arm-eabihf = $(OBJ-arm)
 OBJ-arm-wince = $(ARM_O) $(WIN_O)
 OBJ-riscv64 = $(RISCV64_O) $(LIN_O)
+OBJ-riscv32 = $(RISCV32_O) $(LIN_O)
 
 OBJ-extra = $(filter $(EXTRA_O),$(OBJ-$T))
 OBJ-libtcc1 = $(addprefix $(X),$(filter-out $(OBJ-extra),$(OBJ-$T)))

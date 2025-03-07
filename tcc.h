@@ -145,11 +145,13 @@ extern long double strtold (const char *__nptr, char **__endptr);
 /* #define TCC_TARGET_ARM64  *//* ARMv8 code generator */
 /* #define TCC_TARGET_C67    *//* TMS320C67xx code generator */
 /* #define TCC_TARGET_RISCV64 *//* risc-v code generator */
+/* #define TCC_TARGET_RISCV32 *//* risc-v code generator */
 
 /* default target is I386 */
 #if !defined(TCC_TARGET_I386) && !defined(TCC_TARGET_ARM) && \
     !defined(TCC_TARGET_ARM64) && !defined(TCC_TARGET_C67) && \
-    !defined(TCC_TARGET_X86_64) && !defined(TCC_TARGET_RISCV64)
+    !defined(TCC_TARGET_X86_64) && !defined(TCC_TARGET_RISCV64) && \
+    !defined(TCC_TARGET_RISCV32)
 # if defined __x86_64__
 #  define TCC_TARGET_X86_64
 # elif defined __arm__
@@ -161,6 +163,7 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #  define TCC_TARGET_ARM64
 # elif defined __riscv
 #  define TCC_TARGET_RISCV64
+# warning "This needs updated for riscv32"
 # else
 #  define TCC_TARGET_I386
 # endif
@@ -184,6 +187,8 @@ extern long double strtold (const char *__nptr, char **__endptr);
 # elif defined __aarch64__ && defined TCC_TARGET_ARM64
 #  define TCC_IS_NATIVE
 # elif defined __riscv && defined __LP64__ && defined TCC_TARGET_RISCV64
+#  define TCC_IS_NATIVE
+# elif defined __riscv && defined  TCC_TARGET_RISCV32
 #  define TCC_IS_NATIVE
 # endif
 #endif
@@ -303,6 +308,8 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #  define CONFIG_TCC_ELFINTERP "/lib64/ld-linux-x86-64.so.2"
 # elif defined(TCC_TARGET_RISCV64)
 #  define CONFIG_TCC_ELFINTERP "/lib/ld-linux-riscv64-lp64d.so.1"
+# elif defined(TCC_TARGET_RISCV32)
+#  define CONFIG_TCC_ELFINTERP "/lib/ld-linux-riscv32-lp32.so.1"
 # elif defined(TCC_ARM_EABI)
 #  define DEFAULT_ELFINTERP(s) default_elfinterp(s)
 # else
@@ -389,6 +396,10 @@ extern long double strtold (const char *__nptr, char **__endptr);
 # include "riscv64-gen.c"
 # include "riscv64-link.c"
 # include "riscv64-asm.c"
+#elif defined(TCC_TARGET_RISCV32)
+# include "riscv32-gen.c"
+# include "riscv32-link.c"
+# include "riscv32-asm.c"
 #else
 #error unknown target
 #endif
@@ -928,7 +939,7 @@ struct TCCState {
     ElfW_Rel *qrel;
     #define qrel s1->qrel
 
-#ifdef TCC_TARGET_RISCV64
+#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
     struct pcrel_hi { addr_t addr, val; } last_hi;
     #define last_hi s1->last_hi
 #endif
@@ -1744,8 +1755,8 @@ ST_FUNC void gen_cvt_csti(int t);
 ST_FUNC void gen_increment_tcov (SValue *sv);
 #endif
 
-/* ------------ riscv64-gen.c ------------ */
-#ifdef TCC_TARGET_RISCV64
+/* ------------ riscv{64,32}-gen.c ------------ */
+#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
 ST_FUNC void gen_opl(int op);
 //ST_FUNC void gfunc_return(CType *func_type);
 ST_FUNC void gen_va_start(void);
