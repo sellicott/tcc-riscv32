@@ -1,7 +1,7 @@
 #ifdef TARGET_DEFS_ONLY
 
 // Number of registers available to allocator:
-#ifdef TCC_TARGET_RISCV32_ilp32
+#ifdef TCC_RISCV_ilp32
 // TODO add temporary and saved registers here once I figure out how TCC works
 #define NB_REGS 10 // a0-a7, ra, sp
 #else
@@ -68,7 +68,7 @@ ST_DATA const int reg_classes[ NB_REGS ] = {
     // Integer Function Arguments
     RC_INT | RC_R( 0 ), RC_INT | RC_R( 1 ), RC_INT | RC_R( 2 ), RC_INT | RC_R( 3 ),
     RC_INT | RC_R( 4 ), RC_INT | RC_R( 5 ), RC_INT | RC_R( 6 ), RC_INT | RC_R( 7 ),
-#ifndef TCC_TARGET_RISCV32_ilp32
+#ifndef TCC_RISCV_ilp32
     // Floating point function arguments
     RC_FLOAT | RC_F( 0 ), RC_FLOAT | RC_F( 1 ), RC_FLOAT | RC_F( 2 ), RC_FLOAT | RC_F( 3 ),
     RC_FLOAT | RC_F( 4 ), RC_FLOAT | RC_F( 5 ), RC_FLOAT | RC_F( 6 ), RC_FLOAT | RC_F( 7 ),
@@ -113,7 +113,7 @@ static int freg( int r )
 
 static int is_freg( int r )
 {
-#ifndef TCC_TARGET_RISCV32_ilp32
+#ifndef TCC_RISCV_ilp32
     return r >= 8 && r < 16;
 #else
     // there are no floating point registers in rv32imc isa
