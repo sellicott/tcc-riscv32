@@ -519,8 +519,8 @@ ST_FUNC void store( int r, SValue *sv )
 
 static void gcall_or_jmp( int docall )
 {
-    int tr = docall ? 1 : 5; // ra or t0
-    if( ( vtop->r & ( VT_VALMASK | VT_LVAL ) ) == VT_CONST &&
+    int tr = docall ? 1 : 5; // ra or t0 //TODO: why saving tr to t0 when jmp
+    if( ( vtop->r & ( VT_VALMASK | VT_LVAL ) ) == VT_CONST &&  /* vtop is not lvalue(fun ptr?) and ...*/
         ( ( vtop->r & VT_SYM ) && vtop->c.i == (int)vtop->c.i ) ) {
         /* constant symbolic case -> simple relocation */
         greloca( cur_text_section, vtop->sym, ind, R_RISCV_CALL_PLT, (int)vtop->c.i );
@@ -677,13 +677,13 @@ static void reg_pass( CType *type, int *prc, int *fieldofs, int named )
 ST_FUNC void gfunc_call( int nb_args )
 {
     int i, align, size, areg[ 2 ];
-    /* info[x]:
-    *      28       20            15        12  7   6   5   0
-    * ┌───┬───────────┬─────────┬─────────┬─────┬─────┬─────┐
-    * │∅  │ offset of │ type of │ type of │ 2nd │ by  │ 1st │
-    * │   │ 2nd reg   │ 2nd reg │ 1st reg │ reg^│ ref │ reg │
-    * └───┴───────────┴─────────┴─────────┴─────┴─────┴─────┘
-    *  ^: when `by ref` == 1. this is tempofs
+    /* info[x]: // might contain errors
+    *      28       20        16        12     7   6   5  4     0
+    * ┌───┬───────────┬─────────┬─────────┬─────┬─────┬─┬──┬─────┐
+    * │   │ offset of │ type of │ type of │ 2nd │ by  │?│ ?│ 1st │
+    * │   │ 2nd reg   │ 2nd reg │ 1st reg │ reg^│ ref │ │  │ reg │
+    * └───┴───────────┴─────────┴─────────┴─────┴─────┴─┴──┴─────┘
+    *  ^: when `by ref` == 1. this is tempofs.
     */
     int *info = tcc_malloc( ( nb_args + 1 ) * sizeof( int ) );
     int stack_adj = 0, tempspace = 0, stack_add, ofs, splitofs = 0;
@@ -708,7 +708,7 @@ ST_FUNC void gfunc_call( int nb_args )
         sv->type.t &= ~VT_ARRAY; // XXX this should be done in tccgen.c
         size = type_size( &sv->type, &align );
         // Aggregates larger than 2×XLEN bits are passed by reference
-        if( size > 2 * PTR_SIZE ) { // TODO: more check needed
+        if( size > 2 * XLEN ) { // TODO: more check needed
             align = ( align < XLEN ) ? align : XLEN;
             tempspace = ( tempspace + align - 1 ) & -align;
             tempofs = tempspace;
@@ -730,7 +730,7 @@ ST_FUNC void gfunc_call( int nb_args )
                  ( nregs == 2 && prc[ 1 ] == RC_FLOAT && prc[ 2 ] == RC_FLOAT &&
                      areg[ 1 ] >= 15 ) ||
                  ( nregs == 2 && prc[ 1 ] != prc[ 2 ] && ( areg[ 1 ] >= 16 || areg[ 0 ] >= 8 ) ) ) {
-            info[ i ] = 32;
+            info[ i ] = 32; // TODO: what is this?
             if( align < XLEN )
                 align = XLEN;
             stack_adj += ( size + align - 1 ) & -align;
@@ -815,9 +815,9 @@ ST_FUNC void gfunc_call( int nb_args )
                 vrott( nb_args - i );
             }
             else if( info[ i ] & 16 ) {
-                assert( !splitofs );
+                assert( !splitofs );printf("\nCoA:!!! check what this 16 means\n");
                 splitofs = ofs;
-                ofs += PTR_SIZE;
+                ofs += PTR_SIZE; //TODO: check this
             }
         }
     }
@@ -829,10 +829,10 @@ ST_FUNC void gfunc_call( int nb_args )
         if( !( r & 32 ) ) { // TODO: why test 5th bit of info?
             CType origtype;
             int loadt;
-            r &= 15;
-            r2 = r2 & 64 ? 0 : ( r2 >> 7 ) & 31;
+            r &= 15; // TODO: is there any reason r1's len is limited to 4 bits while r2's is 5 bits? both of them should not exceed 8(right?)
+            r2 = r2 & 64 ? 0 : ( r2 >> 7 ) & 31; // if this arg is not transferred by ref, then a second reg might be used
             assert( r2 <= 16 );
-            vrotb( i + 1 );
+            vrotb( i + 1 ); // now vtop is the i-th arg
             origtype = vtop->type;
             size = type_size( &vtop->type, &align );
             if( size == 0 )
@@ -847,16 +847,16 @@ ST_FUNC void gfunc_call( int nb_args )
             }
             if( loadt == VT_LLONG ) {
                 assert( r2 );
-                r2--;
-            }
+                r2--; //TODO: so this fix the '+1' above. but why?
+            }// TODO: try to craft a test with the following path?
             else if( r2 ) {
                 test_lvalue();
                 vpushv( vtop );
             }
             vtop->type.t = loadt | ( vtop->type.t & VT_UNSIGNED );
-            gv( r < 8 ? RC_R( r ) : RC_F( r - 8 ) );
-            vtop->type = origtype;
-
+            gv( r < 8 ? RC_R( r ) : RC_F( r - 8 ) ); // TODO:when calling gv with RC_X. vtop will be stored at that EXACT register. This only store r1 even when r2 is required
+            vtop->type = origtype;// TODO: Wait gv should always try to fulfill r2... check it later
+            // TODO: craft a test that use r2 but type is not longlong
             if( r2 && loadt != VT_LLONG ) {
                 r2--;
                 assert( r2 < 16 || r2 == TREG_RA );
@@ -887,7 +887,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 vtop--;
                 vtop->r2 = r2;
             }
-            if( info[ nb_args - 1 - i ] & 16 ) {
+            if( info[ nb_args - 1 - i ] & (1 << 4) ) {
                 // ES(0x23, 3, 2, ireg(vtop->r2), splitofs); // sd t0, ofs(sp)
                 emit_SW( ireg( vtop->r2 ), 5, splitofs );
                 vtop->r2 = VT_CONST;
@@ -896,7 +896,8 @@ ST_FUNC void gfunc_call( int nb_args )
                 assert( vtop->r2 <= 7 && r2 <= 7 );
                 /* XXX we'd like to have 'gv' move directly into
                    the right class instead of us fixing it up.  */
-                // mv Ra+1, RR2
+                // mv Ra+1, RR2 //TODO: why this emit mov a3 a0 instead a2 a0 for this test
+                printf("CoA:moving %d to %d at %d\n", ireg( r2 ), ireg( vtop->r2 ),ind);
                 emit_MV( ireg( r2 ), ireg( vtop->r2 ) );
                 vtop->r2 = r2;
             }
@@ -904,14 +905,14 @@ ST_FUNC void gfunc_call( int nb_args )
             vrott( i + 1 );
         }
     }
-    vrotb( nb_args + 1 );
+    vrotb( nb_args + 1 ); // now vtop is the function being called
     save_regs( nb_args + 1 );
     gcall_or_jmp( 1 );
-    vtop -= nb_args + 1;
+    vtop -= nb_args + 1; // pop function and all args
     if( stack_add ) {
         const uint32_t t0 = 5;
         const uint32_t sp = 2;
-        if( stack_add >= 0x1000 ) {
+        if( LARGE_IMM(stack_add)) {
             emit_LUI( t0, IMM_HIGH( stack_add ) );
             emit_ADDI( t0, t0, IMM_LOW( stack_add ) );
             emit_ADD( sp, sp, t0 );
