@@ -661,8 +661,8 @@ static void reg_pass( CType *type, int *prc, int *fieldofs, int named )
     prc[ 0 ] = 0;
     /*
      * fieldofs[0] not used
-     * fieldofs[1/2] [3:0] is type, other is offset
-     */
+     * fieldofs[1/2] [3:0] is type, other is offset bytes from the beginning of the args
+    */
     reg_pass_rec( type, prc, fieldofs, 0 );
     if( prc[ 0 ] <= 0 || !named ) {
         int align, size = type_size( type, &align );
@@ -670,13 +670,21 @@ static void reg_pass( CType *type, int *prc, int *fieldofs, int named )
         assert( size <= 8 ); // We can't handle more than 8 bytes
         prc[ 1 ] = prc[ 2 ] = RC_INT;
         fieldofs[ 1 ] = ( 0 << 4 ) | ( size <= 1 ? VT_BYTE : size <= 2 ? VT_SHORT : VT_INT );
-        fieldofs[ 2 ] = ( 8 << 4 ) | ( size <= 5 ? VT_BYTE : size <= 6 ? VT_SHORT : VT_INT );
+        fieldofs[ 2 ] = ( 4 << 4 ) | ( size <= 5 ? VT_BYTE : size <= 6 ? VT_SHORT : VT_INT );
     }
 }
 
 ST_FUNC void gfunc_call( int nb_args )
 {
     int i, align, size, areg[ 2 ];
+    /* info[x]:
+    *      28       20            15        12  7   6   5   0
+    * ┌───┬───────────┬─────────┬─────────┬─────┬─────┬─────┐
+    * │∅  │ offset of │ type of │ type of │ 2nd │ by  │ 1st │
+    * │   │ 2nd reg   │ 2nd reg │ 1st reg │ reg^│ ref │ reg │
+    * └───┴───────────┴─────────┴─────────┴─────┴─────┴─────┘
+    *  ^: when `by ref` == 1. this is tempofs
+    */
     int *info = tcc_malloc( ( nb_args + 1 ) * sizeof( int ) );
     int stack_adj = 0, tempspace = 0, stack_add, ofs, splitofs = 0;
     SValue *sv; // Point to the argument on the vstack
@@ -690,8 +698,8 @@ ST_FUNC void gfunc_call( int nb_args )
         gbound_args( nb_args );
 #endif
 
-    areg[ 0 ] = 0; /* int arg regs */
-    areg[ 1 ] = 8; /* float arg regs */
+    areg[ 0 ] = 0; /* int arg reg being used (for 2XLEN this is the first reg)  */
+    areg[ 1 ] = 8; /* float arg reg being used */
     sa = vtop[ -nb_args ].type.ref->next;
     for( i = 0; i < nb_args; i++ ) {
         int nregs, byref = 0, tempofs;
@@ -699,7 +707,8 @@ ST_FUNC void gfunc_call( int nb_args )
         sv = &vtop[ 1 + i - nb_args ];
         sv->type.t &= ~VT_ARRAY; // XXX this should be done in tccgen.c
         size = type_size( &sv->type, &align );
-        if( size > 2 * PTR_SIZE ) {
+        // Aggregates larger than 2×XLEN bits are passed by reference
+        if( size > 2 * PTR_SIZE ) { // TODO: more check needed
             align = ( align < XLEN ) ? align : XLEN;
             tempspace = ( tempspace + align - 1 ) & -align;
             tempofs = tempspace;
@@ -708,6 +717,7 @@ ST_FUNC void gfunc_call( int nb_args )
             byref = 64 | ( tempofs << 7 );
         }
         reg_pass( &sv->type, prc, fieldofs, sa != NULL ); // is sa!= 0 means 'last argument' ?
+        // Variadic arguments with 2×XLEN-bit alignment and size at most 2×XLEN bits are passed in an aligned register pair
         if( !sa && align == 2 * XLEN && size <= 2 * XLEN ) {
             areg[ 0 ] = ( areg[ 0 ] + 1 ) & ~1;
         }
@@ -734,7 +744,7 @@ ST_FUNC void gfunc_call( int nb_args )
             assert( !( fieldofs[ 1 ] >> 4 ) );
             if( nregs == 2 ) {
                 if( prc[ 2 ] == RC_FLOAT || areg[ 0 ] < 8 )
-                    info[ i ] |= ( 1 + areg[ prc[ 2 ] - 1 ]++ ) << 7;
+                    info[ i ] |= ( 1 + areg[ prc[ 2 ] - 1 ]++ ) << 7; // TODO: Why is there a '1+'?
                 else {
                     info[ i ] |= 16;
                     stack_adj += 8;
@@ -758,14 +768,14 @@ ST_FUNC void gfunc_call( int nb_args )
         gv( RC_INT );
 
     if( stack_add ) {
-        if( stack_add >= 0x1000 ) {
+        if( LARGE_IMM(stack_add) ) {
             emit_LUI( t0, IMM_HIGH( -stack_add ) );
             emit_ADDI( t0, t0, IMM_LOW( -stack_add ) );
             emit_ADD( sp, sp, t0 );
         }
         else {
             emit_ADDI( sp, sp, IMM_LOW( -stack_add ) );
-        }
+        } // TODO: craft something to test this path
         for( i = ofs = 0; i < nb_args; i++ ) {
             if( info[ i ] & ( 64 | 32 ) ) {
                 vrotb( nb_args - i );
@@ -816,7 +826,7 @@ ST_FUNC void gfunc_call( int nb_args )
         int ii = info[ nb_args - 1 - i ];
         int r = ii;
         int r2 = r;
-        if( !( r & 32 ) ) {
+        if( !( r & 32 ) ) { // TODO: why test 5th bit of info?
             CType origtype;
             int loadt;
             r &= 15;

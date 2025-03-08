@@ -40,9 +40,8 @@ void emit_J( uint32_t imm, uint32_t rd, uint32_t opcode );
 // so when the lower (sign extended) bits get added, they don't ruin things
 #define IMM_HIGH_LEXT( imm ) ( IMM_HIGH( ( imm ) ) + ( ( ( imm ) >> 11 ) & 1 ) )
 
-// macro to check if the immediate value will be larger than 12 bits
+// macro to check if the immediate value will not fits into a single ADDI
 #define LARGE_IMM( imm ) ( (uint32_t)( IMM_HIGH( ( (uint32_t)( imm ) + ( 1 << 11 ) ) ) ) )
-// #define LARGE_IMM( imm ) ( (uint32_t)( IMM_HIGH( ( imm ) + 0x800 ) ) )
 
 // Now for a big table of opcodes (RV32I) from p130 of ISA documentation
 // https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf
