@@ -643,10 +643,14 @@ static void reg_pass_rec( CType *type, int *rc, int *fieldofs, int ofs )
     else if( rc[ 0 ] == 2 || rc[ 0 ] < 0 || ( type->t & VT_BTYPE ) == VT_LDOUBLE )
         rc[ 0 ] = -1;
     else if( !rc[ 0 ] || rc[ 1 ] == RC_FLOAT || is_float( type->t ) ) {
+        // VT_LLONG can't be transferred in a single reg on rv32
+        if ((type->t & VT_BTYPE) == VT_LLONG) {
+            rc[ 0 ] = -1;
+            return;
+        }
         rc[ ++rc[ 0 ] ] = is_float( type->t ) ? RC_FLOAT : RC_INT;
-        fieldofs[ rc[ 0 ] ] = // [3:0] is type [31:4] is offset // FIXME: ptr is not longlong on
-                              // rv32
-            ( ofs << 4 ) | ( ( type->t & VT_BTYPE ) == VT_PTR ? VT_LLONG : type->t & VT_BTYPE );
+        fieldofs[ rc[ 0 ] ] =
+            ( ofs << 4 ) | ( ( type->t & VT_BTYPE ) == VT_PTR ? VT_INT : type->t & VT_BTYPE );
     }
     else
         rc[ 0 ] = -1;
@@ -655,7 +659,8 @@ static void reg_pass_rec( CType *type, int *rc, int *fieldofs, int ofs )
 static void reg_pass( CType *type, int *prc, int *fieldofs, int named )
 {
     /*
-     * prc[0] the number of required registers, -1 means argument can't be stroed in register
+     * prc[0] the number of required registers,
+     *        -1 means argument can't be stroed in register or can't be decided in reg_pass_rec
      * prc[1/2] the type of first/second register
      */
     prc[ 0 ] = 0;
@@ -667,7 +672,6 @@ static void reg_pass( CType *type, int *prc, int *fieldofs, int named )
     if( prc[ 0 ] <= 0 || !named ) {
         int align, size = type_size( type, &align );
         prc[ 0 ] = ( size + 3 ) >> 2;
-        assert( size <= 8 ); // We can't handle more than 8 bytes
         prc[ 1 ] = prc[ 2 ] = RC_INT;
         fieldofs[ 1 ] = ( 0 << 4 ) | ( size <= 1 ? VT_BYTE : size <= 2 ? VT_SHORT : VT_INT );
         fieldofs[ 2 ] = ( 4 << 4 ) | ( size <= 5 ? VT_BYTE : size <= 6 ? VT_SHORT : VT_INT );
@@ -678,12 +682,15 @@ ST_FUNC void gfunc_call( int nb_args )
 {
     int i, align, size, areg[ 2 ];
     /* info[x]: // might contain errors
-    *      28       20        16        12     7   6   5  4     0
-    * ┌───┬───────────┬─────────┬─────────┬─────┬─────┬─┬──┬─────┐
-    * │   │ offset of │ type of │ type of │ 2nd │ by  │?│ ?│ 1st │
-    * │   │ 2nd reg   │ 2nd reg │ 1st reg │ reg^│ ref │ │  │ reg │
-    * └───┴───────────┴─────────┴─────────┴─────┴─────┴─┴──┴─────┘
-    *  ^: when `by ref` == 1. this is tempofs.
+    *      28       20        16        12     7   6   5 4     0
+    * ┌───┬───────────┬─────────┬─────────┬─────┬─────┬─┬─┬─────┐
+    * │   │ offset of │ type of │ type of │ 2nd │ by  │*│$│ 1st │
+    * │   │ 2nd reg   │ 2nd reg │ 1st reg │ reg^│ ref │ │ │ reg │
+    * └───┴───────────┴─────────┴─────────┴─────┴─────┴─┴─┴─────┘
+    *  ^:when `by ref` == 1. this is tempofs. Or,
+    *    when 0, means 2nd reg is not used. so 1 is a0, 2 is a1 a.s.o.
+    *  *: when 1, means this arg is transferred by stack because no reg is available
+    *  $: when 1, only half of the arg can be transferred by reg
     */
     int *info = tcc_malloc( ( nb_args + 1 ) * sizeof( int ) );
     int stack_adj = 0, tempspace = 0, stack_add, ofs, splitofs = 0;
@@ -697,8 +704,9 @@ ST_FUNC void gfunc_call( int nb_args )
     if( tcc_state->do_bounds_check )
         gbound_args( nb_args );
 #endif
-
+    // The base integer calling convention provides eight argument registers, a0-a7
     areg[ 0 ] = 0; /* int arg reg being used (for 2XLEN this is the first reg)  */
+    // The hardware floating-point calling convention adds eight fp argument registers, fa0-fa7
     areg[ 1 ] = 8; /* float arg reg being used */
     sa = vtop[ -nb_args ].type.ref->next;
     for( i = 0; i < nb_args; i++ ) {
@@ -708,7 +716,7 @@ ST_FUNC void gfunc_call( int nb_args )
         sv->type.t &= ~VT_ARRAY; // XXX this should be done in tccgen.c
         size = type_size( &sv->type, &align );
         // Aggregates larger than 2×XLEN bits are passed by reference
-        if( size > 2 * XLEN ) { // TODO: more check needed
+        if( size > 2 * XLEN ) {
             align = ( align < XLEN ) ? align : XLEN;
             tempspace = ( tempspace + align - 1 ) & -align;
             tempofs = tempspace;
@@ -716,7 +724,7 @@ ST_FUNC void gfunc_call( int nb_args )
             size = align = PTR_SIZE;
             byref = 64 | ( tempofs << 7 );
         }
-        reg_pass( &sv->type, prc, fieldofs, sa != NULL ); // is sa!= 0 means 'last argument' ?
+        reg_pass( &sv->type, prc, fieldofs, sa != NULL );
         // Variadic arguments with 2×XLEN-bit alignment and size at most 2×XLEN bits are passed in an aligned register pair
         if( !sa && align == 2 * XLEN && size <= 2 * XLEN ) {
             areg[ 0 ] = ( areg[ 0 ] + 1 ) & ~1;
@@ -730,7 +738,7 @@ ST_FUNC void gfunc_call( int nb_args )
                  ( nregs == 2 && prc[ 1 ] == RC_FLOAT && prc[ 2 ] == RC_FLOAT &&
                      areg[ 1 ] >= 15 ) ||
                  ( nregs == 2 && prc[ 1 ] != prc[ 2 ] && ( areg[ 1 ] >= 16 || areg[ 0 ] >= 8 ) ) ) {
-            info[ i ] = 32; // TODO: what is this?
+            info[ i ] = 32;
             if( align < XLEN )
                 align = XLEN;
             stack_adj += ( size + align - 1 ) & -align;
@@ -744,10 +752,11 @@ ST_FUNC void gfunc_call( int nb_args )
             assert( !( fieldofs[ 1 ] >> 4 ) );
             if( nregs == 2 ) {
                 if( prc[ 2 ] == RC_FLOAT || areg[ 0 ] < 8 )
-                    info[ i ] |= ( 1 + areg[ prc[ 2 ] - 1 ]++ ) << 7; // TODO: Why is there a '1+'?
+                    info[ i ] |= ( 1 + areg[ prc[ 2 ] - 1 ]++ ) << 7;
                 else {
+                    /* Only half of the last arg can be transferred by reg */
                     info[ i ] |= 16;
-                    stack_adj += 8;
+                    stack_adj += 4; //TODO:craft some test
                 }
                 if( !byref ) {
                     assert( ( fieldofs[ 2 ] >> 4 ) < 2048 );
@@ -781,18 +790,17 @@ ST_FUNC void gfunc_call( int nb_args )
                 vrotb( nb_args - i );
                 size = type_size( &vtop->type, &align );
                 if( info[ i ] & 64 ) {
-                    vset( &char_pointer_type, TREG_SP, 0 );
-                    vpushi( stack_adj + ( info[ i ] >> 7 ) );
-                    gen_op( '+' );
-                    vpushv( vtop ); // this replaces the old argument
-                    vrott( 3 );
-                    indir();
+                    vset( &char_pointer_type, TREG_SP, 0 );   // argI SP_adr <- stack top
+                    vpushi( stack_adj + ( info[ i ] >> 7 ) ); // argI SP_adr stack_offset
+                    gen_op( '+' ); // argI offset_ptr
+                    vpushv( vtop ); // this replaces the old argument // argI offset_ptr offset_ptr
+                    vrott( 3 ); // offset_ptr argI offset_ptr
+                    indir();    // offset_ptr argI *offset_ptr
                     vtop->type = vtop[ -1 ].type;
-                    vswap();
-                    vstore();
-                    vpop();
-                    // size = align = 8;
-                    size = align = 2 * PTR_SIZE;
+                    vswap();    // offset_ptr *offset_ptr argI
+                    vstore();   // offset_ptr *offset_ptr
+                    vpop();     // offset_ptr
+                    size = align = PTR_SIZE;
                 }
                 if( info[ i ] & 32 ) {
                     if( align < XLEN )
@@ -815,9 +823,9 @@ ST_FUNC void gfunc_call( int nb_args )
                 vrott( nb_args - i );
             }
             else if( info[ i ] & 16 ) {
-                assert( !splitofs );printf("\nCoA:!!! check what this 16 means\n");
+                assert( !splitofs );printf("\nCoA:!!! half?\n");
                 splitofs = ofs;
-                ofs += PTR_SIZE; //TODO: check this
+                ofs += PTR_SIZE; //TODO: craft a test to check this
             }
         }
     }
@@ -826,11 +834,11 @@ ST_FUNC void gfunc_call( int nb_args )
         int ii = info[ nb_args - 1 - i ];
         int r = ii;
         int r2 = r;
-        if( !( r & 32 ) ) { // TODO: why test 5th bit of info?
+        if( !( ii & 32 ) ) { // reg is not full
             CType origtype;
             int loadt;
-            r &= 15; // TODO: is there any reason r1's len is limited to 4 bits while r2's is 5 bits? both of them should not exceed 8(right?)
-            r2 = r2 & 64 ? 0 : ( r2 >> 7 ) & 31; // if this arg is not transferred by ref, then a second reg might be used
+            r &= 15;
+            r2 = r2 & 64 ? 0 : ( r2 >> 7 ) & 31; // check if r2 is used
             assert( r2 <= 16 );
             vrotb( i + 1 ); // now vtop is the i-th arg
             origtype = vtop->type;
@@ -842,20 +850,24 @@ ST_FUNC void gfunc_call( int nb_args )
                 loadt = ( ii >> 12 ) & VT_BTYPE;
             }
             if( info[ nb_args - 1 - i ] & 16 ) {
+                /* only half of the arg is in the reg */
                 assert( !r2 );
-                r2 = 1 + TREG_RA;
+                /* use a tmp reg to push the other half of this arg to stack */
+                r2 = 1 + TREG_RA; // r2 will be decreased by 1 later. so add 1 here
             }
             if( loadt == VT_LLONG ) {
                 assert( r2 );
-                r2--; //TODO: so this fix the '+1' above. but why?
+                r2--; // for now on, r2 starts from 0.
             }// TODO: try to craft a test with the following path?
             else if( r2 ) {
                 test_lvalue();
                 vpushv( vtop );
             }
             vtop->type.t = loadt | ( vtop->type.t & VT_UNSIGNED );
-            gv( r < 8 ? RC_R( r ) : RC_F( r - 8 ) ); // TODO:when calling gv with RC_X. vtop will be stored at that EXACT register. This only store r1 even when r2 is required
-            vtop->type = origtype;// TODO: Wait gv should always try to fulfill r2... check it later
+            /* when calling gv with RC_X(r). vtop will be stored at that EXACT register. */
+            /* however, this only control r, and we need to manually deal with r2 later (if used) */
+            gv( r < 8 ? RC_R( r ) : RC_F( r - 8 ) );
+            vtop->type = origtype;
             // TODO: craft a test that use r2 but type is not longlong
             if( r2 && loadt != VT_LLONG ) {
                 r2--;
@@ -894,10 +906,8 @@ ST_FUNC void gfunc_call( int nb_args )
             }
             else if( loadt == VT_LLONG && vtop->r2 != r2 ) {
                 assert( vtop->r2 <= 7 && r2 <= 7 );
-                /* XXX we'd like to have 'gv' move directly into
-                   the right class instead of us fixing it up.  */
-                // mv Ra+1, RR2 //TODO: why this emit mov a3 a0 instead a2 a0 for this test
-                printf("CoA:moving %d to %d at %d\n", ireg( r2 ), ireg( vtop->r2 ),ind);
+                /* XXX we'd like to have 'gv' move r2 directly into
+                   the right reg instead of us fixing it up.  */
                 emit_MV( ireg( r2 ), ireg( vtop->r2 ) );
                 vtop->r2 = r2;
             }
