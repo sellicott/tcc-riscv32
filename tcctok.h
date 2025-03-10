@@ -332,6 +332,84 @@
      DEF(TOK___getf2, "__getf2")
 #endif
 
+#if defined TCC_TARGET_RISCV32 
+    // basic math
+     DEF(TOK___addsf3, "__addsf3")
+     DEF(TOK___adddf3, "__adddf3")
+     DEF(TOK___addtf3, "__addtf3")
+     DEF(TOK___subsf3, "__subsf3")
+     DEF(TOK___subdf3, "__subdf3")
+     DEF(TOK___subtf3, "__subtf3")
+     DEF(TOK___mulsf3, "__mulsf3")
+     DEF(TOK___muldf3, "__muldf3")
+     DEF(TOK___multf3, "__multf3")
+     DEF(TOK___divsf3, "__divsf3")
+     DEF(TOK___divdf3, "__divdf3")
+     DEF(TOK___divtf3, "__divtf3")
+
+     // comparison
+     DEF(TOK___eqsf2, "__eqfs2")
+     DEF(TOK___eqdf2, "__eqds2")
+     DEF(TOK___eqtf2, "__eqts2")
+     DEF(TOK___nesf2, "__nefs2")
+     DEF(TOK___nedf2, "__neds2")
+     DEF(TOK___netf2, "__nets2")
+     DEF(TOK___gesf2, "__gefs2")
+     DEF(TOK___gedf2, "__geds2")
+     DEF(TOK___getf2, "__gets2")
+     DEF(TOK___ltsf2, "__ltfs2")
+     DEF(TOK___ltdf2, "__ltds2")
+     DEF(TOK___lttf2, "__ltts2")
+     DEF(TOK___lesf2, "__lefs2")
+     DEF(TOK___ledf2, "__leds2")
+     DEF(TOK___letf2, "__lets2")
+     DEF(TOK___gtsf2, "__gtfs2")
+     DEF(TOK___gtdf2, "__gtds2")
+     DEF(TOK___gttf2, "__gtts2")
+
+     // conversion
+     // signed int -> float, double, long double
+     DEF(TOK___floatsisf, "__floatsisf")
+     DEF(TOK___floatsidf, "__floatsidf")
+     //DEF(TOK___floatsitf, "__floatsitf")
+     // signed long -> float, double, long double
+     DEF(TOK___floatdisf, "__floatdisf")
+     DEF(TOK___floatdidf, "__floatdidf")
+     //DEF(TOK___floatditf, "__floatditf")
+     // signed long long -> float, double, long double
+     DEF(TOK___floattisf, "__floattisf")
+     DEF(TOK___floattidf, "__floattidf")
+     DEF(TOK___floattitf, "__floattitf")
+     // unsigned int -> float, double, long double
+     DEF(TOK___floatunsisf, "__floatunsisf")
+     DEF(TOK___floatunsidf, "__floatunsidf")
+     DEF(TOK___floatunsitf, "__floatunsitf")
+     // unsigned long -> float, double, long double
+     //DEF(TOK___floatundisf, "__floatundisf")
+     //DEF(TOK___floatundidf, "__floatundidf")
+     DEF(TOK___floatunditf, "__floatunditf")
+     // unsigned long long -> float, double, long double
+     DEF(TOK___floatuntisf, "__floatuntisf")
+     DEF(TOK___floatuntidf, "__floatuntidf")
+     DEF(TOK___floatuntitf, "__floatuntitf")
+
+     // conversion between shorter -> longer floating point type 
+     DEF(TOK___extendsfdf2, "__extendsfdf2")
+     DEF(TOK___extendsftf2, "__extendsftf2")
+     DEF(TOK___extenddftf2, "__extenddftf2")
+     // conversion between longer -> shorter floating point type
+     DEF(TOK___trunctfdf2, "__trunctfdf2")
+     DEF(TOK___trunctfsf2, "__trunctfsf2")
+     DEF(TOK___truncdfsf2, "__truncdfsf2")
+
+     DEF(TOK___fixtfsi, "__fixtfsi")
+     DEF(TOK___fixtfdi, "__fixtfdi")
+     DEF(TOK___fixunstfsi, "__fixunstfsi")
+     DEF(TOK___fixunstfdi, "__fixunstfdi")
+     DEF(TOK___floatsitf, "__floatsitf")
+     DEF(TOK___floatditf, "__floatditf")
+#endif
+
 /* bound checking symbols */
 #ifdef CONFIG_TCC_BCHECK
      DEF(TOK___bound_ptr_add, "__bound_ptr_add")
