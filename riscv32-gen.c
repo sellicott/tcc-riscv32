@@ -102,8 +102,13 @@ static int is_ireg( int r )
 
 static int freg( int r )
 {
+#ifndef TCC_TARGET_RISCV32_ilp32
     assert( r >= 8 && r < 16 );
     return r - 8 + 10; // tccfX --> faX == f(10+X)
+#else
+    // there are no floating point registers in rv32imc isa
+    return ireg(r);
+#endif
 }
 
 static int is_freg( int r )
@@ -112,7 +117,7 @@ static int is_freg( int r )
     return r >= 8 && r < 16;
 #else
     // there are no floating point registers in rv32imc isa
-    return 0;
+    return is_ireg(r);
 #endif
 }
 
@@ -270,7 +275,7 @@ static void load_lvalue( int r, SValue *sv )
     //}
 
     if( is_float( sv->type.t ) ) {
-        tcc_internal_error( "floating point not implemented" );
+        //tcc_internal_error( "floating point not implemented" );
     }
 
     // offset is on the stack
@@ -1502,92 +1507,251 @@ ST_FUNC void gen_opl( int op )
     gen_opil( op, 1 );
 }
 #endif
-ST_FUNC void gen_opf( int op )
+
+/* function to check if a floating point constant at a given
+ * stack position is zero. 'i' is the stack offset where 0
+ * is the top of the stack, -1 is one item down, etc.
+ * taken from gen-arm.c
+*/
+static int is_zero(int i)
 {
-    tcc_error( "Floating point not supported on riscv32" );
+  if((vtop[i].r & (VT_VALMASK | VT_LVAL | VT_SYM)) != VT_CONST)
+    return 0;
+  if (vtop[i].type.t == VT_FLOAT)
+    return (vtop[i].c.f == 0.f);
+  else if (vtop[i].type.t == VT_DOUBLE)
+    return (vtop[i].c.d == 0.0);
+  return (vtop[i].c.ld == 0.l);
+}
+
+enum FLOAT_OP_TYPE {
+    FLOAT_OP_INVALID = -1,
+    FLOAT_OP_PLUS = 0,
+    FLOAT_OP_MINUS,
+    FLOAT_OP_MULT,
+    FLOAT_OP_DIV,
+    FLOAT_OP_EQ,
+    FLOAT_OP_NE,
+    FLOAT_OP_GE,
+    FLOAT_OP_LT,
+    FLOAT_OP_LE,
+    FLOAT_OP_GT,
+    // signed integer -> float
+    FLOAT_OP_SI_F,
+    FLOAT_OP_DI_F,
+    FLOAT_OP_TI_F,
+    // unsigned integer -> float
+    FLOAT_OP_UNSI_F,
+    FLOAT_OP_UNDI_F,
+    FLOAT_OP_UNTI_F,
+    // conversion between different floating point types
+    FLOAT_OP_SF_F,
+    FLOAT_OP_DF_F,
+    FLOAT_OP_TF_F,
+};
+
+// array of possible floating point operations grouped by
+// operation in each row and type in the collumn
+static const int float_funcs[][3] = {
+    // basic math
+    {TOK___addsf3, TOK___adddf3, TOK___addtf3},
+    {TOK___subsf3, TOK___subdf3, TOK___subtf3},
+    {TOK___mulsf3, TOK___muldf3, TOK___multf3},
+    {TOK___divsf3, TOK___divdf3, TOK___divtf3},
+    // comparison ops
+    {TOK___eqsf2,  TOK___eqdf2, TOK___eqtf2},
+    {TOK___nesf2,  TOK___nedf2, TOK___netf2},
+    {TOK___gesf2,  TOK___gedf2, TOK___getf2},
+    {TOK___ltsf2,  TOK___ltdf2, TOK___lttf2},
+    {TOK___lesf2,  TOK___ledf2, TOK___letf2},
+    {TOK___gtsf2,  TOK___gtdf2, TOK___gttf2},
+    // conversion functions for signed integers
+    {TOK___floatsisf, TOK___floatsidf, TOK___floatsitf},
+    {TOK___floatdisf, TOK___floatdidf, TOK___floatditf},
+    {TOK___floattisf, TOK___floattidf, TOK___floattitf},
+    // conversion functions for unsigned integers
+    {TOK___floatunsisf, TOK___floatunsidf, TOK___floatunsitf},
+    {TOK___floatundisf, TOK___floatundidf, TOK___floatunditf},
+    {TOK___floatuntisf, TOK___floatuntidf, TOK___floatuntitf},
+    // conversion between different floating point types
+    {TOK_ASM_nop,      TOK___extendsfdf2, TOK___extendsftf2},
+    {TOK___truncdfsf2, TOK_ASM_nop,       TOK___extenddftf2},
+    {TOK___trunctfsf2, TOK___trunctfdf2,  TOK_ASM_nop}
+};
+
+/* generate a floating point operation 'v = t1 op t2' instruction.
+ * The two operands are guaranteed to have the same floating point type.
+ * We are assuming that there is no hardware floating point, so we 
+ * will use the emulated floating poin operations.
+ * TODO: gracefully switch between hardware and software float.
+ * This function was taken from arm-gen.c and modified for riscv32.
+ */
+ST_FUNC void gen_opf(int op) {
+    // get the type from the top of the stack
+    int type = vtop->type.t & VT_BTYPE;
+    // the helper function to call in order to perform the op
+    int float_op = FLOAT_OP_INVALID;
+    int float_type = 0;
+    switch (type) {
+        case VT_FLOAT:   float_type = 0; break;
+        case VT_DOUBLE:  float_type = 1; break;
+        case VT_LDOUBLE: float_type = 2; break;
+        default:
+            tcc_error("unsuported floating point type: '%s'",
+            get_tok_str(tok, NULL));
+            break;
+    }
+
+    switch (op) {
+        case '+':
+            // check for zero constants on the stack
+            if (is_zero(-1))
+                vswap();
+            if (is_zero(0)) {
+                vtop--;
+                return;
+            }
+            float_op = float_funcs[FLOAT_OP_PLUS][float_type];
+            break;
+        case '-':
+            // check for zero contents on the stack
+            if (is_zero(-1))
+                vswap();
+            if (is_zero(0)) {
+                vtop--;
+                return;
+            }
+            float_op = float_funcs[FLOAT_OP_MINUS][float_type];
+            break;
+        case '*': float_op = float_funcs[FLOAT_OP_MULT][float_type]; break;
+        case '/': float_op = float_funcs[FLOAT_OP_DIV][float_type]; break;
+        case TOK_EQ: float_op = float_funcs[FLOAT_OP_EQ][float_type]; break;
+        case TOK_NE: float_op = float_funcs[FLOAT_OP_NE][float_type]; break;
+        case TOK_GE: float_op = float_funcs[FLOAT_OP_GE][float_type]; break;
+        case TOK_LT: float_op = float_funcs[FLOAT_OP_LT][float_type]; break;
+        case TOK_LE: float_op = float_funcs[FLOAT_OP_LE][float_type]; break;
+        case TOK_GT: float_op = float_funcs[FLOAT_OP_GT][float_type]; break;
+        default:
+            tcc_error("unknown floating point op %x!", op);
+            return;
+    }
+    vpush_helper_func( float_op );
+    vrott( 2 );
+    gfunc_call( 1 );
+    vpushi( 0 );
+    vtop->type.t = type;
+    vtop->r = REG_IRET;
+    vtop->r2 = TREG_R( 1 );
+
+    tcc_warning("Floating point is in alpha on riscv32");
 }
 
 ST_FUNC void gen_cvt_sxtw( void )
 {
     /* XXX on risc-v the registers are usually sign-extended already.
        Let's try to not do anything here.  */
+    tcc_warning("sign-extend call, doing nothing");
 }
 
 #if defined( TCC_TARGET_RISCV32 )
 // stubs for riscv32
+
+
+/* convert integer to floating point type
+ * The integer type is stored on the top of the stack, and the output
+ * floating point type is passed as 't'
+ */
 ST_FUNC void gen_cvt_itof( int t )
 {
-    tcc_error( "No floating point support for riscv32" );
+    // get the integer type from the top of the stack
+    int type = vtop->type.t & VT_BTYPE;
+    int is_unsigned = (vtop->type.t & VT_UNSIGNED) != 0;
+
+    // the helper function to call in order to perform the op
+    int float_type = 0;
+    int float_op = FLOAT_OP_INVALID;
+
+    switch (t) {
+        case VT_FLOAT:   float_type = 0; break;
+        case VT_DOUBLE:  float_type = 1; break;
+        case VT_LDOUBLE: float_type = 2; break;
+        default:
+            tcc_error("unsuported floating point type: '%s'",
+            get_tok_str(tok, NULL));
+            return;
+    }
+
+    switch (type) {
+        case VT_INT:
+            float_op = is_unsigned ?  FLOAT_OP_UNSI_F : FLOAT_OP_SI_F;
+            break;
+        case VT_LONG:
+            float_op = is_unsigned ? FLOAT_OP_UNDI_F : FLOAT_OP_DI_F;
+            break;
+        case VT_LLONG:
+            float_op = is_unsigned ? FLOAT_OP_UNTI_F : FLOAT_OP_TI_F;
+            break;
+        default:
+            tcc_error("unsuported type for fp conversion: '%s'",
+            get_tok_str(tok, NULL));
+            return;
+    }
+
+    assert(float_op != FLOAT_OP_INVALID);
+    vpush_helper_func( float_funcs[float_op][float_type] );
+    vrott( 2 );
+    gfunc_call( 1 );
+    vpushi( 0 );
+    vtop->type.t = t;
+    vtop->r = REG_IRET;
+    vtop->r2 = TREG_R( 1 );
 }
 
 ST_FUNC void gen_cvt_ftoi( int t )
 {
-    tcc_error( "No floating point support for riscv32" );
+    tcc_error_noabort("unsupported float to integer conversion");
 }
 
-ST_FUNC void gen_cvt_ftof( int dt )
+ST_FUNC void gen_cvt_ftof(int dest_type)
 {
-    tcc_error( "No floating point support for riscv32" );
-}
+    int source_type = vtop->type.t & VT_BTYPE;
+    int source_type_idx = 0;
+    int dest_type_idx = 0;
+    int float_op = FLOAT_OP_INVALID;
+    dest_type &= VT_BTYPE;
+    if (source_type == dest_type)
+        return;
 
-// riscv64
-#else
-ST_FUNC void gen_cvt_itof( int t )
-{
-    int rr = ireg( gv( RC_INT ) ), dr;
-    int u = vtop->type.t & VT_UNSIGNED;
-    int l = ( vtop->type.t & VT_BTYPE ) == VT_LLONG;
-    if( t == VT_LDOUBLE ) {
-        int func = l ? ( u ? TOK___floatunditf : TOK___floatditf )
-                     : ( u ? TOK___floatunsitf : TOK___floatsitf );
-        vpush_helper_func( func );
-        vrott( 2 );
-        gfunc_call( 1 );
-        vpushi( 0 );
-        vtop->type.t = t;
-        vtop->r = REG_IRET;
-        vtop->r2 = TREG_R( 1 );
+    switch (source_type) {
+        case VT_FLOAT:   source_type_idx = 0; break;
+        case VT_DOUBLE:  source_type_idx = 1; break;
+        case VT_LDOUBLE: source_type_idx = 2; break;
+        default:
+            tcc_error("unsuported floating point type: '%s'",
+            get_tok_str(tok, NULL));
+            return;
     }
-    else {
-        vtop--;
-        dr = get_reg( RC_FLOAT );
-        vtop++;
-        vtop->r = dr;
-        dr = freg( dr );
-        EI( 0x53, 7, dr, rr,
-            ( ( 0x68 | ( t == VT_DOUBLE ? 1 : 0 ) ) << 5 ) | ( u ? 1 : 0 ) |
-                ( l ? 2 : 0 ) ); // fcvt.[sd].[wl][u]
-    }
-}
 
-ST_FUNC void gen_cvt_ftoi( int t )
-{
-    int ft = vtop->type.t & VT_BTYPE;
-    int l = ( t & VT_BTYPE ) == VT_LLONG;
-    int u = t & VT_UNSIGNED;
-    if( ft == VT_LDOUBLE ) {
-        int func =
-            l ? ( u ? TOK___fixunstfdi : TOK___fixtfdi ) : ( u ? TOK___fixunstfsi : TOK___fixtfsi );
-        vpush_helper_func( func );
-        vrott( 2 );
-        gfunc_call( 1 );
-        vpushi( 0 );
-        vtop->type.t = t;
-        vtop->r = REG_IRET;
+    switch (dest_type) {
+        case VT_FLOAT:   dest_type_idx = FLOAT_OP_SF_F; break;
+        case VT_DOUBLE:  dest_type_idx = FLOAT_OP_DF_F; break;
+        case VT_LDOUBLE: dest_type_idx = FLOAT_OP_TF_F; break;
+        default:
+            tcc_error("unsuported floating point type: '%s'",
+            get_tok_str(tok, NULL));
+            return;
     }
-    else {
-        int rr = freg( gv( RC_FLOAT ) ), dr;
-        vtop--;
-        dr = get_reg( RC_INT );
-        vtop++;
-        vtop->r = dr;
-        dr = ireg( dr );
-        EI( 0x53, 1, dr, rr,
-            ( ( 0x60 | ( ft == VT_DOUBLE ? 1 : 0 ) ) << 5 ) | ( u ? 1 : 0 ) |
-                ( l ? 2 : 0 ) ); // fcvt.[wl][u].[sd] rtz
-    }
-}
 
+    float_op = float_funcs[dest_type_idx][source_type_idx];
+    assert(float_op != TOK_ASM_nop);
+    vpush_helper_func(float_op);
+    vrott( 2 );
+    gfunc_call( 1 );
+    vpushi( 0 );
+    vtop->type.t = dest_type;
+    vtop->r = REG_IRET;
+    vtop->r2 = TREG_R( 1 );
+}
 #endif // TCC_TARGET_RISCV32
 
 /* increment tcov counter */
