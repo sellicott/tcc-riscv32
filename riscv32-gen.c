@@ -1593,9 +1593,18 @@ ST_FUNC void gen_opf(int op) {
     int float_op = FLOAT_OP_INVALID;
     int float_type = 0;
     switch (type) {
-        case VT_FLOAT:   float_type = 0; break;
-        case VT_DOUBLE:  float_type = 1; break;
-        case VT_LDOUBLE: float_type = 2; break;
+        case VT_FLOAT:
+            float_type = 0;
+            printf("[gen_opf]: type = float\n");
+            break;
+        case VT_DOUBLE:
+            float_type = 1;
+            printf("[gen_opf]: type = double\n");
+            break;
+        case VT_LDOUBLE:
+            float_type = 2;
+            printf("[gen_opf]: type = long double\n");
+            break;
         default:
             tcc_error("unsuported floating point type: '%s'",
             get_tok_str(tok, NULL));
@@ -1603,26 +1612,8 @@ ST_FUNC void gen_opf(int op) {
     }
 
     switch (op) {
-        case '+':
-            // check for zero constants on the stack
-            if (is_zero(-1))
-                vswap();
-            if (is_zero(0)) {
-                vtop--;
-                return;
-            }
-            float_op = float_funcs[FLOAT_OP_PLUS][float_type];
-            break;
-        case '-':
-            // check for zero contents on the stack
-            if (is_zero(-1))
-                vswap();
-            if (is_zero(0)) {
-                vtop--;
-                return;
-            }
-            float_op = float_funcs[FLOAT_OP_MINUS][float_type];
-            break;
+        case '+': float_op = float_funcs[FLOAT_OP_PLUS][float_type]; break;
+        case '-': float_op = float_funcs[FLOAT_OP_MINUS][float_type]; break;
         case '*': float_op = float_funcs[FLOAT_OP_MULT][float_type]; break;
         case '/': float_op = float_funcs[FLOAT_OP_DIV][float_type]; break;
         case TOK_EQ: float_op = float_funcs[FLOAT_OP_EQ][float_type]; break;
@@ -1636,12 +1627,10 @@ ST_FUNC void gen_opf(int op) {
             return;
     }
     vpush_helper_func( float_op );
-    vrott( 2 );
-    gfunc_call( 1 );
+    vrott( 3 );
+    gfunc_call( 2 );
     vpushi( 0 );
-    vtop->type.t = type;
-    vtop->r = REG_IRET;
-    vtop->r2 = TREG_R( 1 );
+    PUT_R_RET(vtop, type);
 
     tcc_warning("Floating point is in alpha on riscv32");
 }
@@ -1702,9 +1691,7 @@ ST_FUNC void gen_cvt_itof( int t )
     vrott( 2 );
     gfunc_call( 1 );
     vpushi( 0 );
-    vtop->type.t = t;
-    vtop->r = REG_IRET;
-    vtop->r2 = TREG_R( 1 );
+    PUT_R_RET(vtop, t);
 }
 
 ST_FUNC void gen_cvt_ftoi( int t )
