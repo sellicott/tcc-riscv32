@@ -73,7 +73,7 @@ ST_DATA const int reg_classes[ NB_REGS ] = {
     RC_FLOAT | RC_F( 0 ), RC_FLOAT | RC_F( 1 ), RC_FLOAT | RC_F( 2 ), RC_FLOAT | RC_F( 3 ),
     RC_FLOAT | RC_F( 4 ), RC_FLOAT | RC_F( 5 ), RC_FLOAT | RC_F( 6 ), RC_FLOAT | RC_F( 7 ),
 #endif
-    0, 1 << TREG_RA, 1 << TREG_SP };
+    1 << TREG_RA, 1 << TREG_SP };
 
 #if defined( CONFIG_TCC_BCHECK )
 static addr_t func_bound_offset;
@@ -117,7 +117,7 @@ static int is_freg( int r )
     return r >= 8 && r < 16;
 #else
     // there are no floating point registers in rv32imc isa
-    return is_ireg(r);
+    return 0;
 #endif
 }
 
@@ -139,25 +139,21 @@ ST_FUNC void o( unsigned int opcode )
 static void EIu( uint32_t opcode, uint32_t func3, uint32_t rd, uint32_t rs1, uint32_t imm )
 {
     o( opcode | ( func3 << 12 ) | ( rd << 7 ) | ( rs1 << 15 ) | ( imm << 20 ) );
+    tcc_warning("[tcc-riscv32]: direct EIu call, switch to emit_XXX code");
 }
 
 static void ER(
     uint32_t opcode, uint32_t func3, uint32_t rd, uint32_t rs1, uint32_t rs2, uint32_t func7 )
 {
     o( opcode | func3 << 12 | rd << 7 | rs1 << 15 | rs2 << 20 | func7 << 25 );
+    tcc_warning("[tcc-riscv32]: direct ER call, switch to emit_XXX code");
 }
 
 static void EI( uint32_t opcode, uint32_t func3, uint32_t rd, uint32_t rs1, uint32_t imm )
 {
     assert( !( ( imm + ( 1 << 11 ) ) >> 12 ) );
     EIu( opcode, func3, rd, rs1, imm );
-}
-
-static void ES( uint32_t opcode, uint32_t func3, uint32_t rs1, uint32_t rs2, uint32_t imm )
-{
-    assert( !( ( imm + ( 1 << 11 ) ) >> 12 ) );
-    o( opcode | ( func3 << 12 ) | ( ( imm & 0x1f ) << 7 ) | ( rs1 << 15 ) | ( rs2 << 20 ) |
-        ( ( imm >> 5 ) << 25 ) );
+    tcc_warning("[tcc-riscv32]: direct EI call, switch to emit_XXX code");
 }
 
 /*
@@ -167,7 +163,6 @@ static void ES( uint32_t opcode, uint32_t func3, uint32_t rs1, uint32_t rs2, uin
 static int load_symofs( int r, SValue *sv, int forstore )
 {
     int doload = 0;
-    int t0 = 5;                           // t0 = x5 = 5
     int rd;                               // return register
     int sv_constant = sv->c.i;            // stack value constant
     int stack_value = sv->r & VT_VALMASK; // stack value
@@ -260,7 +255,8 @@ static void load_lvalue( int r, SValue *sv )
     int stack_type = sv->type.t & VT_BTYPE;              // bt
     int stack_reg = sv->r;                               // fr
     int masked_stack_reg = stack_reg & VT_VALMASK;       // v
-    int align, rs1, dest_reg2 = 0;
+    int align;
+    int rs1;
 
     int size = type_size( &sv->type, &align );
 
