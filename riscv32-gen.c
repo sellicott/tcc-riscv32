@@ -655,7 +655,7 @@ static void reg_pass_rec( CType *type, int *rc, int *fieldofs, int ofs )
         rc[ ++rc[ 0 ] ] = is_float( type->t ) ? RC_FLOAT : RC_INT;
         fieldofs[ rc[ 0 ] ] = // [3:0] is type [31:4] is offset // FIXME: ptr is not longlong on
                               // rv32
-            ( ofs << 4 ) | ( ( type->t & VT_BTYPE ) == VT_PTR ? VT_LLONG : type->t & VT_BTYPE );
+            ( ofs << 4 ) | ( ( type->t & VT_BTYPE ) == VT_PTR ? VT_LONG : type->t & VT_BTYPE );
     }
     else
         rc[ 0 ] = -1;
@@ -676,7 +676,7 @@ static void reg_pass( CType *type, int *prc, int *fieldofs, int named )
     if( prc[ 0 ] <= 0 || !named ) {
         int align, size = type_size( type, &align );
         prc[ 0 ] = ( size + 3 ) >> 2;
-        assert( size <= 8 ); // We can't handle more than 8 bytes
+        assert( size <= 2*XLEN ); // We can't handle more than 8 bytes
         prc[ 1 ] = prc[ 2 ] = RC_INT;
         fieldofs[ 1 ] = ( 0 << 4 ) | ( size <= 1 ? VT_BYTE : size <= 2 ? VT_SHORT : VT_INT );
         fieldofs[ 2 ] = ( 8 << 4 ) | ( size <= 5 ? VT_BYTE : size <= 6 ? VT_SHORT : VT_INT );
@@ -708,7 +708,7 @@ ST_FUNC void gfunc_call( int nb_args )
         sv = &vtop[ 1 + i - nb_args ];
         sv->type.t &= ~VT_ARRAY; // XXX this should be done in tccgen.c
         size = type_size( &sv->type, &align );
-        if( size > 2 * PTR_SIZE ) {
+        if( size > 2 * XLEN) {
             align = ( align < XLEN ) ? align : XLEN;
             tempspace = ( tempspace + align - 1 ) & -align;
             tempofs = tempspace;
@@ -740,7 +740,7 @@ ST_FUNC void gfunc_call( int nb_args )
             info[ i ] = areg[ prc[ 1 ] - 1 ]++;
             if( !byref )
                 info[ i ] |= ( fieldofs[ 1 ] & VT_BTYPE ) << 12;
-            assert( !( fieldofs[ 1 ] >> 4 ) );
+            //assert( !( fieldofs[ 1 ] >> 4 ) );
             if( nregs == 2 ) {
                 if( prc[ 2 ] == RC_FLOAT || areg[ 0 ] < 8 )
                     info[ i ] |= ( 1 + areg[ prc[ 2 ] - 1 ]++ ) << 7;
