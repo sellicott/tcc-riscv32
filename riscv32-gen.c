@@ -3,7 +3,7 @@
 // Number of registers available to allocator:
 #ifdef TCC_RISCV_ilp32
 // TODO add temporary and saved registers here once I figure out how TCC works
-#define NB_REGS 17 // t0-t6, a0-a7, ra, sp
+#define NB_REGS 17 // t0-t6, a0-a7, ra, sp, (fa0-fa7) aliases for a0-a7
 #else
 #define NB_REGS 26 // a0-a7, t0-t6, fa0-fa7, xxx, ra, sp
 #endif
@@ -11,8 +11,8 @@
 #define CONFIG_TCC_ASM
 
 // define tcc register number for argument registers
-#define TREG_R( x ) ( x + 7 ) // a0-a7 (for tcc these start at 7)
-#define TREG_F( x ) ( x + 8 ) // x = 0..7
+#define TREG_R( x ) ( x + 7 )  // a0-a7 (for tcc these start at 7)
+#define TREG_F( x ) ( x + 15 ) // fa0-fa7 (we are aliasing these to a0-a7)
 
 // Register classes sorted from more general to more precise:
 #define RC_INT ( 1 << 0 )
@@ -24,10 +24,12 @@
 #define RC_IRET RC_R( 0 ) // int return register class
 #define RC_IRE2 RC_R( 1 ) // int 2nd return register class
 #define RC_FRET RC_F( 0 ) // float return register class
+#define RC_FRE2 RC_F( 1 ) // float 2nd return register class
 
 #define REG_IRET ( TREG_R( 0 ) ) // int return register number
 #define REG_IRE2 ( TREG_R( 1 ) ) // int 2nd return register number
 #define REG_FRET ( TREG_F( 0 ) ) // float return register number
+#define REG_FRE2 ( TREG_F( 1 ) ) // float 2nd return register number
 
 #define PTR_SIZE 4
 
@@ -69,12 +71,22 @@ ST_DATA const char *const target_machine_defs = "__riscv\0"
 ST_DATA const int reg_classes[ NB_REGS ] = {
     // general registers (t0-t6)
     RC_INT, RC_INT, RC_INT, RC_INT, RC_INT, RC_INT, RC_INT, 
+#ifdef TCC_RISCV_ilp32
+    // Integer/Float Function Arguments
+    RC_INT | RC_FLOAT | RC_R( 0 ) | RC_F( 0 ),
+    RC_INT | RC_FLOAT | RC_R( 1 ) | RC_F( 1 ),
+    RC_INT | RC_FLOAT | RC_R( 2 ) | RC_F( 2 ),
+    RC_INT | RC_FLOAT | RC_R( 3 ) | RC_F( 3 ),
+    RC_INT | RC_FLOAT | RC_R( 4 ) | RC_F( 4 ),
+    RC_INT | RC_FLOAT | RC_R( 5 ) | RC_F( 5 ),
+    RC_INT | RC_FLOAT | RC_R( 6 ) | RC_F( 6 ),
+    RC_INT | RC_FLOAT | RC_R( 7 ) | RC_F( 7 ),
+#else 
     // Integer Function Arguments
     RC_INT | RC_R( 0 ), RC_INT | RC_R( 1 ),
     RC_INT | RC_R( 2 ), RC_INT | RC_R( 3 ),
     RC_INT | RC_R( 4 ), RC_INT | RC_R( 5 ),
     RC_INT | RC_R( 6 ), RC_INT | RC_R( 7 ),
-#ifndef TCC_RISCV_ilp32
     // Floating point function arguments
     RC_FLOAT | RC_F( 0 ), RC_FLOAT | RC_F( 1 ),
     RC_FLOAT | RC_F( 2 ), RC_FLOAT | RC_F( 3 ),
@@ -116,22 +128,22 @@ static int is_ireg( int r )
 
 static int freg( int r )
 {
-#ifndef TCC_RISCV_ilp32
+#ifdef TCC_RISCV_ilp32
+    assert( r >= NB_REGS && r < NB_REGS + 8 );
+    // shift to the a0-a7 registers
+    return ireg( r - NB_REGS + 7);
+#else
     assert( r >= 15 && r < 23 );
     return r - 8 + 10; // tccfX --> faX == f(10+X)
-#else
-    // there are no floating point registers in rv32imc isa
-    return ireg(r);
 #endif
 }
 
 static int is_freg( int r )
 {
-#ifndef TCC_RISCV_ilp32
-    return r >= 15 && r < 23;
+#ifdef TCC_RISCV_ilp32
+    return r >= NB_REGS && r < NB_REGS + 8;
 #else
-    // there are no floating point registers in rv32imc isa
-    return 0;
+    return r >= 15 && r < 23;
 #endif
 }
 
@@ -274,7 +286,7 @@ static void load_lvalue( int r, SValue *sv )
 
     int size = type_size( &sv->type, &align );
 
-    assert( !is_freg( r ) || stack_type == VT_FLOAT || stack_type == VT_DOUBLE );
+    //assert( !is_freg( r ) || stack_type == VT_FLOAT || stack_type == VT_DOUBLE );
     if( stack_type == VT_FUNC ) { /* XXX should be done in generic code */
         size = PTR_SIZE;
     }
@@ -286,6 +298,7 @@ static void load_lvalue( int r, SValue *sv )
 
     if( is_float( sv->type.t ) ) {
         //tcc_internal_error( "floating point not implemented" );
+        printf("[load_lvalue]: trying to load float type %d\n", stack_type);
     }
 
     // offset is on the stack
@@ -477,7 +490,7 @@ ST_FUNC void store( int r, SValue *sv )
     int size = type_size( &sv->type, &align );
 
     // Make sure we can perform the operation (if floating point)
-    assert( !is_float( stack_type ) || is_freg( r ) || stack_type == VT_LDOUBLE );
+    //assert( !is_float( stack_type ) || is_freg( r ) || stack_type == VT_LDOUBLE );
 
     /* long doubles are in two integer registers, but the load/store
        primitives only deal with one, so do as if it's one reg.  */

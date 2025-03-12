@@ -250,6 +250,10 @@ static int R2_RET(int t)
 #if PTR_SIZE == 4
     if (t == VT_LLONG)
         return REG_IRE2;
+# if defined TCC_TARGET_RISCV32
+    if (t == VT_DOUBLE)
+        return REG_FRE2;
+# endif
 #elif defined TCC_TARGET_X86_64
     if (t == VT_QLONG)
         return REG_IRE2;
@@ -287,6 +291,12 @@ static int RC_TYPE(int t)
         return RC_ST0;
     if ((t & VT_BTYPE) == VT_QFLOAT)
         return RC_FRET;
+#elif defined TCC_TARGET_RISCV32
+    if ((t & VT_BTYPE) == VT_FLOAT
+            || (t & VT_BTYPE) == VT_DOUBLE)
+        return RC_FRET;
+    //if ((t & VT_BTYPE) == VT_LDOUBLE)
+    //    return RC_INT;
 #elif defined TCC_TARGET_RISCV64
     if ((t & VT_BTYPE) == VT_LDOUBLE)
         return RC_INT;
@@ -1858,10 +1868,14 @@ ST_FUNC int gv(int rc)
 
         bt = vtop->type.t & VT_BTYPE;
 
-#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
+#if defined TCC_TARGET_RISCV64
         /* XXX mega hack */
         if (bt == VT_LDOUBLE && rc == RC_FLOAT)
-          rc = RC_INT;
+            rc = RC_INT;
+#elif defined TCC_TARGET_RISCV32
+        if (bt == VT_LDOUBLE) {
+            printf("[gv]: long double type\n");
+        }
 #endif
         rc2 = RC2_TYPE(bt, rc);
 
