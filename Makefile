@@ -119,6 +119,7 @@ DEF-arm64-FreeBSD  = $(DEF-arm64) -DTARGETOS_FreeBSD
 DEF-arm64-NetBSD   = $(DEF-arm64) -DTARGETOS_NetBSD
 DEF-arm64-OpenBSD  = $(DEF-arm64) -DTARGETOS_OpenBSD
 DEF-riscv64        = -DTCC_TARGET_RISCV64
+#TODO: riscv32 is not necessarily ilp32, it might be ilp32d though tcc doesn't support it
 DEF-riscv32        = -DTCC_TARGET_RISCV32 -DTCC_RISCV_ilp32
 DEF-riscv32-ilp32  = $(DEF-riscv32) -DTCC_RISCV_ilp32
 DEF-c67            = -DTCC_TARGET_C67 -w # disable warnigs
