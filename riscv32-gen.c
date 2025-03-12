@@ -378,11 +378,6 @@ ST_FUNC void load( int r, SValue *sv )
     else if( masked_stack_reg == VT_CONST ) {
         int rs1 = 0; // For addi, default to x0
 
-        // only handle integer types
-        if( is_float( sv->type.t ) ) {
-            tcc_error( "unimp: load(float)" );
-        }
-
         assert( !is_float( sv->type.t ) && is_ireg( r ) );
         // We need to add Svalue.sym to the constant
         if( stack_reg & VT_SYM ) {
@@ -736,7 +731,7 @@ ST_FUNC void gfunc_call( int nb_args )
 #endif
 
     areg[ 0 ] = 0; /* int arg regs */
-    areg[ 1 ] = 8; /* float arg regs */
+    areg[ 1 ] = 0; /* float arg regs */
     sa = vtop[ -nb_args ].type.ref->next;
     for( i = 0; i < nb_args; i++ ) {
         int nregs, byref = 0, tempofs;
@@ -1024,7 +1019,8 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
                 else if( prc[ 1 + i ] == RC_FLOAT ) {
                     // emit_S(0x22, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc +
                     // (fieldofs[i+1] >> 4)); // fs[wd] FAi, loc(s0)
-                    tcc_error( "unimp: floating point support" );
+                    tcc_warning( "experimental floating point support" );
+                    emit_SW( s0, freg( TREG_F(areg[ 1 ]++) ), loc + i * XLEN );
                 }
                 else {
                     emit_SW( s0, ireg( TREG_R(areg[ 0 ]++) ), loc + i * XLEN );
