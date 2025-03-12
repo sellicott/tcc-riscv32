@@ -3,25 +3,27 @@
 // Number of registers available to allocator:
 #ifdef TCC_RISCV_ilp32
 // TODO add temporary and saved registers here once I figure out how TCC works
-#define NB_REGS 17 // a0-a7, t0-t6, ra, sp
+#define NB_REGS 17 // t0-t6, a0-a7, ra, sp
 #else
 #define NB_REGS 26 // a0-a7, t0-t6, fa0-fa7, xxx, ra, sp
 #endif
 #define NB_ASM_REGS 32
 #define CONFIG_TCC_ASM
 
-#define TREG_R( x ) ( x )     // x = 0..7
+// define tcc register number for argument registers
+#define TREG_R( x ) ( x + 7 ) // a0-a7 (for tcc these start at 7)
 #define TREG_F( x ) ( x + 8 ) // x = 0..7
 
 // Register classes sorted from more general to more precise:
 #define RC_INT ( 1 << 0 )
 #define RC_FLOAT ( 1 << 1 )
+// define classes for function argument registers
 #define RC_R( x ) ( 1 << ( 2 + ( x ) ) )  // x = 0..7
-#define RC_F( x ) ( 1 << ( 10 + ( x ) ) ) // x = 0..7
+#define RC_F( x ) ( 1 << ( 2 + 15 + ( x ) ) ) // x = 0..7
 
-#define RC_IRET ( RC_R( 0 ) ) // int return register class
-#define RC_IRE2 ( RC_R( 1 ) ) // int 2nd return register class
-#define RC_FRET ( RC_F( 0 ) ) // float return register class
+#define RC_IRET RC_R( 0 ) // int return register class
+#define RC_IRE2 RC_R( 1 ) // int 2nd return register class
+#define RC_FRET RC_F( 0 ) // float return register class
 
 #define REG_IRET ( TREG_R( 0 ) ) // int return register number
 #define REG_IRE2 ( TREG_R( 1 ) ) // int 2nd return register number
@@ -65,15 +67,19 @@ ST_DATA const char *const target_machine_defs = "__riscv\0"
 #define TREG_SP 18
 
 ST_DATA const int reg_classes[ NB_REGS ] = {
-    // Integer Function Arguments
-    RC_INT | RC_R( 0 ), RC_INT | RC_R( 1 ), RC_INT | RC_R( 2 ), RC_INT | RC_R( 3 ),
-    RC_INT | RC_R( 4 ), RC_INT | RC_R( 5 ), RC_INT | RC_R( 6 ), RC_INT | RC_R( 7 ),
     // general registers (t0-t6)
-    RC_INT, RC_INT, RC_INT, RC_INT, RC_INT, RC_INT, RC_INT,
+    RC_INT, RC_INT, RC_INT, RC_INT, RC_INT, RC_INT, RC_INT, 
+    // Integer Function Arguments
+    RC_INT | RC_R( 0 ), RC_INT | RC_R( 1 ),
+    RC_INT | RC_R( 2 ), RC_INT | RC_R( 3 ),
+    RC_INT | RC_R( 4 ), RC_INT | RC_R( 5 ),
+    RC_INT | RC_R( 6 ), RC_INT | RC_R( 7 ),
 #ifndef TCC_RISCV_ilp32
     // Floating point function arguments
-    RC_FLOAT | RC_F( 0 ), RC_FLOAT | RC_F( 1 ), RC_FLOAT | RC_F( 2 ), RC_FLOAT | RC_F( 3 ),
-    RC_FLOAT | RC_F( 4 ), RC_FLOAT | RC_F( 5 ), RC_FLOAT | RC_F( 6 ), RC_FLOAT | RC_F( 7 ),
+    RC_FLOAT | RC_F( 0 ), RC_FLOAT | RC_F( 1 ),
+    RC_FLOAT | RC_F( 2 ), RC_FLOAT | RC_F( 3 ),
+    RC_FLOAT | RC_F( 4 ), RC_FLOAT | RC_F( 5 ),
+    RC_FLOAT | RC_F( 6 ), RC_FLOAT | RC_F( 7 ),
 #endif
     1 << TREG_RA, 1 << TREG_SP };
 
@@ -93,14 +99,14 @@ static int ireg( int r )
     if( r < 0 || r >= 15 ) {
         tcc_error( "internal error: unexpected register value %d\n", r );
     }
-    // a0-a7 (x10-x17)
-    if ( r <= 7 )
-        return r + 10;
     // t0-t2 (x5-x7)
-    if (r > 7 && r <= 10)
-        return (r - 8) + 5;
+    if ( r <= 2 )
+        return r + 5;
     // t3-t6 (x28-x31)
-    return ( r - 11 ) + 28;
+    if (r > 2 && r <= 6)
+        return ( r - 3 ) + 28;
+    // a0-a7 (x10-x17)
+    return ( r - 7 ) + 10;
 }
 
 static int is_ireg( int r )
@@ -997,8 +1003,7 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
                     tcc_error( "unimp: floating point support" );
                 }
                 else {
-                    // sw aX, loc(s0) // XXX
-                    emit_SW( s0, ireg( areg[ 0 ]++ ), loc + i * XLEN );
+                    emit_SW( s0, ireg( TREG_R(areg[ 0 ]++) ), loc + i * XLEN );
                 }
             }
         }
