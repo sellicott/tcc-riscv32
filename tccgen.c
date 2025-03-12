@@ -309,6 +309,11 @@ static int RC2_TYPE(int t, int rc)
 #endif
     if (rc & RC_FLOAT)
         return RC_FLOAT;
+// advance to the next register class for two argument calls
+#if defined TCC_TARGET_RISCV32 || defined TCC_TARGET_RISCV32
+    if (rc > RC_FLOAT)
+        return rc << 1;
+#endif
     return RC_INT;
 }
 
@@ -6688,7 +6693,7 @@ static void gfunc_return(CType *func_type)
         ret_nregs = gfunc_sret(func_type, func_var, &ret_type,
                                &ret_align, &regsize);
         if (ret_nregs < 0) {
-#ifdef TCC_TARGET_RISCV64
+#if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
             arch_transfer_ret_regs(0);
 #endif
         } else if (0 == ret_nregs) {

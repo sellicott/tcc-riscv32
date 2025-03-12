@@ -859,7 +859,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 vpushv( vtop );
             }
             vtop->type.t = loadt | ( vtop->type.t & VT_UNSIGNED );
-            gv( r < 8 ? RC_R( r ) : RC_F( r - 8 ) );
+            gv( is_ireg(r) ? RC_R( r ) : RC_F( r - 8 ) );
             vtop->type = origtype;
 
             if( r2 && loadt != VT_LLONG ) {
@@ -896,14 +896,6 @@ ST_FUNC void gfunc_call( int nb_args )
                 // ES(0x23, 3, 2, ireg(vtop->r2), splitofs); // sd t0, ofs(sp)
                 emit_SW( ireg( vtop->r2 ), 5, splitofs );
                 vtop->r2 = VT_CONST;
-            }
-            else if( loadt == VT_LLONG && vtop->r2 != r2 ) {
-                assert( vtop->r2 <= 7 && r2 <= 7 );
-                /* XXX we'd like to have 'gv' move directly into
-                   the right class instead of us fixing it up.  */
-                // mv Ra+1, RR2
-                emit_MV( ireg( r2 ), ireg( vtop->r2 ) );
-                vtop->r2 = r2;
             }
         done:
             vrott( i + 1 );
