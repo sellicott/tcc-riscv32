@@ -12,7 +12,7 @@
 
 // define tcc register number for argument registers
 #define TREG_R( x ) ( x + 7 )  // a0-a7 (for tcc these start at 7)
-#define TREG_F( x ) ( x + 15 ) // fa0-fa7 (we are aliasing these to a0-a7)
+#define TREG_F( x ) ( x + NB_REGS ) // fa0-fa7 (we are aliasing these to a0-a7)
 
 // Register classes sorted from more general to more precise:
 #define RC_INT ( 1 << 0 )
@@ -65,8 +65,8 @@ ST_DATA const char *const target_machine_defs = "__riscv\0"
 
 #define XLEN 4
 
-#define TREG_RA 17
-#define TREG_SP 18
+#define TREG_RA (NB_REGS - 2)
+#define TREG_SP (NB_REGS - 1)
 
 ST_DATA const int reg_classes[ NB_REGS ] = {
     // general registers (t0-t6)
@@ -109,7 +109,7 @@ static int ireg( int r )
         return 2; // sp
 
     if( r < 0 || r >= 15 ) {
-        tcc_error( "internal error: unexpected register value %d\n", r );
+        tcc_error( "[ireg] internal error: unexpected register value %d\n", r );
     }
     // t0-t2 (x5-x7)
     if ( r <= 2 )
@@ -131,7 +131,7 @@ static int freg( int r )
 #ifdef TCC_RISCV_ilp32
     assert( r >= NB_REGS && r < NB_REGS + 8 );
     // shift to the a0-a7 registers
-    return ireg( r - NB_REGS + 7);
+    return ireg( r - NB_REGS + 7 );
 #else
     assert( r >= 15 && r < 23 );
     return r - 8 + 10; // tccfX --> faX == f(10+X)
@@ -296,9 +296,9 @@ static void load_lvalue( int r, SValue *sv )
     //    dest_reg2 = is_ireg( r2 ) ? ireg( r2 ) : freg( r2 );
     //}
 
-    if( is_float( sv->type.t ) ) {
-        //tcc_internal_error( "floating point not implemented" );
-        printf("[load_lvalue]: trying to load float type %d\n", stack_type);
+    if (stack_type == VT_DOUBLE) {
+        size = align = 4;
+    }
     }
 
     // offset is on the stack
@@ -336,6 +336,10 @@ static void load_lvalue( int r, SValue *sv )
     }
     else {
         tcc_error( "unimp: load(non-local lval)" );
+    }
+
+    if (size > 2*XLEN){
+        tcc_error("[internal error] load sizes > %d bytes should be on the stack", 2*XLEN);
     }
     // TODO handle floating pont, 64-bit values, and 128-bit values
     switch( size ) {
@@ -410,7 +414,11 @@ ST_FUNC void load( int r, SValue *sv )
             emit_ADDI( dest_reg, ireg( masked_stack_reg ), 0 );
         }
         else {
-            tcc_error( "Floating point not implemented in riscv32" );
+            tcc_warning("riscv32 floating point support is experimental");
+            emit_MV(dest_reg, is_freg(masked_stack_reg) ?
+                freg(masked_stack_reg) : ireg(masked_stack_reg));
+            emit_NOP();
+            emit_NOP();
         }
     }
     // Value is stored in the CPU flag from a comparison operation. Put it in a safe place.
@@ -503,6 +511,9 @@ ST_FUNC void store( int r, SValue *sv )
     if( size > 8 ) {
         tcc_error( "unimp: large sized store" );
     }
+    if (stack_type == VT_DOUBLE) {
+        size = align = 4;
+    }
 
     // Load the correct address into the loc_reg register
     assert( stack_reg & VT_LVAL );
@@ -530,13 +541,12 @@ ST_FUNC void store( int r, SValue *sv )
         tcc_error( "implement me: %s(!local)", __FUNCTION__ );
     }
 
-    if( is_freg( r ) ) {
-        tcc_error( "unip: floating point" );
-    }
-
     // load the value from the source register into the location pointed to by
     // loc_reg
     // TODO: store floating point, 64-bit, and 128-bit values
+    if (size > 2*XLEN){
+        tcc_error("[internal error] store sizes > %d bytes should be on the stack", 2*XLEN);
+    }
     switch( size ) {
         case 1: emit_SB( loc_reg, src_reg, offset ); break;
         case 2: emit_SH( loc_reg, src_reg, offset ); break;
@@ -672,8 +682,7 @@ static void reg_pass_rec( CType *type, int *rc, int *fieldofs, int ofs )
         rc[ 0 ] = -1;
     else if( !rc[ 0 ] || rc[ 1 ] == RC_FLOAT || is_float( type->t ) ) {
         rc[ ++rc[ 0 ] ] = is_float( type->t ) ? RC_FLOAT : RC_INT;
-        fieldofs[ rc[ 0 ] ] = // [3:0] is type [31:4] is offset // FIXME: ptr is not longlong on
-                              // rv32
+        fieldofs[ rc[ 0 ] ] = // [3:0] is type [31:4] is offset
             ( ofs << 4 ) | ( ( type->t & VT_BTYPE ) == VT_PTR ? VT_LONG : type->t & VT_BTYPE );
     }
     else
@@ -863,7 +872,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 assert( !r2 );
                 r2 = 1 + TREG_RA;
             }
-            if( loadt == VT_LLONG ) {
+            if( loadt == VT_LLONG || loadt == VT_DOUBLE ) {
                 assert( r2 );
                 r2--;
             }
@@ -872,10 +881,10 @@ ST_FUNC void gfunc_call( int nb_args )
                 vpushv( vtop );
             }
             vtop->type.t = loadt | ( vtop->type.t & VT_UNSIGNED );
-            gv( is_ireg(r) ? RC_R( r ) : RC_F( r - 8 ) );
+            gv( is_ireg(r) ? RC_R( r ) : RC_F( r ) );
             vtop->type = origtype;
 
-            if( r2 && loadt != VT_LLONG ) {
+            if( r2 && loadt != VT_LLONG && loadt != VT_DOUBLE ) {
                 r2--;
                 assert( r2 < 16 || r2 == TREG_RA );
                 vswap();
