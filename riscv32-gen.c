@@ -129,6 +129,8 @@ static int is_ireg( int r )
 static int freg( int r )
 {
 #ifdef TCC_RISCV_ilp32
+    int tmp_reg_num = r - NB_REGS + 7;
+    printf( "[freg]: get register %d -> %d\n", r, tmp_reg_num);
     assert( r >= NB_REGS && r < NB_REGS + 8 );
     // shift to the a0-a7 registers
     return ireg( r - NB_REGS + 7 );
@@ -290,8 +292,8 @@ static void load_lvalue( int r, SValue *sv )
     if( stack_type == VT_FUNC ) { /* XXX should be done in generic code */
         size = PTR_SIZE;
     }
-    // what do we do with 64-bit values
-    // else if( stack_type == VT_LLONG ) {
+    // what do we do with 128-bit values
+    //else if( stack_type == VT_LDOUBLE) {
     //    int r2 = sv->r2;
     //    dest_reg2 = is_ireg( r2 ) ? ireg( r2 ) : freg( r2 );
     //}
@@ -299,6 +301,9 @@ static void load_lvalue( int r, SValue *sv )
     if (stack_type == VT_DOUBLE) {
         size = align = 4;
     }
+
+    if (is_float(stack_type)){
+        printf("[load_lvalue]: floating point type %d, size %d\n", stack_type, size);
     }
 
     // offset is on the stack
@@ -513,6 +518,9 @@ ST_FUNC void store( int r, SValue *sv )
     }
     if (stack_type == VT_DOUBLE) {
         size = align = 4;
+    }
+    if (is_float(stack_type)){
+        printf("[store]: floating point type %d, size %d\n", stack_type, size);
     }
 
     // Load the correct address into the loc_reg register
@@ -862,6 +870,7 @@ ST_FUNC void gfunc_call( int nb_args )
             vrotb( i + 1 );
             origtype = vtop->type;
             size = type_size( &vtop->type, &align );
+            printf("[gfunc_call]: arg %d, type %d\n", nb_args - 1 - i, origtype.t & VT_BTYPE);
             if( size == 0 )
                 goto done;
             loadt = vtop->type.t & VT_BTYPE;
@@ -877,6 +886,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 r2--;
             }
             else if( r2 ) {
+                printf("[gfunc_call]: lvalue -> %04x\n", vtop->r);
                 test_lvalue();
                 vpushv( vtop );
             }
@@ -1851,3 +1861,4 @@ ST_FUNC void gen_vla_alloc( CType *type, int align )
 #endif
 }
 #endif
+
