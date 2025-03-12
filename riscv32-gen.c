@@ -3,9 +3,9 @@
 // Number of registers available to allocator:
 #ifdef TCC_RISCV_ilp32
 // TODO add temporary and saved registers here once I figure out how TCC works
-#define NB_REGS 17 // a0-a7, ra, sp
+#define NB_REGS 17 // a0-a7, t0-t6, ra, sp
 #else
-#define NB_REGS 19 // a0-a7, fa0-fa7, xxx, ra, sp
+#define NB_REGS 26 // a0-a7, t0-t6, fa0-fa7, xxx, ra, sp
 #endif
 #define NB_ASM_REGS 32
 #define CONFIG_TCC_ASM
@@ -111,7 +111,7 @@ static int is_ireg( int r )
 static int freg( int r )
 {
 #ifndef TCC_RISCV_ilp32
-    assert( r >= 8 && r < 16 );
+    assert( r >= 15 && r < 23 );
     return r - 8 + 10; // tccfX --> faX == f(10+X)
 #else
     // there are no floating point registers in rv32imc isa
@@ -122,7 +122,7 @@ static int freg( int r )
 static int is_freg( int r )
 {
 #ifndef TCC_RISCV_ilp32
-    return r >= 8 && r < 16;
+    return r >= 15 && r < 23;
 #else
     // there are no floating point registers in rv32imc isa
     return 0;
