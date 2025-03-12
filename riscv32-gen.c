@@ -3,7 +3,7 @@
 // Number of registers available to allocator:
 #ifdef TCC_RISCV_ilp32
 // TODO add temporary and saved registers here once I figure out how TCC works
-#define NB_REGS 10 // a0-a7, ra, sp
+#define NB_REGS 17 // a0-a7, ra, sp
 #else
 #define NB_REGS 19 // a0-a7, fa0-fa7, xxx, ra, sp
 #endif
@@ -68,6 +68,8 @@ ST_DATA const int reg_classes[ NB_REGS ] = {
     // Integer Function Arguments
     RC_INT | RC_R( 0 ), RC_INT | RC_R( 1 ), RC_INT | RC_R( 2 ), RC_INT | RC_R( 3 ),
     RC_INT | RC_R( 4 ), RC_INT | RC_R( 5 ), RC_INT | RC_R( 6 ), RC_INT | RC_R( 7 ),
+    // general registers (t0-t6)
+    RC_INT, RC_INT, RC_INT, RC_INT, RC_INT, RC_INT, RC_INT,
 #ifndef TCC_RISCV_ilp32
     // Floating point function arguments
     RC_FLOAT | RC_F( 0 ), RC_FLOAT | RC_F( 1 ), RC_FLOAT | RC_F( 2 ), RC_FLOAT | RC_F( 3 ),
@@ -88,21 +90,27 @@ static int ireg( int r )
     if( r == TREG_SP )
         return 2; // sp
 
-    if( r < 0 || r >= 8 ) {
+    if( r < 0 || r >= 15 ) {
         tcc_error( "internal error: unexpected register value %d\n", r );
-        assert( r >= 0 && r < 8 );
     }
-    return r + 10; // tccrX --> aX == x(10+X)
+    // a0-a7 (x10-x17)
+    if ( r <= 7 )
+        return r + 10;
+    // t0-t2 (x5-x7)
+    if (r > 7 && r <= 10)
+        return (r - 8) + 5;
+    // t3-t6 (x28-x31)
+    return ( r - 11 ) + 28;
 }
 
 static int is_ireg( int r )
 {
-    return (unsigned)r < 8 || r == TREG_RA || r == TREG_SP;
+    return (unsigned)r < 15 || r == TREG_RA || r == TREG_SP;
 }
 
 static int freg( int r )
 {
-#ifndef TCC_TARGET_RISCV32_ilp32
+#ifndef TCC_RISCV_ilp32
     assert( r >= 8 && r < 16 );
     return r - 8 + 10; // tccfX --> faX == f(10+X)
 #else
