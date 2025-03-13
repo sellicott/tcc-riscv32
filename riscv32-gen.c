@@ -1670,7 +1670,11 @@ ST_FUNC void gen_opf(int op) {
     vrott( 3 );
     gfunc_call( 2 );
     vpushi( 0 );
-    PUT_R_RET(vtop, type);
+    vtop->r = REG_FRET;
+    if (type == VT_DOUBLE)
+        vtop->r2 = REG_FRE2;
+    else
+        vtop->r2 = VT_CONST;
 
     tcc_warning("Floating point is in alpha on riscv32");
 }
@@ -1731,7 +1735,11 @@ ST_FUNC void gen_cvt_itof( int t )
     vrott( 2 );
     gfunc_call( 1 );
     vpushi( 0 );
-    PUT_R_RET(vtop, t);
+    vtop->r = REG_FRET;
+    if (type == VT_DOUBLE)
+        vtop->r2 = REG_FRE2;
+    else
+        vtop->r2 = VT_CONST;
 }
 
 ST_FUNC void gen_cvt_ftoi( int t )
