@@ -657,7 +657,8 @@ static void gen_bounds_epilog( void )
 
 static void reg_pass_rec( CType *type, int *rc, int *fieldofs, int ofs )
 {
-    if( ( type->t & VT_BTYPE ) == VT_STRUCT ) {
+    int c_type = type->t & VT_BTYPE;
+    if( c_type == VT_STRUCT ) {
         Sym *f;
         if( type->ref->type.t == VT_UNION )
             rc[ 0 ] = -1;
@@ -681,12 +682,22 @@ static void reg_pass_rec( CType *type, int *rc, int *fieldofs, int ofs )
                 rc[ 0 ] = -1;
         }
     }
-    else if( rc[ 0 ] == 2 || rc[ 0 ] < 0 || ( type->t & VT_BTYPE ) == VT_LDOUBLE )
+    else if( rc[ 0 ] == 2 || rc[ 0 ] < 0 || c_type == VT_LDOUBLE )
         rc[ 0 ] = -1;
-    else if( !rc[ 0 ] || rc[ 1 ] == RC_FLOAT || is_float( type->t ) ) {
-        rc[ ++rc[ 0 ] ] = is_float( type->t ) ? RC_FLOAT : RC_INT;
-        fieldofs[ rc[ 0 ] ] = // [3:0] is type [31:4] is offset
-            ( ofs << 4 ) | ( ( type->t & VT_BTYPE ) == VT_PTR ? VT_LONG : type->t & VT_BTYPE );
+    else if( !rc[ 0 ] || rc[ 1 ] == RC_FLOAT || is_float( c_type ) ) {
+        if ( c_type == VT_LDOUBLE ) {
+            rc [ 0 ] = -1;
+        }
+        else if (c_type == VT_DOUBLE) {
+            rc[ 0 ] = 2;
+            rc[ 1 ] = rc[ 2 ] = RC_FLOAT;
+        }
+        else {
+            rc[ ++rc[ 0 ] ] = is_float( c_type ) ? RC_FLOAT : RC_INT;
+        }
+        // [3:0] is type [31:4] is offset
+        fieldofs[ rc[ 0 ] ] = ( ofs << 4 )
+                            | ( c_type == VT_PTR ? VT_LONG : c_type );
     }
     else
         rc[ 0 ] = -1;
