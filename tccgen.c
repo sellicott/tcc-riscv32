@@ -2063,7 +2063,7 @@ static void gv_dup(void)
 
 #if PTR_SIZE == 4
 /* generate CPU independent (unsigned) long long operations */
-static void gen_opl(int op)
+ST_FUNC void gen_opl(int op)
 {
     int t, a, b, op1, c, i;
     int func;
