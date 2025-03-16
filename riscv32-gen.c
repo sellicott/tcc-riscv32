@@ -728,6 +728,17 @@ static void reg_pass( CType *type, int *prc, int *fieldofs, int named )
 ST_FUNC void gfunc_call( int nb_args )
 {
     int i, align, size, areg[ 2 ];
+    /* info[x]: // might contain errors
+    *      28       20        16        12     7   6   5 4     0
+    * ┌───┬───────────┬─────────┬─────────┬─────┬─────┬─┬─┬─────┐
+    * │   │ offset of │ type of │ type of │ 2nd │ by  │*│$│ 1st │
+    * │   │ 2nd reg   │ 2nd reg │ 1st reg │ reg^│ ref │ │ │ reg │
+    * └───┴───────────┴─────────┴─────────┴─────┴─────┴─┴─┴─────┘
+    *  ^:when `by ref` == 1. this is tempofs. Or,
+    *    when 0, means 2nd reg is not used. so 1 is a0, 2 is a1 a.s.o.
+    *  *: when 1, means this arg is transferred by stack because no reg is available
+    *  $: when 1, only half of the arg can be transferred by reg
+    */
     int *info = tcc_malloc( ( nb_args + 1 ) * sizeof( int ) );
     int stack_adj = 0, tempspace = 0, stack_add, ofs, splitofs = 0;
     SValue *sv; // Point to the argument on the vstack
@@ -740,7 +751,7 @@ ST_FUNC void gfunc_call( int nb_args )
     if( tcc_state->do_bounds_check )
         gbound_args( nb_args );
 #endif
-
+    // The base integer calling convention provides eight argument registers, a0-a7
     areg[ 0 ] = 0; /* int arg regs */
     areg[ 1 ] = 0; /* float arg regs */
     sa = vtop[ -nb_args ].type.ref->next;
@@ -750,6 +761,7 @@ ST_FUNC void gfunc_call( int nb_args )
         sv = &vtop[ 1 + i - nb_args ];
         sv->type.t &= ~VT_ARRAY; // XXX this should be done in tccgen.c
         size = type_size( &sv->type, &align );
+        // Aggregates larger than 2×XLEN bits are passed by reference
         if( size > 2 * XLEN) {
             align = ( align < XLEN ) ? align : XLEN;
             tempspace = ( tempspace + align - 1 ) & -align;
@@ -758,7 +770,8 @@ ST_FUNC void gfunc_call( int nb_args )
             size = align = PTR_SIZE;
             byref = 64 | ( tempofs << 7 );
         }
-        reg_pass( &sv->type, prc, fieldofs, sa != NULL ); // is sa!= 0 means 'last argument' ?
+        reg_pass( &sv->type, prc, fieldofs, sa != NULL );
+        // Variadic arguments with 2×XLEN-bit alignment and size at most 2×XLEN bits are passed in an aligned register pair
         if( !sa && align == 2 * XLEN && size <= 2 * XLEN ) {
             areg[ 0 ] = ( areg[ 0 ] + 1 ) & ~1;
         }
@@ -787,6 +800,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 if( prc[ 2 ] == RC_FLOAT || areg[ 0 ] < 8 )
                     info[ i ] |= ( 1 + areg[ prc[ 2 ] - 1 ]++ ) << 7;
                 else {
+                    /* Only half of the last arg can be transferred by reg */
                     info[ i ] |= 16;
                     stack_adj += 8;
                 }
@@ -822,16 +836,16 @@ ST_FUNC void gfunc_call( int nb_args )
                 vrotb( nb_args - i );
                 size = type_size( &vtop->type, &align );
                 if( info[ i ] & 64 ) {
-                    vset( &char_pointer_type, TREG_SP, 0 );
-                    vpushi( stack_adj + ( info[ i ] >> 7 ) );
-                    gen_op( '+' );
-                    vpushv( vtop ); // this replaces the old argument
-                    vrott( 3 );
-                    indir();
+                    vset( &char_pointer_type, TREG_SP, 0 ); // argI SP_adr <- stack top
+                    vpushi( stack_adj + ( info[ i ] >> 7 ) ); // argI SP_adr stack_offset
+                    gen_op( '+' );  // argI offset_ptr
+                    vpushv( vtop ); // argI offset_ptr offset_ptr
+                    vrott( 3 );   // offset_ptr argI offset_ptr
+                    indir();        // offset_ptr argI *offset_ptr
                     vtop->type = vtop[ -1 ].type;
-                    vswap();
-                    vstore();
-                    vpop();
+                    vswap();        // offset_ptr *offset_ptr argI
+                    vstore();       // offset_ptr *offset_ptr
+                    vpop();         // offset_ptr
                     // size = align = 8;
                     size = align = 2 * PTR_SIZE;
                 }
@@ -871,9 +885,9 @@ ST_FUNC void gfunc_call( int nb_args )
             CType origtype;
             int loadt;
             r &= 15;
-            r2 = r2 & 64 ? 0 : ( r2 >> 7 ) & 31;
+            r2 = r2 & 64 ? 0 : ( r2 >> 7 ) & 31; // check if r2 is used
             assert( r2 <= 16 );
-            vrotb( i + 1 );
+            vrotb( i + 1 ); // now vtop is the i-th arg
             origtype = vtop->type;
             size = type_size( &vtop->type, &align );
             printf("[gfunc_call]: arg %d, type %d\n", nb_args - 1 - i, origtype.t & VT_BTYPE);
@@ -884,12 +898,14 @@ ST_FUNC void gfunc_call( int nb_args )
                 loadt = ( ii >> 12 ) & VT_BTYPE;
             }
             if( info[ nb_args - 1 - i ] & 16 ) {
+                /* only half of the arg is in the reg */
                 assert( !r2 );
-                r2 = 1 + TREG_RA;
+                /* use a reg x1 to push the other half of this arg to stack */
+                r2 = 1 + TREG_RA; // r2 will be decreased by 1 later. so add 1 here
             }
             if( loadt == VT_LLONG || loadt == VT_DOUBLE ) {
                 assert( r2 );
-                r2--;
+                r2--; // for now on, r2 starts from 0
             }
             else if( r2 ) {
                 printf("[gfunc_call]: lvalue -> %04x\n", vtop->r);
@@ -939,10 +955,10 @@ ST_FUNC void gfunc_call( int nb_args )
             vrott( i + 1 );
         }
     }
-    vrotb( nb_args + 1 );
+    vrotb( nb_args + 1 ); // now vtop is the function being called
     save_regs( nb_args + 1 );
     gcall_or_jmp( 1 );
-    vtop -= nb_args + 1;
+    vtop -= nb_args + 1; // pop function and all args
     if( stack_add ) {
         const uint32_t t0 = 5;
         const uint32_t sp = 2;
