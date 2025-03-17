@@ -682,7 +682,7 @@ static void reg_pass_rec( CType *type, int *rc, int *fieldofs, int ofs )
                 rc[ 0 ] = -1;
         }
     }
-    else if( rc[ 0 ] == 2 || rc[ 0 ] < 0 || c_type == VT_LDOUBLE )
+    else if( rc[ 0 ] == 2 || rc[ 0 ] < 0 || c_type == VT_LDOUBLE || c_type == VT_LLONG )
         rc[ 0 ] = -1;
     else if( !rc[ 0 ] || rc[ 1 ] == RC_FLOAT || is_float( c_type ) ) {
         if ( c_type == VT_LDOUBLE ) {
@@ -802,7 +802,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 else {
                     /* Only half of the last arg can be transferred by reg */
                     info[ i ] |= 16;
-                    stack_adj += 8;
+                    stack_adj += 4;
                 }
                 if( !byref ) {
                     assert( ( fieldofs[ 2 ] >> 4 ) < 2048 );
@@ -901,6 +901,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 /* only half of the arg is in the reg */
                 assert( !r2 );
                 /* use a reg x1 to push the other half of this arg to stack */
+                /* FIXME: It seems that this r2 will be ignored. Maybe delete this? */
                 r2 = 1 + TREG_RA; // r2 will be decreased by 1 later. so add 1 here
             }
             if( loadt == VT_LLONG || loadt == VT_DOUBLE ) {
@@ -913,7 +914,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 vpushv( vtop );
             }
             vtop->type.t = loadt | ( vtop->type.t & VT_UNSIGNED );
-            gv( r < 8 ? RC_R( r ) : RC_F( r ) );
+            gv( is_ireg(r) ? RC_R( r ) : RC_F( r ) );
             vtop->type = origtype;
 
             if( r2 && loadt != VT_LLONG && loadt != VT_DOUBLE ) {
@@ -947,12 +948,11 @@ ST_FUNC void gfunc_call( int nb_args )
                 vtop->r2 = r2;
             }
             if( info[ nb_args - 1 - i ] & 16 ) {
-                // ES(0x23, 3, 2, ireg(vtop->r2), splitofs); // sd t0, ofs(sp)
-                emit_SW( ireg( vtop->r2 ), 5, splitofs );
+                emit_SW(2, ireg( vtop->r2 ),  splitofs ); // sw r2, splitofs(sp)
                 vtop->r2 = VT_CONST;
             }
             else if( loadt == VT_LLONG && vtop->r2 != r2 ) {
-                assert( vtop->r2 <= 7 && r2 <= 7 );
+                assert( is_ireg(vtop->r2)&& r2 <= 7 );
                 /* XXX we'd like to have 'gv' move directly into
                    the right class instead of us fixing it up.  */
                 // mv Ra+1, RR2
