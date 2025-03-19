@@ -942,7 +942,7 @@ ST_FUNC void gfunc_call( int nb_args )
 
                 save_reg_upstack( r2, 1 );
                 vtop->type.t = loadt | ( vtop->type.t & VT_UNSIGNED );
-                load( r2, vtop );
+                load( r2, vtop ); //TODO: check this
                 assert( r2 < VT_CONST );
                 vtop--;
                 vtop->r2 = r2;
@@ -956,7 +956,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 /* XXX we'd like to have 'gv' move directly into
                    the right class instead of us fixing it up.  */
                 // mv Ra+1, RR2
-                emit_MV( ireg( r2 ), ireg( vtop->r2 ) );
+                emit_MV( ireg(TREG_R(r2)) , ireg( vtop->r2 ) );
                 vtop->r2 = r2;
             }
         done:
