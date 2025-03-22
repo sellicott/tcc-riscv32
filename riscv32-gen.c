@@ -28,8 +28,14 @@
 
 #define REG_IRET ( TREG_R( 0 ) ) // int return register number
 #define REG_IRE2 ( TREG_R( 1 ) ) // int 2nd return register number
+#ifdef TCC_RISCV_ilp32
+// floating-point arguments are returned in int register
+#define REG_FRET ( TREG_R( 0 ) )
+#define REG_FRE2 ( TREG_R( 1 ) )
+#else
 #define REG_FRET ( TREG_F( 0 ) ) // float return register number
 #define REG_FRE2 ( TREG_F( 1 ) ) // float 2nd return register number
+#endif
 
 #define PTR_SIZE 4
 
@@ -101,6 +107,7 @@ static unsigned long func_bound_ind;
 ST_DATA int func_bound_add_epilog;
 #endif
 
+// convert tcc reg into physical integer reg
 static int ireg( int r )
 {
     if( r == TREG_RA )
@@ -1056,7 +1063,7 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
                     // emit_S(0x22, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc +
                     // (fieldofs[i+1] >> 4)); // fs[wd] FAi, loc(s0)
                     tcc_warning( "experimental floating point support" );
-                    emit_SW( s0, freg( TREG_F(areg[ 1 ]++) ), loc + i * XLEN );
+                    emit_SW( s0, freg( TREG_F(areg[ 1 ]++) ), loc + i * XLEN ); //todo: check this
                 }
                 else {
                     emit_SW( s0, ireg( TREG_R(areg[ 0 ]++) ), loc + i * XLEN );
@@ -1761,7 +1768,7 @@ ST_FUNC void gen_cvt_itof( int t )
     gfunc_call( 1 );
     vpushi( 0 );
     vtop->r = REG_FRET;
-    if (type == VT_DOUBLE)
+    if (t == VT_DOUBLE)
         vtop->r2 = REG_FRE2;
     else
         vtop->r2 = VT_CONST;
