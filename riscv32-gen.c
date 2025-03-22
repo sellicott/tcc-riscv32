@@ -167,7 +167,6 @@ ST_FUNC void o( unsigned int opcode )
     if( ind1 > cur_text_section->data_allocated ) {
         section_realloc( cur_text_section, ind1 );
     }
-    printf("[o]opcode: %.8x\n",opcode);
     write32le( cur_text_section->data + ind, opcode );
     ind = ind1;
 }
@@ -898,7 +897,7 @@ ST_FUNC void gfunc_call( int nb_args )
             vrotb( i + 1 ); // now vtop is the i-th arg
             origtype = vtop->type;
             size = type_size( &vtop->type, &align );
-            printf("[gfunc_call]: arg %d, type %d\n", nb_args - 1 - i, origtype.t & VT_BTYPE);
+            //printf("[gfunc_call]: arg %d, type %d\n", nb_args - 1 - i, origtype.t & VT_BTYPE);
             if( size == 0 )
                 goto done;
             loadt = vtop->type.t & VT_BTYPE;
@@ -1646,9 +1645,9 @@ static const int float_funcs[][3] = {
     {TOK___floatundisf, TOK___floatundidf, TOK___floatunditf},
     {TOK___floatuntisf, TOK___floatuntidf, TOK___floatuntitf},
     // conversion between different floating point types
-    {TOK_ASM_nop,      TOK___extendsfdf2, TOK___extendsftf2},
-    {TOK___truncdfsf2, TOK_ASM_nop,       TOK___extenddftf2},
-    {TOK___trunctfsf2, TOK___trunctfdf2,  TOK_ASM_nop}
+    {TOK_ASM_nop,       TOK___truncdfsf2,  TOK___trunctfsf2},
+    {TOK___extendsfdf2, TOK_ASM_nop,       TOK___trunctfdf2},
+    {TOK___extendsftf2, TOK___extenddftf2, TOK_ASM_nop}
 };
 
 /* generate a floating point operation 'v = t1 op t2' instruction.
