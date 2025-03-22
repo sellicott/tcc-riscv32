@@ -5,7 +5,7 @@
 // TODO add temporary and saved registers here once I figure out how TCC works
 #define NB_REGS 17 // t0-t6, a0-a7, ra, sp, (fa0-fa7) aliases for a0-a7
 #else
-#define NB_REGS 26 // a0-a7, t0-t6, fa0-fa7, xxx, ra, sp
+#define NB_REGS 26 // t0-t6, a0-a7, fa0-fa7, xxx, ra, sp
 #endif
 #define NB_ASM_REGS 32
 #define CONFIG_TCC_ASM
@@ -111,13 +111,13 @@ static int ireg( int r )
     if( r < 0 || r >= 15 ) {
         tcc_error( "[ireg] internal error: unexpected register value %d\n", r );
     }
-    // t0-t2 (x5-x7)
+    // 0~1: t0-t2 (x5-x7)
     if ( r <= 2 )
         return r + 5;
-    // t3-t6 (x28-x31)
+    // 2~6: t3-t6 (x28-x31)
     if (r > 2 && r <= 6)
         return ( r - 3 ) + 28;
-    // a0-a7 (x10-x17)
+    // 7~14: a0-a7 (x10-x17)
     return ( r - 7 ) + 10;
 }
 
@@ -130,7 +130,7 @@ static int freg( int r )
 {
 #ifdef TCC_RISCV_ilp32
     int tmp_reg_num = r - NB_REGS + 7;
-    printf( "[freg]: get register %d -> %d\n", r, tmp_reg_num);
+    printf( "[freg]: get register %d(fa%d) -> %d\n", r, r - 17, tmp_reg_num);
     assert( r >= NB_REGS && r < NB_REGS + 8 );
     // shift to the a0-a7 registers
     return ireg( r - NB_REGS + 7 );
@@ -160,6 +160,7 @@ ST_FUNC void o( unsigned int opcode )
     if( ind1 > cur_text_section->data_allocated ) {
         section_realloc( cur_text_section, ind1 );
     }
+    printf("[o]opcode: %.8x\n",opcode);
     write32le( cur_text_section->data + ind, opcode );
     ind = ind1;
 }
@@ -378,7 +379,7 @@ ST_FUNC void load( int r, SValue *sv )
     else if( masked_stack_reg == VT_CONST ) {
         int rs1 = 0; // For addi, default to x0
 
-        assert( !is_float( sv->type.t ) && is_ireg( r ) );
+        //assert( !is_float( sv->type.t ) && is_ireg( r ) );
         // We need to add Svalue.sym to the constant
         if( stack_reg & VT_SYM ) {
             rs1 = load_symofs( r, sv, 0 );
@@ -951,13 +952,13 @@ ST_FUNC void gfunc_call( int nb_args )
                 emit_SW(2, ireg( vtop->r2 ),  splitofs ); // sw r2, splitofs(sp)
                 vtop->r2 = VT_CONST;
             }
-            else if( loadt == VT_LLONG && vtop->r2 != r2 ) {
+            else if( (loadt == VT_LLONG || loadt == VT_DOUBLE) && vtop->r2 != TREG_R(r2) ) {
                 assert( is_ireg(vtop->r2)&& r2 <= 7 );
                 /* XXX we'd like to have 'gv' move directly into
                    the right class instead of us fixing it up.  */
                 // mv Ra+1, RR2
                 emit_MV( ireg(TREG_R(r2)) , ireg( vtop->r2 ) );
-                vtop->r2 = r2;
+                vtop->r2 = TREG_R(r2);
             }
         done:
             vrott( i + 1 );
