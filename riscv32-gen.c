@@ -5,7 +5,7 @@
 // TODO add temporary and saved registers here once I figure out how TCC works
 #define NB_REGS 17 // t0-t6, a0-a7, ra, sp, (fa0-fa7) aliases for a0-a7
 #else
-#define NB_REGS 26 // a0-a7, t0-t6, fa0-fa7, xxx, ra, sp
+#define NB_REGS 26 // t0-t6, a0-a7, fa0-fa7, xxx, ra, sp
 #endif
 #define NB_ASM_REGS 32
 #define CONFIG_TCC_ASM
@@ -28,8 +28,14 @@
 
 #define REG_IRET ( TREG_R( 0 ) ) // int return register number
 #define REG_IRE2 ( TREG_R( 1 ) ) // int 2nd return register number
+#ifdef TCC_RISCV_ilp32
+// floating-point arguments are returned in int register
+#define REG_FRET ( TREG_R( 0 ) )
+#define REG_FRE2 ( TREG_R( 1 ) )
+#else
 #define REG_FRET ( TREG_F( 0 ) ) // float return register number
 #define REG_FRE2 ( TREG_F( 1 ) ) // float 2nd return register number
+#endif
 
 #define PTR_SIZE 4
 
@@ -81,7 +87,7 @@ ST_DATA const int reg_classes[ NB_REGS ] = {
     RC_INT | RC_FLOAT | RC_R( 5 ) | RC_F( 5 ),
     RC_INT | RC_FLOAT | RC_R( 6 ) | RC_F( 6 ),
     RC_INT | RC_FLOAT | RC_R( 7 ) | RC_F( 7 ),
-#else 
+#else
     // Integer Function Arguments
     RC_INT | RC_R( 0 ), RC_INT | RC_R( 1 ),
     RC_INT | RC_R( 2 ), RC_INT | RC_R( 3 ),
@@ -101,6 +107,7 @@ static unsigned long func_bound_ind;
 ST_DATA int func_bound_add_epilog;
 #endif
 
+// convert tcc reg into physical integer reg
 static int ireg( int r )
 {
     if( r == TREG_RA )
@@ -111,13 +118,13 @@ static int ireg( int r )
     if( r < 0 || r >= 15 ) {
         tcc_error( "[ireg] internal error: unexpected register value %d\n", r );
     }
-    // t0-t2 (x5-x7)
+    // 0~1: t0-t2 (x5-x7)
     if ( r <= 2 )
         return r + 5;
-    // t3-t6 (x28-x31)
+    // 2~6: t3-t6 (x28-x31)
     if (r > 2 && r <= 6)
         return ( r - 3 ) + 28;
-    // a0-a7 (x10-x17)
+    // 7~14: a0-a7 (x10-x17)
     return ( r - 7 ) + 10;
 }
 
@@ -130,7 +137,7 @@ static int freg( int r )
 {
 #ifdef TCC_RISCV_ilp32
     int tmp_reg_num = r - NB_REGS + 7;
-    printf( "[freg]: get register %d -> %d\n", r, tmp_reg_num);
+    printf( "[freg]: get register %d(fa%d) -> %d\n", r, r - 17, tmp_reg_num);
     assert( r >= NB_REGS && r < NB_REGS + 8 );
     // shift to the a0-a7 registers
     return ireg( r - NB_REGS + 7 );
@@ -378,7 +385,7 @@ ST_FUNC void load( int r, SValue *sv )
     else if( masked_stack_reg == VT_CONST ) {
         int rs1 = 0; // For addi, default to x0
 
-        assert( !is_float( sv->type.t ) && is_ireg( r ) );
+        //assert( !is_float( sv->type.t ) && is_ireg( r ) );
         // We need to add Svalue.sym to the constant
         if( stack_reg & VT_SYM ) {
             rs1 = load_symofs( r, sv, 0 );
@@ -682,7 +689,7 @@ static void reg_pass_rec( CType *type, int *rc, int *fieldofs, int ofs )
                 rc[ 0 ] = -1;
         }
     }
-    else if( rc[ 0 ] == 2 || rc[ 0 ] < 0 || c_type == VT_LDOUBLE )
+    else if( rc[ 0 ] == 2 || rc[ 0 ] < 0 || c_type == VT_LDOUBLE || c_type == VT_LLONG )
         rc[ 0 ] = -1;
     else if( !rc[ 0 ] || rc[ 1 ] == RC_FLOAT || is_float( c_type ) ) {
         if ( c_type == VT_LDOUBLE ) {
@@ -802,7 +809,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 else {
                     /* Only half of the last arg can be transferred by reg */
                     info[ i ] |= 16;
-                    stack_adj += 8;
+                    stack_adj += XLEN;
                 }
                 if( !byref ) {
                     assert( ( fieldofs[ 2 ] >> 4 ) < 2048 );
@@ -890,7 +897,7 @@ ST_FUNC void gfunc_call( int nb_args )
             vrotb( i + 1 ); // now vtop is the i-th arg
             origtype = vtop->type;
             size = type_size( &vtop->type, &align );
-            printf("[gfunc_call]: arg %d, type %d\n", nb_args - 1 - i, origtype.t & VT_BTYPE);
+            //printf("[gfunc_call]: arg %d, type %d\n", nb_args - 1 - i, origtype.t & VT_BTYPE);
             if( size == 0 )
                 goto done;
             loadt = vtop->type.t & VT_BTYPE;
@@ -901,6 +908,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 /* only half of the arg is in the reg */
                 assert( !r2 );
                 /* use a reg x1 to push the other half of this arg to stack */
+                /* FIXME: It seems that this r2 will be ignored. Maybe delete this? */
                 r2 = 1 + TREG_RA; // r2 will be decreased by 1 later. so add 1 here
             }
             if( loadt == VT_LLONG || loadt == VT_DOUBLE ) {
@@ -941,14 +949,13 @@ ST_FUNC void gfunc_call( int nb_args )
 
                 save_reg_upstack( r2, 1 );
                 vtop->type.t = loadt | ( vtop->type.t & VT_UNSIGNED );
-                load( r2, vtop );
+                load( r2, vtop ); //TODO: check this
                 assert( r2 < VT_CONST );
                 vtop--;
                 vtop->r2 = r2;
             }
-            if( info[ nb_args - 1 - i ] & 16 ) {
-                // ES(0x23, 3, 2, ireg(vtop->r2), splitofs); // sd t0, ofs(sp)
-                emit_SW( ireg( vtop->r2 ), 5, splitofs );
+            if(info[ nb_args - 1 - i ] & 16) {
+                emit_SW(2, ireg( vtop->r2 ),  splitofs ); // sw r2, splitofs(sp)
                 vtop->r2 = VT_CONST;
             }
         done:
@@ -1047,7 +1054,7 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
                     // emit_S(0x22, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc +
                     // (fieldofs[i+1] >> 4)); // fs[wd] FAi, loc(s0)
                     tcc_warning( "experimental floating point support" );
-                    emit_SW( s0, freg( TREG_F(areg[ 1 ]++) ), loc + i * XLEN );
+                    emit_SW( s0, freg( TREG_F(areg[ 1 ]++) ), loc + i * XLEN ); //todo: check this
                 }
                 else {
                     emit_SW( s0, ireg( TREG_R(areg[ 0 ]++) ), loc + i * XLEN );
@@ -1630,9 +1637,9 @@ static const int float_funcs[][3] = {
     {TOK___floatundisf, TOK___floatundidf, TOK___floatunditf},
     {TOK___floatuntisf, TOK___floatuntidf, TOK___floatuntitf},
     // conversion between different floating point types
-    {TOK_ASM_nop,      TOK___extendsfdf2, TOK___extendsftf2},
-    {TOK___truncdfsf2, TOK_ASM_nop,       TOK___extenddftf2},
-    {TOK___trunctfsf2, TOK___trunctfdf2,  TOK_ASM_nop}
+    {TOK_ASM_nop,       TOK___truncdfsf2,  TOK___trunctfsf2},
+    {TOK___extendsfdf2, TOK_ASM_nop,       TOK___trunctfdf2},
+    {TOK___extendsftf2, TOK___extenddftf2, TOK_ASM_nop}
 };
 
 /* generate a floating point operation 'v = t1 op t2' instruction.
@@ -1752,7 +1759,7 @@ ST_FUNC void gen_cvt_itof( int t )
     gfunc_call( 1 );
     vpushi( 0 );
     vtop->r = REG_FRET;
-    if (type == VT_DOUBLE)
+    if (t == VT_DOUBLE)
         vtop->r2 = REG_FRE2;
     else
         vtop->r2 = VT_CONST;
