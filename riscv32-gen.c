@@ -1183,8 +1183,7 @@ ST_FUNC void gsym_addr( int branch_list_offset, int target_offset )
     // turn on code generation, but save the state so we can turn it off again if necessary
     int nocode_wanted_old = nocode_wanted; // save the old no code state
     int original_ind = ind;                // save the current pointer location
-    nocode_wanted &= ~0x20000000;          // copy code from the NO_CODE macro (move to tcc.h?)
-
+    nocode_wanted = 0;
     while( next_branch_offset ) {
         int32_t rel_jmp;
         // set the current branch offset (the offset from the data section to write to).
