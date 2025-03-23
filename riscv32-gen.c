@@ -809,7 +809,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 else {
                     /* Only half of the last arg can be transferred by reg */
                     info[ i ] |= 16;
-                    stack_adj += 4;
+                    stack_adj += XLEN;
                 }
                 if( !byref ) {
                     assert( ( fieldofs[ 2 ] >> 4 ) < 2048 );
@@ -954,17 +954,9 @@ ST_FUNC void gfunc_call( int nb_args )
                 vtop--;
                 vtop->r2 = r2;
             }
-            if( info[ nb_args - 1 - i ] & 16 ) {
+            if(info[ nb_args - 1 - i ] & 16) {
                 emit_SW(2, ireg( vtop->r2 ),  splitofs ); // sw r2, splitofs(sp)
                 vtop->r2 = VT_CONST;
-            }
-            else if( (loadt == VT_LLONG || loadt == VT_DOUBLE) && vtop->r2 != TREG_R(r2) ) {
-                assert( is_ireg(vtop->r2)&& r2 <= 7 );
-                /* XXX we'd like to have 'gv' move directly into
-                   the right class instead of us fixing it up.  */
-                // mv Ra+1, RR2
-                emit_MV( ireg(TREG_R(r2)) , ireg( vtop->r2 ) );
-                vtop->r2 = TREG_R(r2);
             }
         done:
             vrott( i + 1 );

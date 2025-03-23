@@ -319,6 +319,14 @@ static int RC2_TYPE(int t, int rc)
 #endif
     if (rc & RC_FLOAT)
         return RC_FLOAT;
+#if defined TCC_TARGET_RISCV32
+// advance to the next register class for two argument calls
+    if (rc >= RC_R(0)) { // rc is a specific reg
+        if (rc < RC_R(7)) { // there are more reg to split to
+            return rc << 1;
+        } // if not, just store it to a temp reg
+    }
+#endif
     return RC_INT;
 }
 
