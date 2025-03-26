@@ -1071,7 +1071,7 @@ static void tcc_assemble_inline(TCCState *s1, const char *str, int len, int glob
 {
     const int *saved_macro_ptr = macro_ptr;
     int dotid = set_idnum('.', IS_ID);
-#ifndef TCC_TARGET_RISCV64
+#if !defined(TCC_TARGET_RISCV64) && !defined(TCC_TARGET_RISCV32)
     int dolid = set_idnum('$', 0);
 #endif
 
@@ -1081,7 +1081,7 @@ static void tcc_assemble_inline(TCCState *s1, const char *str, int len, int glob
     tcc_assemble_internal(s1, 0, global);
     tcc_close();
 
-#ifndef TCC_TARGET_RISCV64
+#if !defined(TCC_TARGET_RISCV64) && !defined(TCC_TARGET_RISCV32)
     set_idnum('$', dolid);
 #endif
     set_idnum('.', dotid);
@@ -1144,15 +1144,15 @@ static void subst_asm_operands(ASMOperand *operands, int nb_operands,
                 goto add_char;
             }
             modifier = 0;
-            if (*str == 'c' || *str == 'n' ||
-                *str == 'b' || *str == 'w' || *str == 'h' || *str == 'k' ||
-		*str == 'q' || *str == 'l' ||
-#ifdef TCC_TARGET_RISCV64
-		*str == 'z' ||
+            if (*str == 'c' || *str == 'n' || *str == 'l' ||
+                *str == 'b' || *str == 'w' || *str == 'h' || *str == 'q' ||
+		        *str == 'k' ||
+#if defined(TCC_TARGET_RISCV64) || defined(TCC_TARGET_RISCV32)
+		        *str == 'z' ||
 #endif
 		/* P in GCC would add "@PLT" to symbol refs in PIC mode,
 		   and make literal operands not be decorated with '$'.  */
-		*str == 'P')
+		        *str == 'P')
                 modifier = *str++;
             index = find_constraint(operands, nb_operands, str, &str);
             if (index < 0)
