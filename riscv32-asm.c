@@ -421,8 +421,8 @@ static void asm_binary_opcode( TCCState *s1, int token )
     // printf("hi 2\n");
     parse_operand( s1, &ops[ 1 ] );
 
-    // la pseudoinstruction can load a full 32b word
-    if( token != TOK_ASM_la ) {
+    // la and li pseudo-instruction can load a full 32b word
+    if( token != TOK_ASM_la && token != TOK_ASM_li) {
         if( !( ops[ 1 ].type & OP_IM32 ) ) {
             tcc_error( "'%s': Expected second source operand that is an immediate value",
                 get_tok_str( token, NULL ) );
@@ -441,20 +441,12 @@ static void asm_binary_opcode( TCCState *s1, int token )
     switch( token ) {
         case TOK_ASM_la:
             label.type.t = VT_VOID | VT_STATIC;
-            // hacky method to generate relocation entries at the correct offsets (ind)
             greloc(cur_text_section, ops[1].e.sym, ind, R_RISCV_PCREL_HI20);
-            /* generate_symbol_reallocation( &ops[ 1 ], R_RISCV_PCREL_HI20 ); */
             // See RV-ABI 1.0 §8.4.9
             put_extern_sym(&label, cur_text_section, ind, 0);
-            /* generate_symbol_reallocation( &ops[ 1 ], R_RISCV_PCREL_LO12_I ); */
             greloc(cur_text_section, &label, ind + 4, R_RISCV_PCREL_LO12_I);
-            
-            ops[1].e.v = 0; // reset the v since relocation is required. leaving that to linker
-            ops[1].type = OP_IM12S;
-            imm = ops[ 1 ].e.v;
-            // rewind offset to put instructions at the correct offsets
-            /* ind = ind_bak; */
-            emit_LA( rd, imm );
+            // leaving imm to linker
+            emit_LA( rd, 0 );
             return;
         case TOK_ASM_li:
             // hacky method to generate relocation entries at the correct offsets (ind)
