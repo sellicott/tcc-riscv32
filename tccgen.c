@@ -2137,8 +2137,11 @@ ST_FUNC void gen_opl(int op)
             vtop[-2] = tmp;
             /* stack: ML MH H1 L2 H2 L1 */
             gen_op('*');
+            /* stack: ML MH H1 L2 M1 */
             vrotb(3);
+            /* stack: ML MH L2 M1 H1 */
             vrotb(3);
+            /* stack: ML MH M1 H1 L2 */
             gen_op('*');
             /* stack: ML MH M1 M2 */
             gen_op('+');
