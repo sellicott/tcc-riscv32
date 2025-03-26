@@ -171,12 +171,6 @@ ST_FUNC void o( unsigned int opcode )
     ind = ind1;
 }
 
-static void EIu( uint32_t opcode, uint32_t func3, uint32_t rd, uint32_t rs1, uint32_t imm )
-{
-    o( opcode | ( func3 << 12 ) | ( rd << 7 ) | ( rs1 << 15 ) | ( imm << 20 ) );
-    tcc_warning("[tcc-riscv32]: direct EIu call, switch to emit_XXX code");
-}
-
 static void ER(
     uint32_t opcode, uint32_t func3, uint32_t rd, uint32_t rs1, uint32_t rs2, uint32_t func7 )
 {
@@ -184,12 +178,6 @@ static void ER(
     tcc_warning("[tcc-riscv32]: direct ER call, switch to emit_XXX code");
 }
 
-static void EI( uint32_t opcode, uint32_t func3, uint32_t rd, uint32_t rs1, uint32_t imm )
-{
-    assert( !( ( imm + ( 1 << 11 ) ) >> 12 ) );
-    EIu( opcode, func3, rd, rs1, imm );
-    tcc_warning("[tcc-riscv32]: direct EI call, switch to emit_XXX code");
-}
 
 /*
  * loads symbol offsets from the symbol on the value stack and puts it in register r.
@@ -597,7 +585,8 @@ static void gen_bounds_call( int v )
 
     greloca( cur_text_section, sym, ind, R_RISCV_CALL_PLT, 0 );
     o( 0x17 | ( 1 << 7 ) ); // auipc TR, 0 %call(func)
-    EI( 0x67, 0, 1, 1, 0 ); // jalr  TR, r(TR)
+    emit_JALR(1,1,0);//EI( 0x67, 0, 1, 1, 0 ); // jalr  TR, r(TR)
+
 }
 
 static void gen_bounds_prolog( void )
@@ -642,7 +631,7 @@ static void gen_bounds_epilog( void )
         greloca( cur_text_section, sym_data, ind, R_RISCV_PCREL_HI20, 0 );
         o( 0x17 | ( 10 << 7 ) ); // auipc a0, 0 %pcrel_hi(sym)+addend
         greloca( cur_text_section, &label, ind, R_RISCV_PCREL_LO12_I, 0 );
-        EI( 0x03, 2, 10, 10, 0 ); // lw a0, 0(a0)
+        emit_LW(10, 10, 0); //EI( 0x03, 2, 10, 10, 0 ); // lw a0, 0(a0)
         gen_bounds_call( TOK___bound_local_new );
         ind = saved_ind;
         label.c = 0; /* force new local ELF symbol */
@@ -655,7 +644,7 @@ static void gen_bounds_epilog( void )
     greloca( cur_text_section, sym_data, ind, R_RISCV_PCREL_HI20, 0 );
     o( 0x17 | ( 10 << 7 ) ); // auipc a0, 0 %pcrel_hi(sym)+addend
     greloca( cur_text_section, &label, ind, R_RISCV_PCREL_LO12_I, 0 );
-    EI( 0x03, 2, 10, 10, 0 ); // lw a0, 0(a0)
+    emit_LW(10, 10, 0); //EI( 0x03, 2, 10, 10, 0 ); // lw a0, 0(a0)
     gen_bounds_call( TOK___bound_local_delete );
     o( 0x65a26502 ); /* ld   a0,0(sp)   ld   a1,8(sp)   */
     o( 0x61052542 ); /* fld  fa0,16(sp) addi sp,sp,32   */
@@ -1873,12 +1862,12 @@ ST_FUNC void gen_vla_alloc( CType *type, int align )
     rr = ireg( gv( RC_INT ) );
 #if defined( CONFIG_TCC_BCHECK )
     if( tcc_state->do_bounds_check )
-        EI( 0x13, 0, rr, rr, 15 + 1 ); // addi RR, RR, 15+1
+        emit_ADDI(rr, rr, 15+1); // addi RR, RR, 15+1
     else
 #endif
-        EI( 0x13, 0, rr, rr, 15 ); // addi RR, RR, 15
-    EI( 0x13, 7, rr, rr, -16 );    // andi, RR, RR, -16
-    ER( 0x33, 0, 2, 2, rr, 0x20 ); // sub sp, sp, rr
+        emit_ADDI(rr, rr, 15); // addi RR, RR, 15
+    emit_ANDI(rr,rr,-16); // andi, RR, RR, -16
+    emit_SUB(2,2,rr); // sub sp, sp, rr
     vpop();
 #if defined( CONFIG_TCC_BCHECK )
     if( tcc_state->do_bounds_check ) {
