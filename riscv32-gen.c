@@ -20,6 +20,7 @@
 // define classes for function argument registers
 #define RC_R( x ) ( 1 << ( 2 + ( x ) ) )  // x = 0..7
 #define RC_F( x ) ( 1 << ( 2 + 15 + ( x ) ) ) // x = 0..7
+#define RC_R_MASK 0x03FC
 
 #define RC_IRET RC_R( 0 ) // int return register class
 #define RC_IRE2 RC_R( 1 ) // int 2nd return register class
