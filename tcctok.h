@@ -402,10 +402,29 @@
      DEF(TOK___trunctfsf2, "__trunctfsf2")
      DEF(TOK___truncdfsf2, "__truncdfsf2")
 
-     DEF(TOK___fixtfsi, "__fixtfsi")
-     DEF(TOK___fixtfdi, "__fixtfdi")
-     DEF(TOK___fixunstfsi, "__fixunstfsi")
-     DEF(TOK___fixunstfdi, "__fixunstfdi")
+     // float -> signed int, signed long long
+     DEF(TOK___fixsfsi, "__fixsfsi")
+     DEF(TOK___fixsfdi, "__fixsfdi")
+
+     // float -> unsigned int
+     DEF(TOK___fixunssfsi, "__fixunssfsi")
+
+     // double -> signed int, signed long long
+     DEF(TOK___fixdfsi, "__fixdfsi")
+     DEF(TOK___fixdfdi, "__fixdfdi")
+
+     // double -> unsigned int
+     DEF(TOK___fixunsdfsi, "__fixunsdfsi")
+
+     // long double -> signed int, unsigned int
+     //DEF(TOK___fixtfsi, "__fixtfsi")
+     //DEF(TOK___fixunstfsi, "__fixunstfsi")
+
+     // long double -> signed long long, unsigned long long
+     //DEF(TOK___fixtfdi, "__fixtfdi")
+     //DEF(TOK___fixunstfdi, "__fixunstfdi")
+
+     //signed int, signed long long -> long double
      DEF(TOK___floatsitf, "__floatsitf")
      DEF(TOK___floatditf, "__floatditf")
 #endif
