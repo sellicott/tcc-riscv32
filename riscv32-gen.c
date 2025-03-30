@@ -715,7 +715,6 @@ static void reg_pass( CType *type, int *prc, int *fieldofs, int named )
     if( prc[ 0 ] <= 0 || !named ) {
         int align, size = type_size( type, &align );
         prc[ 0 ] = ( size + 3 ) >> 2;
-        assert( size <= 2*XLEN ); // We can't handle more than 8 bytes
         prc[ 1 ] = prc[ 2 ] = RC_INT;
         fieldofs[ 1 ] = ( 0 << 4 ) | ( size <= 1 ? VT_BYTE : size <= 2 ? VT_SHORT : VT_INT );
         fieldofs[ 2 ] = ( 8 << 4 ) | ( size <= 5 ? VT_BYTE : size <= 6 ? VT_SHORT : VT_INT );
@@ -1608,6 +1607,15 @@ enum FLOAT_OP_TYPE {
     FLOAT_OP_SF_F,
     FLOAT_OP_DF_F,
     FLOAT_OP_TF_F,
+    // float -> signed integer
+    FLOAT_OP_SF_I,
+    // float -> unsigned integer
+    FLOAT_OP_SF_UNI,
+    // double -> signed integer
+    FLOAT_OP_DF_I,
+    // double -> unsigned integer
+    FLOAT_OP_DF_UNI,
+
 };
 
 // array of possible floating point operations grouped by
@@ -1636,7 +1644,15 @@ static const int float_funcs[][3] = {
     // conversion between different floating point types
     {TOK_ASM_nop,       TOK___truncdfsf2,  TOK___trunctfsf2},
     {TOK___extendsfdf2, TOK_ASM_nop,       TOK___trunctfdf2},
-    {TOK___extendsftf2, TOK___extenddftf2, TOK_ASM_nop}
+    {TOK___extendsftf2, TOK___extenddftf2, TOK_ASM_nop},
+    // conversion from float to signed integers
+    {TOK___fixsfsi, TOK___fixsfdi, TOK_ASM_nop},
+    // conversion from float to unsigned integers
+    {TOK___fixunssfsi, TOK___fixunssfdi, TOK_ASM_nop},
+    // conversion from double to signed integers
+    {TOK___fixdfsi, TOK___fixdfdi, TOK_ASM_nop},
+    // conversion from double to unsigned integers
+    {TOK___fixunsdfsi, TOK___fixunsdfdi, TOK_ASM_nop},
 };
 
 /* generate a floating point operation 'v = t1 op t2' instruction.
@@ -1764,7 +1780,47 @@ ST_FUNC void gen_cvt_itof( int t )
 
 ST_FUNC void gen_cvt_ftoi( int t )
 {
-    tcc_error_noabort("unsupported float to integer conversion");
+    // get the floating point type from the top of the stack
+    int type = vtop->type.t & VT_BTYPE;
+    int is_unsigned = (t & VT_UNSIGNED) != 0;
+
+    // the helper function to call in order to perform the op
+    int int_type = -1;
+    int float_op = FLOAT_OP_INVALID;
+
+    switch (type) {
+        case VT_FLOAT:   float_op = FLOAT_OP_SF_I; break;
+        case VT_DOUBLE:  float_op = FLOAT_OP_DF_I; break;
+        //case VT_LDOUBLE: float_type = 2; break; // rv32 doesn't support long double
+        default:
+            tcc_error("unsuported floating point type: '%s'",
+            get_tok_str(tok, NULL));
+            return;
+    }
+    switch (t & VT_BTYPE) {
+        case VT_INT:
+        case VT_LONG:
+            int_type = 0;
+        break;
+        case VT_LLONG:
+            int_type = 1;;
+        break;
+        default:
+            tcc_error("unsuported type for fp conversion: '%s'",
+            get_tok_str(tok, NULL));
+            return;
+    }
+
+    assert(int_type != -1);
+    vpush_helper_func( float_funcs[float_op + is_unsigned][int_type] );
+    vrott( 2 );
+    gfunc_call( 1 );
+    vpushi( 0 );
+    vtop->r = REG_IRET;
+    if (t == VT_LLONG)
+        vtop->r2 = REG_IRE2;
+    else
+        vtop->r2 = VT_CONST;
 }
 
 ST_FUNC void gen_cvt_ftof(int dest_type)
