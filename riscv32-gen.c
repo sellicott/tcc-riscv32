@@ -1608,11 +1608,9 @@ enum FLOAT_OP_TYPE {
     // signed integer -> float
     FLOAT_OP_SI_F,
     FLOAT_OP_DI_F,
-    FLOAT_OP_TI_F,
     // unsigned integer -> float
     FLOAT_OP_UNSI_F,
     FLOAT_OP_UNDI_F,
-    FLOAT_OP_UNTI_F,
     // conversion between different floating point types
     FLOAT_OP_SF_F,
     FLOAT_OP_DF_F,
@@ -1646,11 +1644,9 @@ static const int float_funcs[][3] = {
     // conversion functions for signed integers
     {TOK___floatsisf, TOK___floatsidf, TOK___floatsitf},
     {TOK___floatdisf, TOK___floatdidf, TOK___floatditf},
-    {TOK___floattisf, TOK___floattidf, TOK___floattitf},
     // conversion functions for unsigned integers
     {TOK___floatunsisf, TOK___floatunsidf, TOK___floatunsitf},
     {TOK___floatundisf, TOK___floatundidf, TOK___floatunditf},
-    {TOK___floatuntisf, TOK___floatuntidf, TOK___floatuntitf},
     // conversion between different floating point types
     {TOK_ASM_nop,       TOK___truncdfsf2,  TOK___trunctfsf2},
     {TOK___extendsfdf2, TOK_ASM_nop,       TOK___trunctfdf2},
