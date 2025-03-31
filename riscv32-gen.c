@@ -1688,8 +1688,7 @@ ST_FUNC void gen_opf(int op) {
             printf("[gen_opf]: type = long double\n");
             break;
         default:
-            tcc_error("unsuported floating point type: '%s'",
-            get_tok_str(tok, NULL));
+            tcc_error("unsuported floating point type: %d", type);
             break;
     }
 
@@ -1717,8 +1716,6 @@ ST_FUNC void gen_opf(int op) {
         vtop->r2 = REG_FRE2;
     else
         vtop->r2 = VT_CONST;
-
-    tcc_warning("Floating point is in alpha on riscv32");
 }
 
 ST_FUNC void gen_cvt_sxtw( void )
@@ -1751,24 +1748,22 @@ ST_FUNC void gen_cvt_itof( int t )
         case VT_DOUBLE:  float_type = 1; break;
         case VT_LDOUBLE: float_type = 2; break;
         default:
-            tcc_error("unsuported floating point type: '%s'",
-            get_tok_str(tok, NULL));
+            tcc_error("unsuported floating point type: %d", t);
             return;
     }
 
     switch (type) {
+        case VT_BYTE:
+        case VT_SHORT:
         case VT_INT:
+        case VT_LONG:
             float_op = is_unsigned ?  FLOAT_OP_UNSI_F : FLOAT_OP_SI_F;
             break;
-        case VT_LONG:
+        case VT_LLONG:
             float_op = is_unsigned ? FLOAT_OP_UNDI_F : FLOAT_OP_DI_F;
             break;
-        case VT_LLONG:
-            float_op = is_unsigned ? FLOAT_OP_UNTI_F : FLOAT_OP_TI_F;
-            break;
         default:
-            tcc_error("unsuported type for fp conversion: '%s'",
-            get_tok_str(tok, NULL));
+            tcc_error("unsuported type for itof conversion: %d" , type);
             return;
     }
 
@@ -1799,8 +1794,7 @@ ST_FUNC void gen_cvt_ftoi( int t )
         case VT_DOUBLE:  float_op = FLOAT_OP_DF_I; break;
         //case VT_LDOUBLE: float_type = 2; break; // rv32 doesn't support long double
         default:
-            tcc_error("unsuported floating point type: '%s'",
-            get_tok_str(tok, NULL));
+            tcc_error("unsuported floating point type: %d", type);
             return;
     }
     switch (t & VT_BTYPE) {
@@ -1812,8 +1806,7 @@ ST_FUNC void gen_cvt_ftoi( int t )
             int_type = 1;;
         break;
         default:
-            tcc_error("unsuported type for fp conversion: '%s'",
-            get_tok_str(tok, NULL));
+            tcc_error("unsuported type for ftoi conversion: %d", t);
             return;
     }
 
@@ -1844,8 +1837,7 @@ ST_FUNC void gen_cvt_ftof(int dest_type)
         case VT_DOUBLE:  source_type_idx = 1; break;
         case VT_LDOUBLE: source_type_idx = 2; break;
         default:
-            tcc_error("unsuported floating point type: '%s'",
-            get_tok_str(tok, NULL));
+            tcc_error("unsuported floating point type: %d", source_type);
             return;
     }
 
@@ -1854,8 +1846,7 @@ ST_FUNC void gen_cvt_ftof(int dest_type)
         case VT_DOUBLE:  dest_type_idx = FLOAT_OP_DF_F; break;
         case VT_LDOUBLE: dest_type_idx = FLOAT_OP_TF_F; break;
         default:
-            tcc_error("unsuported floating point type: '%s'",
-            get_tok_str(tok, NULL));
+            tcc_error("unsuported floating point type: %d", dest_type);
             return;
     }
 
