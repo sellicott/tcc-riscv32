@@ -277,6 +277,7 @@ static void load_lvalue( int r, SValue *sv )
     int dest_reg = is_ireg( r ) ? ireg( r ) : freg( r ); // rr
     int lvar_offset = sv->c.i;                           // fc
     int stack_type = sv->type.t & VT_BTYPE;              // bt
+    int is_unsigned = (sv->type.t & VT_UNSIGNED) != 0;
     int stack_reg = sv->r;                               // fr
     int masked_stack_reg = stack_reg & VT_VALMASK;       // v
     int align;
@@ -343,11 +344,20 @@ static void load_lvalue( int r, SValue *sv )
         tcc_error("[internal error] load sizes > %d bytes should be on the stack", 2*XLEN);
     }
     // TODO handle floating pont, 64-bit values, and 128-bit values
-    switch( size ) {
-        case 1: emit_LB( dest_reg, rs1, lvar_offset ); break;
-        case 2: emit_LH( dest_reg, rs1, lvar_offset ); break;
-        case 4: emit_LW( dest_reg, rs1, lvar_offset ); break;
-        default: tcc_error( "unexpected load size: %d", size );
+    if (is_unsigned) {
+        switch( size ) {
+            case 1: emit_LBU( dest_reg, rs1, lvar_offset ); break;
+            case 2: emit_LHU( dest_reg, rs1, lvar_offset ); break;
+            case 4: emit_LW( dest_reg, rs1, lvar_offset ); break;
+            default: tcc_error( "unexpected load size: %d", size );
+        }
+    }else {
+        switch( size ) {
+            case 1: emit_LB( dest_reg, rs1, lvar_offset ); break;
+            case 2: emit_LH( dest_reg, rs1, lvar_offset ); break;
+            case 4: emit_LW( dest_reg, rs1, lvar_offset ); break;
+            default: tcc_error( "unexpected load size: %d", size );
+        }
     }
 }
 
