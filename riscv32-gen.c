@@ -1052,7 +1052,7 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
                 else if( prc[ 1 + i ] == RC_FLOAT ) {
                     // emit_S(0x22, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc +
                     // (fieldofs[i+1] >> 4)); // fs[wd] FAi, loc(s0)
-                    tcc_warning( "experimental floating point support" );
+                    printf( "experimental floating point support" );
                     emit_SW( s0, freg( TREG_F(areg[ 1 ]++) ), loc + i * XLEN ); //todo: check this
                 }
                 else {
