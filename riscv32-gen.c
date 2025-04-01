@@ -982,9 +982,9 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
     CType *type;
 
     sym = func_type->ref;
-    loc = -16; // for ra and s0
+    loc = -XLEN * 2; // for ra and s0
     func_sub_sp_offset = ind;
-    ind += 5 * 4;
+    ind += 5 * 4; // skip stack expand now, to be filled in gfunc_epilog
 
     areg[ 0 ] = 0;
     areg[ 1 ] = 0;
@@ -1012,7 +1012,7 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
         size = type_size( type, &align );
         if( size > 2 * XLEN ) {
             type = &char_pointer_type;
-            size = align = byref = 8;
+            size = align = byref = XLEN;
         }
         reg_pass( type, prc, fieldofs, 1 );
         regcount = prc[ 0 ];
@@ -1027,8 +1027,8 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
             addr += size;
         }
         else {
-            loc -= regcount * 8; // XXX could reserve only 'size' bytes
-            // loc -= regcount * PTR_SIZE; // XXX could reserve only 'size' bytes
+            loc -= regcount * XLEN;
+
             param_addr = loc;
             for( i = 0; i < regcount; i++ ) {
                 const uint32_t t0 = 5;
@@ -1059,8 +1059,7 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
         const uint32_t s0 = 8;
         for( ; areg[ 0 ] < 8; areg[ 0 ]++ ) {
             num_va_regs++;
-            // ES(0x23, 2, 8, 10 + areg[0], -8 + num_va_regs * 8); // sw aX, loc(s0)
-            emit_SW( s0, ireg( areg[ 0 ] ), -8 + num_va_regs * 8 );
+            emit_SW( s0, ireg( TREG_R(areg[ 0 ]) ), -XLEN + num_va_regs * XLEN );
         }
     }
 #ifdef CONFIG_TCC_BCHECK

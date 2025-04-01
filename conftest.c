@@ -14,6 +14,8 @@ const char *platform_macros[] = {
     "__arm__",              "TCC_TARGET_ARM",
     "__ARM_EABI__",         "TCC_ARM_EABI",
     "__aarch64__",          "TCC_TARGET_ARM64",
+    /* Both riscv32 and riscv64 define __riscv =1 so we add an artificial define here */
+    "__riscv32",            "TCC_TARGET_RISCV32",
     "__riscv",              "TCC_TARGET_RISCV64",
     "__APPLE__",            "TCC_TARGET_MACHO",
     "__FreeBSD__",          "TARGETOS_FreeBSD",
