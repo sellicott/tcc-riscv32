@@ -517,7 +517,8 @@ ST_FUNC void store( int r, SValue *sv )
     if( size > 8 ) {
         tcc_error( "unimp: large sized store" );
     }
-    if (stack_type == VT_DOUBLE) {
+    // caller takes the responsibility for splitting anything that USING_TWO_WORDS
+    if (stack_type == VT_DOUBLE || stack_type == VT_LLONG) {
         size = align = 4;
     }
     if (is_float(stack_type)){
@@ -1816,7 +1817,7 @@ ST_FUNC void gen_cvt_ftoi( int t )
     gfunc_call( 1 );
     vpushi( 0 );
     vtop->r = REG_IRET;
-    if (t == VT_LLONG)
+    if ((t & VT_BTYPE) == VT_LLONG)
         vtop->r2 = REG_IRE2;
     else
         vtop->r2 = VT_CONST;
