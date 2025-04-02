@@ -372,26 +372,18 @@
      DEF(TOK___floatsisf, "__floatsisf")
      DEF(TOK___floatsidf, "__floatsidf")
      //DEF(TOK___floatsitf, "__floatsitf")
-     // signed long -> float, double, long double
+     // signed long long -> float, double, long double
      DEF(TOK___floatdisf, "__floatdisf")
      DEF(TOK___floatdidf, "__floatdidf")
      //DEF(TOK___floatditf, "__floatditf")
-     // signed long long -> float, double, long double
-     DEF(TOK___floattisf, "__floattisf")
-     DEF(TOK___floattidf, "__floattidf")
-     DEF(TOK___floattitf, "__floattitf")
      // unsigned int -> float, double, long double
      DEF(TOK___floatunsisf, "__floatunsisf")
      DEF(TOK___floatunsidf, "__floatunsidf")
      DEF(TOK___floatunsitf, "__floatunsitf")
-     // unsigned long -> float, double, long double
+     // unsigned long long -> float, double, long double
      //DEF(TOK___floatundisf, "__floatundisf")
      //DEF(TOK___floatundidf, "__floatundidf")
      DEF(TOK___floatunditf, "__floatunditf")
-     // unsigned long long -> float, double, long double
-     DEF(TOK___floatuntisf, "__floatuntisf")
-     DEF(TOK___floatuntidf, "__floatuntidf")
-     DEF(TOK___floatuntitf, "__floatuntitf")
 
      // conversion between shorter -> longer floating point type 
      DEF(TOK___extendsfdf2, "__extendsfdf2")

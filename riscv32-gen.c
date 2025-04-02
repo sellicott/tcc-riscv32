@@ -277,6 +277,7 @@ static void load_lvalue( int r, SValue *sv )
     int dest_reg = is_ireg( r ) ? ireg( r ) : freg( r ); // rr
     int lvar_offset = sv->c.i;                           // fc
     int stack_type = sv->type.t & VT_BTYPE;              // bt
+    int is_unsigned = (sv->type.t & VT_UNSIGNED) != 0;
     int stack_reg = sv->r;                               // fr
     int masked_stack_reg = stack_reg & VT_VALMASK;       // v
     int align;
@@ -343,11 +344,20 @@ static void load_lvalue( int r, SValue *sv )
         tcc_error("[internal error] load sizes > %d bytes should be on the stack", 2*XLEN);
     }
     // TODO handle floating pont, 64-bit values, and 128-bit values
-    switch( size ) {
-        case 1: emit_LB( dest_reg, rs1, lvar_offset ); break;
-        case 2: emit_LH( dest_reg, rs1, lvar_offset ); break;
-        case 4: emit_LW( dest_reg, rs1, lvar_offset ); break;
-        default: tcc_error( "unexpected load size: %d", size );
+    if (is_unsigned) {
+        switch( size ) {
+            case 1: emit_LBU( dest_reg, rs1, lvar_offset ); break;
+            case 2: emit_LHU( dest_reg, rs1, lvar_offset ); break;
+            case 4: emit_LW( dest_reg, rs1, lvar_offset ); break;
+            default: tcc_error( "unexpected load size: %d", size );
+        }
+    }else {
+        switch( size ) {
+            case 1: emit_LB( dest_reg, rs1, lvar_offset ); break;
+            case 2: emit_LH( dest_reg, rs1, lvar_offset ); break;
+            case 4: emit_LW( dest_reg, rs1, lvar_offset ); break;
+            default: tcc_error( "unexpected load size: %d", size );
+        }
     }
 }
 
@@ -1042,7 +1052,7 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
                 else if( prc[ 1 + i ] == RC_FLOAT ) {
                     // emit_S(0x22, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc +
                     // (fieldofs[i+1] >> 4)); // fs[wd] FAi, loc(s0)
-                    tcc_warning( "experimental floating point support" );
+                    printf( "experimental floating point support" );
                     emit_SW( s0, freg( TREG_F(areg[ 1 ]++) ), loc + i * XLEN ); //todo: check this
                 }
                 else {
@@ -1598,11 +1608,9 @@ enum FLOAT_OP_TYPE {
     // signed integer -> float
     FLOAT_OP_SI_F,
     FLOAT_OP_DI_F,
-    FLOAT_OP_TI_F,
     // unsigned integer -> float
     FLOAT_OP_UNSI_F,
     FLOAT_OP_UNDI_F,
-    FLOAT_OP_UNTI_F,
     // conversion between different floating point types
     FLOAT_OP_SF_F,
     FLOAT_OP_DF_F,
@@ -1636,11 +1644,9 @@ static const int float_funcs[][3] = {
     // conversion functions for signed integers
     {TOK___floatsisf, TOK___floatsidf, TOK___floatsitf},
     {TOK___floatdisf, TOK___floatdidf, TOK___floatditf},
-    {TOK___floattisf, TOK___floattidf, TOK___floattitf},
     // conversion functions for unsigned integers
     {TOK___floatunsisf, TOK___floatunsidf, TOK___floatunsitf},
     {TOK___floatundisf, TOK___floatundidf, TOK___floatunditf},
-    {TOK___floatuntisf, TOK___floatuntidf, TOK___floatuntitf},
     // conversion between different floating point types
     {TOK_ASM_nop,       TOK___truncdfsf2,  TOK___trunctfsf2},
     {TOK___extendsfdf2, TOK_ASM_nop,       TOK___trunctfdf2},
@@ -1682,8 +1688,7 @@ ST_FUNC void gen_opf(int op) {
             printf("[gen_opf]: type = long double\n");
             break;
         default:
-            tcc_error("unsuported floating point type: '%s'",
-            get_tok_str(tok, NULL));
+            tcc_error("unsuported floating point type: %d", type);
             break;
     }
 
@@ -1711,8 +1716,6 @@ ST_FUNC void gen_opf(int op) {
         vtop->r2 = REG_FRE2;
     else
         vtop->r2 = VT_CONST;
-
-    tcc_warning("Floating point is in alpha on riscv32");
 }
 
 ST_FUNC void gen_cvt_sxtw( void )
@@ -1745,24 +1748,22 @@ ST_FUNC void gen_cvt_itof( int t )
         case VT_DOUBLE:  float_type = 1; break;
         case VT_LDOUBLE: float_type = 2; break;
         default:
-            tcc_error("unsuported floating point type: '%s'",
-            get_tok_str(tok, NULL));
+            tcc_error("unsuported floating point type: %d", t);
             return;
     }
 
     switch (type) {
+        case VT_BYTE:
+        case VT_SHORT:
         case VT_INT:
+        case VT_LONG:
             float_op = is_unsigned ?  FLOAT_OP_UNSI_F : FLOAT_OP_SI_F;
             break;
-        case VT_LONG:
+        case VT_LLONG:
             float_op = is_unsigned ? FLOAT_OP_UNDI_F : FLOAT_OP_DI_F;
             break;
-        case VT_LLONG:
-            float_op = is_unsigned ? FLOAT_OP_UNTI_F : FLOAT_OP_TI_F;
-            break;
         default:
-            tcc_error("unsuported type for fp conversion: '%s'",
-            get_tok_str(tok, NULL));
+            tcc_error("unsuported type for itof conversion: %d" , type);
             return;
     }
 
@@ -1793,8 +1794,7 @@ ST_FUNC void gen_cvt_ftoi( int t )
         case VT_DOUBLE:  float_op = FLOAT_OP_DF_I; break;
         //case VT_LDOUBLE: float_type = 2; break; // rv32 doesn't support long double
         default:
-            tcc_error("unsuported floating point type: '%s'",
-            get_tok_str(tok, NULL));
+            tcc_error("unsuported floating point type: %d", type);
             return;
     }
     switch (t & VT_BTYPE) {
@@ -1806,8 +1806,7 @@ ST_FUNC void gen_cvt_ftoi( int t )
             int_type = 1;;
         break;
         default:
-            tcc_error("unsuported type for fp conversion: '%s'",
-            get_tok_str(tok, NULL));
+            tcc_error("unsuported type for ftoi conversion: %d", t);
             return;
     }
 
@@ -1838,8 +1837,7 @@ ST_FUNC void gen_cvt_ftof(int dest_type)
         case VT_DOUBLE:  source_type_idx = 1; break;
         case VT_LDOUBLE: source_type_idx = 2; break;
         default:
-            tcc_error("unsuported floating point type: '%s'",
-            get_tok_str(tok, NULL));
+            tcc_error("unsuported floating point type: %d", source_type);
             return;
     }
 
@@ -1848,8 +1846,7 @@ ST_FUNC void gen_cvt_ftof(int dest_type)
         case VT_DOUBLE:  dest_type_idx = FLOAT_OP_DF_F; break;
         case VT_LDOUBLE: dest_type_idx = FLOAT_OP_TF_F; break;
         default:
-            tcc_error("unsuported floating point type: '%s'",
-            get_tok_str(tok, NULL));
+            tcc_error("unsuported floating point type: %d", dest_type);
             return;
     }
 
