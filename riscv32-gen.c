@@ -1675,6 +1675,7 @@ ST_FUNC void gen_opf(int op) {
     // the helper function to call in order to perform the op
     int float_op = FLOAT_OP_INVALID;
     int float_type = 0;
+    const int a0 = ireg( REG_IRET );
     switch (type) {
         case VT_FLOAT:
             float_type = 0;
@@ -1712,11 +1713,22 @@ ST_FUNC void gen_opf(int op) {
     vrott( 3 );
     gfunc_call( 2 );
     vpushi( 0 );
-    vtop->r = REG_FRET;
+    vtop->r = REG_FRET;  //FIXME: EQ ~ GT return though IRET
     if (type == VT_DOUBLE)
         vtop->r2 = REG_FRE2;
     else
         vtop->r2 = VT_CONST;
+
+    // Comparison functions in Soft float library routines has unique return semantics
+    // note: op `not` is `~`, not `!`
+    switch (op) {
+        case TOK_LT: emit_SLTZ(a0, a0); break;
+        case TOK_LE: emit_SGTZ(a0, a0); emit_SEQZ(a0, a0); break;
+        case TOK_GT: emit_SGTZ(a0, a0); break;
+        case TOK_GE: emit_SLTZ(a0, a0); emit_SEQZ(a0, a0); break;
+        case TOK_EQ: emit_SEQZ(a0, a0); break;
+        default:
+    }
 }
 
 ST_FUNC void gen_cvt_sxtw( void )
