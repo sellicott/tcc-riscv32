@@ -16,7 +16,12 @@
 
 // Register classes sorted from more general to more precise:
 #define RC_INT ( 1 << 0 )
+#ifdef TCC_RISCV_ilp32
+#define RC_FLOAT RC_INT
+#else
 #define RC_FLOAT ( 1 << 1 )
+#endif
+
 // define classes for function argument registers
 #define RC_R( x ) ( 1 << ( 2 + ( x ) ) )  // x = 0..7
 #define RC_F( x ) ( 1 << ( 2 + 15 + ( x ) ) ) // x = 0..7
@@ -80,14 +85,14 @@ ST_DATA const int reg_classes[ NB_REGS ] = {
     RC_INT, RC_INT, RC_INT, RC_INT, RC_INT, RC_INT, RC_INT, 
 #ifdef TCC_RISCV_ilp32
     // Integer/Float Function Arguments
-    RC_INT | RC_FLOAT | RC_R( 0 ) | RC_F( 0 ),
-    RC_INT | RC_FLOAT | RC_R( 1 ) | RC_F( 1 ),
-    RC_INT | RC_FLOAT | RC_R( 2 ) | RC_F( 2 ),
-    RC_INT | RC_FLOAT | RC_R( 3 ) | RC_F( 3 ),
-    RC_INT | RC_FLOAT | RC_R( 4 ) | RC_F( 4 ),
-    RC_INT | RC_FLOAT | RC_R( 5 ) | RC_F( 5 ),
-    RC_INT | RC_FLOAT | RC_R( 6 ) | RC_F( 6 ),
-    RC_INT | RC_FLOAT | RC_R( 7 ) | RC_F( 7 ),
+    RC_INT | RC_R( 0 ) | RC_F( 0 ),
+    RC_INT | RC_R( 1 ) | RC_F( 1 ),
+    RC_INT | RC_R( 2 ) | RC_F( 2 ),
+    RC_INT | RC_R( 3 ) | RC_F( 3 ),
+    RC_INT | RC_R( 4 ) | RC_F( 4 ),
+    RC_INT | RC_R( 5 ) | RC_F( 5 ),
+    RC_INT | RC_R( 6 ) | RC_F( 6 ),
+    RC_INT | RC_R( 7 ) | RC_F( 7 ),
 #else
     // Integer Function Arguments
     RC_INT | RC_R( 0 ), RC_INT | RC_R( 1 ),
@@ -137,11 +142,7 @@ static int is_ireg( int r )
 static int freg( int r )
 {
 #ifdef TCC_RISCV_ilp32
-    int tmp_reg_num = r - NB_REGS + 7;
-    printf( "[freg]: get register %d(fa%d) -> %d\n", r, r - 17, tmp_reg_num);
-    assert( r >= NB_REGS && r < NB_REGS + 8 );
-    // shift to the a0-a7 registers
-    return ireg( r - NB_REGS + 7 );
+    tcc_error("freg shouldn't be called in ilp32!");
 #else
     assert( r >= 15 && r < 23 );
     return r - 8 + 10; // tccfX --> faX == f(10+X)
@@ -1050,12 +1051,14 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
                     addr += XLEN;
                     emit_SW( s0, t0, loc + i * 4 );
                 }
+#ifndef TCC_RISCV_ilp32
                 else if( prc[ 1 + i ] == RC_FLOAT ) {
                     // emit_S(0x22, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc +
                     // (fieldofs[i+1] >> 4)); // fs[wd] FAi, loc(s0)
                     printf( "experimental floating point support" );
                     emit_SW( s0, freg( TREG_F(areg[ 1 ]++) ), loc + i * XLEN ); //todo: check this
                 }
+#endif
                 else {
                     emit_SW( s0, ireg( TREG_R(areg[ 0 ]++) ), loc + i * XLEN );
                 }
