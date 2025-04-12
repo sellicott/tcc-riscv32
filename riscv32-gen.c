@@ -243,7 +243,11 @@ static int load_symofs( int r, SValue *sv, int forstore )
         }
         if( LARGE_IMM( sv_constant ) ) {
             // sv->c.i = IMM_LOW( sv_constant );
-            emit_LI( rd, sv_constant );
+            int s1 = 9;
+            emit_LI( s1, sv_constant );
+            emit_ADD( s1, s0, s1);
+            sv->c.i = 0;
+            rd = s1;
         }
     }
     else {
