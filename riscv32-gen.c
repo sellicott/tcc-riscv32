@@ -3,6 +3,7 @@
 // Number of registers available to allocator:
 #ifdef TCC_RISCV_ilp32
 // TODO add temporary and saved registers here once I figure out how TCC works
+// NOTE: s0 is used as fp and s1 is used as tmp reg in load_symofs
 #define NB_REGS 17 // t0-t6, a0-a7, ra, sp, (fa0-fa7) aliases for a0-a7
 #else
 #define NB_REGS 26 // t0-t6, a0-a7, fa0-fa7, xxx, ra, sp
@@ -235,14 +236,12 @@ static int load_symofs( int r, SValue *sv, int forstore )
     }
     // if the stack value is a pointer
     else if( stack_value == VT_LOCAL || stack_value == VT_LLOCAL ) {
-        int s0;
-        s0 = 8; // s0
+        int s0 = 8;
         rd = s0;
         if( sv_constant != sv->c.i ) {
-            tcc_error( "unimp: store(giant local off) (0x%lx)", (long)sv->c.i );
+            tcc_error( "unimp: store(giant local off) (0x%lx)", sv->c.i );
         }
         if( LARGE_IMM( sv_constant ) ) {
-            // sv->c.i = IMM_LOW( sv_constant );
             int s1 = 9;
             emit_LI( s1, sv_constant );
             emit_ADD( s1, s0, s1);
