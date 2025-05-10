@@ -33,7 +33,10 @@ void emit_J( uint32_t imm, uint32_t rd, uint32_t opcode );
 
 // Macros for masking values for immediate operations
 // mask off the lower 12 bits of a 32-bit value
-#define IMM_LOW( imm ) ( ( imm ) & 0x00000FFF )
+#define IMM_LOW(imm) ((int32_t)((imm) << 20) >> 20)
+// NOTE: the following one is only suitable for emit_XXX since
+// it will ignore signedness
+// #define IMM_LOW( imm ) ( ( imm ) & 0x00000FFF )
 // mask and shift a 32-bit immediate value to grab the upper 24 bits
 #define IMM_HIGH( imm ) ( ( ( imm ) & 0xFFFFF000 ) >> 12 )
 // like IMM_HIGH but with lower sign extended bits considered

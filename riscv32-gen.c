@@ -243,9 +243,9 @@ static int load_symofs( int r, SValue *sv, int forstore )
         }
         if( LARGE_IMM( sv_constant ) ) {
             int s1 = 9;
-            emit_LI( s1, sv_constant );
+            emit_LUI( s1, IMM_HIGH_LEXT(sv_constant) );
             emit_ADD( s1, s0, s1);
-            sv->c.i = 0;
+            sv->c.i = IMM_LOW(sv_constant);
             rd = s1;
         }
     }
