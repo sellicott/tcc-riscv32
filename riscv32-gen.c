@@ -1308,7 +1308,7 @@ static int gen_opi_immediate( int op, int fc, int ll );
 // ll is set to 1 when generating 'long' code (64-bit stuff)
 static void gen_opil( int op, int ll )
 {
-    int a, b, d, d2;
+    int a, b, d, d_hi;
 
     // handle the case where one of the values is a constant, use an immediate value if we can
     if( ( vtop->r & ( VT_VALMASK | VT_LVAL | VT_SYM ) ) == VT_CONST ) {
@@ -1332,7 +1332,7 @@ static void gen_opil( int op, int ll )
     }
     gv2( RC_INT, RC_INT );
     a = ireg( vtop[ -1 ].r );
-    b = ireg( d2 = vtop[ 0 ].r );
+    b = ireg( d_hi = vtop[ 0 ].r ); // backup b for TOK_UMULL
     vtop -= 2; // TODO: Maybe use get_reg_ex so we don't have to mess with vtop?
     d = get_reg( RC_INT );
     vtop++;
@@ -1364,11 +1364,14 @@ static void gen_opil( int op, int ll )
         case TOK_PDIV:
         case TOK_UDIV: emit_DIVU( d, a, b ); break;
         case TOK_UMULL:
-            vtop[0].r2 = d2; // hack to prevent get_reg allocate reg b
+            vtop[0].r2 = d_hi; // hack to prevent get_reg allocate reg b
+
             vtop[0].r2 = get_reg(RC_INT);
-            d2 = ireg(vtop[0].r2);
-            emit_MULH(d2, a, b);
-            emit_MUL(d, a, b);
+            d_hi = ireg(vtop[0].r2);
+            // §12.1 recommended code sequence is: MULH[[S]U] ; MUL
+            emit_MULHU(d_hi, a, b); // high 32-bit
+            emit_MUL(d, a, b);    // low 32-bit
+            vtop[0].type.t = VT_LLONG | VT_UNSIGNED;
             break;
 
     }
