@@ -1521,8 +1521,8 @@ static int gen_opi_immediate( int op, int fc, int ll )
             emit_SRLI( rd, a, fc );
             break;
         case TOK_SAR:
-            fc = 1024 | ( fc & m );
-            emit_SRA( rd, a, fc );
+            fc &= m;
+            emit_SRAI( rd, a, fc );
             break;
 
 
