@@ -467,9 +467,9 @@ ST_FUNC void load( int r, SValue *sv )
         switch( op ) {
             default: break;
             case TOK_ULE:
-            case TOK_UGT:
+            case TOK_UGE:
             case TOK_LE:
-            case TOK_GT:
+            case TOK_GE:
                 emit_XORI( dest_reg, dest_reg, 1 );
                 // printf( "[load] comparison generated xori\n" );
                 break;
