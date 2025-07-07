@@ -3,6 +3,7 @@
 // Number of registers available to allocator:
 #ifdef TCC_RISCV_ilp32
 // TODO add temporary and saved registers here once I figure out how TCC works
+// NOTE: s0 is used as fp and s1 is used as tmp reg in load_symofs
 #define NB_REGS 17 // t0-t6, a0-a7, ra, sp, (fa0-fa7) aliases for a0-a7
 #else
 #define NB_REGS 26 // t0-t6, a0-a7, fa0-fa7, xxx, ra, sp
@@ -182,18 +183,21 @@ static void ER(
 
 
 /*
- * loads symbol offsets from the symbol on the value stack and puts it in register r.
- * The register is a
+ * Loads symbol offsets from the symbol on the value stack and puts its base into an register
+ * r is the preferred tcc register to put base address, will allocate one if -1
+ * r is changed to physical register
+ * return the offset from base register
  */
-static int load_symofs( int r, SValue *sv, int forstore )
+static int load_symofs( int *r, SValue *sv, int forstore )
 {
     int doload = 0;
-    int rd;                               // return register
-    int sv_constant = sv->c.i;            // stack value constant
+    int rd;                               // return register (physical register)
+    int sv_constant = sv->c.i;            // stack value constant (narrowed from u64)
     int stack_value = sv->r & VT_VALMASK; // stack value
+    int offset = sv_constant;             // calculated offset
 
     // get the riscv register
-    rd = ireg( is_ireg( r ) ? r : get_reg( RC_INT ) );
+    rd = ireg( is_ireg( *r ) ? *r : get_reg( RC_INT ) );
 
     // check if we are dealing with a named symbol. If we are, we need to generate a
     // relocation entry that loads the value into our local register.
@@ -212,45 +216,45 @@ static int load_symofs( int r, SValue *sv, int forstore )
 
         if( sv->sym->type.t & VT_STATIC ) { // XXX do this per linker relax
             addend = sv_constant;
-            sv->c.i = 0;
+            offset = 0;
             // offset is probably loaded already, we don't need to generate a load in this case
             doload = 0;
         }
-
         // generate a relocation entry with the generated offset
         greloca( cur_text_section, sv->sym, ind, R_RISCV_PCREL_HI20, addend );
 
         if( !nocode_wanted ) {
             put_extern_sym( &label, cur_text_section, ind, 0 );
         }
-
         // immediate value is 0 so that the linker can load values into it
         emit_AUIPC( rd, 0 );
 
         type = ( doload || !forstore ) ? R_RISCV_PCREL_LO12_I : R_RISCV_PCREL_LO12_S;
         greloca( cur_text_section, &label, ind, type, 0 );
-
         if( doload ) {
             emit_ADDI( rd, rd, 0 ); // lw RR, 0(RR)
         }
     }
     // if the stack value is a pointer
     else if( stack_value == VT_LOCAL || stack_value == VT_LLOCAL ) {
-        int s0;
-        s0 = 8; // s0
+        int s0 = 8;
         rd = s0;
         if( sv_constant != sv->c.i ) {
-            tcc_error( "unimp: store(giant local off) (0x%lx)", (long)sv->c.i );
+            tcc_error( "unimp: store(giant local off) (0x%lx)", sv->c.i );
         }
         if( LARGE_IMM( sv_constant ) ) {
-            // sv->c.i = IMM_LOW( sv_constant );
-            emit_LI( rd, sv_constant );
+            int s1 = 9;
+            emit_LUI( s1, IMM_HIGH(sv_constant) );
+            emit_ADD( s1, s0 , s1);
+            offset = SIGNED_IMM_LOW(sv_constant);
+            rd = s1;
         }
     }
     else {
         tcc_error( "uhh" );
     }
-    return rd;
+    *r = rd;
+    return offset;
 }
 
 static void load_large_constant( int rr, int fc, uint32_t pi )
@@ -280,7 +284,7 @@ static void load_lvalue( int r, SValue *sv )
     int stack_type = sv->type.t & VT_BTYPE;              // bt
     int is_unsigned = (sv->type.t & VT_UNSIGNED) != 0;
     int stack_reg = sv->r;                               // fr
-    int masked_stack_reg = stack_reg & VT_VALMASK;       // v
+    int masked_stack_reg = stack_reg & VT_VALMASK;       // v // stack_reg_type
     int align;
     int rs1;
 
@@ -306,8 +310,8 @@ static void load_lvalue( int r, SValue *sv )
 
     // offset is on the stack
     if( masked_stack_reg == VT_LOCAL || ( stack_reg & VT_SYM ) ) {
-        rs1 = load_symofs( r, sv, 0 );
-        lvar_offset = sv->c.i;
+        rs1 = r;
+        lvar_offset = load_symofs( &rs1, sv, 0 );
     }
     // case where our lvalue location is stored in a register
     else if( masked_stack_reg < VT_CONST ) {
@@ -316,8 +320,8 @@ static void load_lvalue( int r, SValue *sv )
     }
     // lvalue, offset on the stack
     else if( masked_stack_reg == VT_LLOCAL ) {
-        rs1 = load_symofs( r, sv, 0 );
-        lvar_offset = sv->c.i;
+        rs1 = r;
+        lvar_offset = load_symofs( &rs1, sv, 0 );
         emit_LW( dest_reg, rs1, lvar_offset );
         rs1 = dest_reg;
         lvar_offset = 0;
@@ -388,14 +392,14 @@ ST_FUNC void load( int r, SValue *sv )
         //assert( !is_float( sv->type.t ) && is_ireg( r ) );
         // We need to add Svalue.sym to the constant
         if( stack_reg & VT_SYM ) {
-            rs1 = load_symofs( r, sv, 0 );
-            lvar_offset = sv->c.i;
+            rs1 = r;
+            lvar_offset = load_symofs( &rs1, sv, 0 );
         }
 
 
         if( LARGE_IMM( lvar_offset ) ) {
             rs1 = dest_reg;
-            emit_LUI( dest_reg, IMM_HIGH_LEXT( lvar_offset ) );
+            emit_LUI( dest_reg, IMM_HIGH( lvar_offset ) );
         }
         if( lvar_offset || ( dest_reg != rs1 ) || ( stack_reg & VT_SYM ) ) {
             emit_ADDI( dest_reg, rs1, IMM_LOW( lvar_offset ) );
@@ -405,10 +409,8 @@ ST_FUNC void load( int r, SValue *sv )
         }
     }
     else if( masked_stack_reg == VT_LOCAL ) {
-        int br = load_symofs( r, sv, 0 );
-        assert( is_ireg( r ) );
-        lvar_offset = sv->c.i;
-        emit_ADDI( dest_reg, br, lvar_offset );
+        lvar_offset = load_symofs( &r, sv, 0 );
+        emit_ADDI( dest_reg, r, lvar_offset );
     }
     else if( masked_stack_reg < VT_CONST ) { /* reg-reg */
         // assert(!lvar_offset); XXX support offseted regs
@@ -487,8 +489,8 @@ ST_FUNC void load( int r, SValue *sv )
 }
 
 /*
- * Store: push a value from a register (r) onto the top of the stack
- * The top of the stack should be an lvalue (a pointer to somewhere in memory)
+ * Store: push a value from a register (r) to a stack location(sv)
+ * sv should be an lvalue(a pointer to somewhere in memory)
  */
 ST_FUNC void store( int r, SValue *sv )
 {
@@ -526,16 +528,20 @@ ST_FUNC void store( int r, SValue *sv )
         printf("[store]: floating point type %d, size %d\n", stack_type, size);
     }
 
-    // Load the correct address into the loc_reg register
+    // sv should be a pointer
     assert( stack_reg & VT_LVAL );
+    // load the correct address into the loc_reg register
+    // Destination address is a named symbol or a runtime stack value
     if( stack_reg_type == VT_LOCAL || ( stack_reg & VT_SYM ) ) {
-        loc_reg = load_symofs( -1, sv, 1 );
-        offset = sv->c.i;
+        loc_reg = -1;
+        offset = load_symofs( &loc_reg, sv, 1);
     }
+    // Destination address is stored in a register
     else if( stack_reg_type < VT_CONST ) {
         loc_reg = ireg( stack_reg_type );
         offset = 0; // XXX support offsets regs
     }
+    // Destination address is a const
     else if( stack_reg_type == VT_CONST ) {
         uint64_t offset_hi = ( sv->c.i >> 32 );
         if( offset_hi != 0 ) {
@@ -552,12 +558,12 @@ ST_FUNC void store( int r, SValue *sv )
         tcc_error( "implement me: %s(!local)", __FUNCTION__ );
     }
 
-    // load the value from the source register into the location pointed to by
-    // loc_reg
-    // TODO: store floating point, 64-bit, and 128-bit values
+    // TODO: store floating point and 128-bit values
     if (size > 2*XLEN){
         tcc_error("[internal error] store sizes > %d bytes should be on the stack", 2*XLEN);
     }
+    // store the value from the source register into the location pointed by
+    // loc_reg with offset
     switch( size ) {
         case 1: emit_SB( loc_reg, src_reg, offset ); break;
         case 2: emit_SH( loc_reg, src_reg, offset ); break;
@@ -1240,8 +1246,8 @@ ST_FUNC void gjmp_addr( int a )
     if( ( rel_jmp + ( 1 << 21 ) ) & ~( ( 1U << 22 ) - 2 ) ) {
         // far jump
         uint32_t t0 = 5;
-        emit_LUI( t0, IMM_HIGH( rel_jmp + 0x800 ) );
-        emit_JALR( 0, t0, IMM_LOW( rel_jmp ) << 20 >> 20 ); // sign extend masked value
+        emit_LUI( t0, IMM_HIGH( rel_jmp ) );
+        emit_JALR( 0, t0, IMM_LOW( rel_jmp ));
     }
     else {
         // near jump
