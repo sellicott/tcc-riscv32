@@ -1100,9 +1100,11 @@ ST_FUNC int gfunc_sret( CType *vt, int variadic, CType *ret, int *ret_align, int
     nregs = prc[ 0 ];
     if( nregs == 2 && prc[ 1 ] != prc[ 2 ] )
         return -1; /* generic code can't deal with this case */
+#ifndef TCC_RISCV_ilp32
     if( prc[ 1 ] == RC_FLOAT ) {
         *regsize = size / nregs;
     }
+#endif
     ret->t = fieldofs[ 1 ] & VT_BTYPE;
     ret->ref = NULL;
     return nregs;
