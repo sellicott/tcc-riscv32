@@ -210,8 +210,23 @@ static int load_symofs( int *r, SValue *sv, int forstore )
 
         assert( stack_value == VT_CONST );
 
-        if( LARGE_IMM( sv_constant ) ) {
-            tcc_error( "unimp: large addend for global address (0x%lx)", (long)sv_constant );
+        if( LARGE_IMM( sv_constant ) ) { // need more test
+            int ind_hi = ind;
+
+            greloca( cur_text_section, &label, ind_hi, R_RISCV_PCREL_HI20, 0 );
+            emit_AUIPC( rd, 0 );
+            if ( !nocode_wanted ){
+                put_extern_sym( &label, cur_text_section, ind_hi, 0 );
+            }
+            greloca( cur_text_section, &label, ind, R_RISCV_PCREL_LO12_I, 0 );
+            emit_ADDI( rd, rd, 0 );
+
+            int tmp = ireg( get_reg( RC_INT ) );
+            emit_LI( tmp, sv_constant );
+            emit_ADD( rd, rd, tmp );
+
+            sv->c.i = 0;
+            return rd;
         }
 
         if( sv->sym->type.t & VT_STATIC ) { // XXX do this per linker relax
