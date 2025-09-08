@@ -1880,7 +1880,7 @@ ST_FUNC int gv(int rc)
          * a stack pointer register.
          * Done by setting rc to an integer class register
          */
-        if (bt == VT_LDOUBLE && rc == RC_FLOAT) {
+        if (bt == VT_LDOUBLE) {
             printf("[gv]: long double type\n");
             rc = RC_INT;
         }
