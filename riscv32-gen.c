@@ -995,6 +995,9 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
     CType *func_type = &func_sym->type;
     int i, addr, align, size;
     int param_addr = 0;
+    // array for holding number of arguments to the function
+    // areg[0] : integer class arguments
+    // areg[1] : floating point class arguments
     int areg[ 2 ];
     Sym *sym;
     CType *type;
@@ -1006,20 +1009,22 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
 
     areg[ 0 ] = 0;
     areg[ 1 ] = 0;
-    addr = 0;
+    addr = 0; // for ra and s0
+
     /* if the function returns by reference, then add an
-       implicit pointer parameter */
+       implicit pointer parameter
+       This also occurs for 128bit types and large structs */
     size = type_size( &func_vt, &align );
     if( size > 2 * XLEN ) {
         int s0 = 8;
         int loc_reg = s0; // s0
-        int src_reg = ireg( areg[ 0 ]++ );
+        // add the implicit parameter to the count of total parameters
+        int src_reg = ireg( areg[ 0 ]++ ); 
 
-        loc -= 8;
+        loc -= XLEN;
         func_vc = loc;
 
         emit_SW( loc_reg, src_reg, loc );
-        tcc_internal_error( "I don't think we are handling this case correctly" );
     }
     /* define parameters */
     while( ( sym = sym->next ) != NULL ) {
