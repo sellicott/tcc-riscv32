@@ -1098,8 +1098,8 @@ ST_FUNC int gfunc_sret( CType *vt, int variadic, CType *ret, int *ret_align, int
     int align, size = type_size( vt, &align ), nregs;
     int prc[ 3 ], fieldofs[ 3 ];
     *ret_align = 1;
-    *regsize = 8;
-    if( size > 16 )
+    *regsize = XLEN;
+    if( size > 2*XLEN )
         return 0;
     reg_pass( vt, prc, fieldofs, 1 );
     nregs = prc[ 0 ];
