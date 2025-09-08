@@ -1876,8 +1876,13 @@ ST_FUNC int gv(int rc)
         if (bt == VT_LDOUBLE && rc == RC_FLOAT)
             rc = RC_INT;
 #elif defined TCC_TARGET_RISCV32
-        if (bt == VT_LDOUBLE) {
+        /* hack for long doubles to force output into
+         * a stack pointer register.
+         * Done by setting rc to an integer class register
+         */
+        if (bt == VT_LDOUBLE && rc == RC_FLOAT) {
             printf("[gv]: long double type\n");
+            rc = RC_INT;
         }
 #endif
         rc2 = RC2_TYPE(bt, rc);
