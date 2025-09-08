@@ -1577,11 +1577,13 @@ ST_FUNC void asm_compute_constraints( ASMOperand *operands, int nb_operands, int
             (op->vt->r & VT_VALMASK) == VT_LLOCAL && !op->is_memory) {
             if (REG_IS_FLOAT(op->reg)){
                 tcc_warning("unimp:");
+#ifndef TCC_RISCV_ilp32
                 /* From fa0 to fa7 */
                 for (reg = 42; reg <= 50; reg++) {
                     if (!(regs_allocated[reg] & REG_OUT_MASK))
                         goto reg_found2;
                 }
+#endif
             } else {
                 /* From a0 to a7 */
                 for (reg = 10; reg <= 18; reg++) {
