@@ -6712,7 +6712,12 @@ ST_FUNC int expr_const(void)
 #ifndef TCC_TARGET_ARM64
 static void gfunc_return(CType *func_type)
 {
+#if defined TCC_TARGET_RISCV32
+    if ((func_type->t & VT_BTYPE) == VT_STRUCT || 
+        (func_type->t & VT_BTYPE) == VT_VDOUBLE ) {
+#else
     if ((func_type->t & VT_BTYPE) == VT_STRUCT) {
+#endif
         CType type, ret_type;
         int ret_align, ret_nregs, regsize;
         ret_nregs = gfunc_sret(func_type, func_var, &ret_type,
