@@ -303,6 +303,12 @@ static void load_lvalue( int r, SValue *sv )
     if (stack_type == VT_DOUBLE) {
         size = align = 4;
     }
+    
+    if (stack_type == VT_LDOUBLE) {
+        // skip load on long doubles since it should be the next item on the stack.
+        printf("[load_lvalue]: skipping long double load\n");
+        return;
+    }
 
     if (is_float(stack_type)){
         printf("[load_lvalue]: floating point type %d, size %d\n", stack_type, size);
