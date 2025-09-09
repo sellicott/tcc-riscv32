@@ -6714,7 +6714,7 @@ static void gfunc_return(CType *func_type)
 {
 #if defined TCC_TARGET_RISCV32
     if ((func_type->t & VT_BTYPE) == VT_STRUCT || 
-        (func_type->t & VT_BTYPE) == VT_VDOUBLE ) {
+        (func_type->t & VT_BTYPE) == VT_LDOUBLE ) {
 #else
     if ((func_type->t & VT_BTYPE) == VT_STRUCT) {
 #endif
