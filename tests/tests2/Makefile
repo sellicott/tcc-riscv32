@@ -53,17 +53,9 @@ ifneq (,$(filter OpenBSD FreeBSD NetBSD,$(TARGETOS)))
  SKIP += 116_bound_setjmp2.test # No TLS_FUNC/TLS_VAR in bcheck.c
 endif
 ifeq ($(ARCH),riscv32)
- SKIP += 22_floating_point.test
- SKIP += 70_floating_point_literals.test
- SKIP += 73_arm64.test # long double
  SKIP += 93_integer_promotion.test # do we follow gcc on x86_64 or riscv?
  SKIP += 95_bitfields.test # more bitfield nonsense
  SKIP += 95_bitfields_ms.test # more bitfield nonsense
- SKIP += 96_nodata_wanted.test # floating point
- SKIP += 101_cleanup.test # floating point
- SKIP += 107_stack_safe.test # floating point
- SKIP += 109_float_struct_calling.test
- SKIP += 111_conversion.test # long double 
  SKIP += 112_backtrace.test # no bounds checking
  SKIP += 113_btdll.test # need to build those libraries still
  SKIP += 114_bound_signal.test # no bounds checking
