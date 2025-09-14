@@ -306,12 +306,12 @@ static void load_lvalue( int r, SValue *sv )
     
     if (stack_type == VT_LDOUBLE) {
         // skip load on long doubles since it should be the next item on the stack.
-        printf("[load_lvalue]: skipping long double load\n");
+        //printf("[load_lvalue]: skipping long double load\n");
         return;
     }
 
     if (is_float(stack_type)){
-        printf("[load_lvalue]: floating point type %d, size %d\n", stack_type, size);
+        //printf("[load_lvalue]: floating point type %d, size %d\n", stack_type, size);
     }
 
     // offset is on the stack
@@ -336,7 +336,7 @@ static void load_lvalue( int r, SValue *sv )
         int64_t si = sv->c.i;
         si >>= 32;
         if( si != 0 ) {
-            printf( "[load_lvalue] 64-bit constant\n" );
+            // printf( "[load_lvalue] 64-bit constant\n" );
             load_large_constant( dest_reg, lvar_offset, si );
             lvar_offset &= 0xff;
         }
@@ -468,7 +468,7 @@ ST_FUNC void load( int r, SValue *sv )
                     emit_SEQZ( dest_reg, dest_reg ); // sltiu d, d, 1 == seqz d,d
                 }
                 break;
-            default: printf( "[load] unknown comparison\n" ); break;
+            default: tcc_error( "[internal error] unknown comparison in load\n" ); break;
         }
         switch( op ) {
             default: break;
@@ -527,9 +527,9 @@ ST_FUNC void store( int r, SValue *sv )
     if( stack_type == VT_STRUCT ) {
         tcc_error( "[store] unimp: store(struct)" );
     }
-    if (is_float(stack_type)){
-        printf("[store]: floating point type %d, size %d\n", stack_type, size);
-    }
+    //if (is_float(stack_type)){
+    //    printf("[store]: floating point type %d, size %d\n", stack_type, size);
+    //}
 
     // sv should be a pointer
     assert( stack_reg & VT_LVAL );
@@ -926,7 +926,7 @@ ST_FUNC void gfunc_call( int nb_args )
                 r2--; // for now on, r2 starts from 0
             }
             else if( r2 ) {
-                printf("[gfunc_call]: lvalue -> %04x\n", vtop->r);
+                // printf("[gfunc_call]: lvalue -> %04x\n", vtop->r);
                 test_lvalue();
                 vpushv( vtop );
             }
@@ -1068,7 +1068,7 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
                 else if( prc[ 1 + i ] == RC_FLOAT ) {
                     // emit_S(0x22, (size / regcount) == 4 ? 2 : 3, 8, 10 + areg[1]++, loc +
                     // (fieldofs[i+1] >> 4)); // fs[wd] FAi, loc(s0)
-                    printf( "experimental floating point support" );
+                    // printf( "experimental floating point support" );
                     emit_SW( s0, freg( TREG_F(areg[ 1 ]++) ), loc + i * XLEN ); //todo: check this
                 }
 #endif
@@ -1699,15 +1699,15 @@ ST_FUNC void gen_opf(int op) {
     switch (type) {
         case VT_FLOAT:
             float_type = 0;
-            printf("[gen_opf]: type = float\n");
+            // printf("[gen_opf]: type = float\n");
             break;
         case VT_DOUBLE:
             float_type = 1;
-            printf("[gen_opf]: type = double\n");
+            // printf("[gen_opf]: type = double\n");
             break;
         case VT_LDOUBLE:
             float_type = 2;
-            printf("[gen_opf]: type = long double\n");
+            // printf("[gen_opf]: type = long double\n");
             break;
         default:
             tcc_error("unsuported floating point type: %d", type);
