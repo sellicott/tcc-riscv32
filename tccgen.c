@@ -6722,6 +6722,7 @@ static void gfunc_return(CType *func_type)
         int ret_align, ret_nregs, regsize;
         ret_nregs = gfunc_sret(func_type, func_var, &ret_type,
                                &ret_align, &regsize);
+        printf("[gfunc_return]: type %d\n", func_type->t & VT_BTYPE);
         if (ret_nregs < 0) {
 #if defined TCC_TARGET_RISCV64 || defined TCC_TARGET_RISCV32
             arch_transfer_ret_regs(0);
