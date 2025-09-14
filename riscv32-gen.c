@@ -515,20 +515,17 @@ ST_FUNC void store( int r, SValue *sv )
     // Make sure we can perform the operation (if floating point)
     //assert( !is_float( stack_type ) || is_freg( r ) || stack_type == VT_LDOUBLE );
 
-    /* long doubles are in two integer registers, but the load/store
-       primitives only deal with one, so do as if it's one reg.  */
-    if( stack_type == VT_LDOUBLE ) {
+    /* long doubles are stored on the stack for rv32. higher level
+     * code gen has hopefully taken care of this for us
+     *
+     * caller takes the responsibility for splitting anything that USING_TWO_WORDS
+     * i.e. doubles and long long integers
+     */
+    if (stack_type == VT_LDOUBLE || stack_type == VT_DOUBLE || stack_type == VT_LLONG) {
         size = align = 4;
     }
     if( stack_type == VT_STRUCT ) {
-        tcc_error( "unimp: store(struct)" );
-    }
-    if( size > XLEN ) {
-        tcc_error( "unimp: large sized store" );
-    }
-    // caller takes the responsibility for splitting anything that USING_TWO_WORDS
-    if (stack_type == VT_DOUBLE || stack_type == VT_LLONG) {
-        size = align = 4;
+        tcc_error( "[store] unimp: store(struct)" );
     }
     if (is_float(stack_type)){
         printf("[store]: floating point type %d, size %d\n", stack_type, size);
@@ -574,7 +571,7 @@ ST_FUNC void store( int r, SValue *sv )
         case 1: emit_SB( loc_reg, src_reg, offset ); break;
         case 2: emit_SH( loc_reg, src_reg, offset ); break;
         case 4: emit_SW( loc_reg, src_reg, offset ); break;
-        default: tcc_error( "unexpected store size: %d", size );
+        default: tcc_error( "[store] unexpected size: %d", size );
     }
 }
 
