@@ -518,12 +518,12 @@ ST_FUNC void store( int r, SValue *sv )
     /* long doubles are in two integer registers, but the load/store
        primitives only deal with one, so do as if it's one reg.  */
     if( stack_type == VT_LDOUBLE ) {
-        size = align = 8;
+        size = align = 4;
     }
     if( stack_type == VT_STRUCT ) {
         tcc_error( "unimp: store(struct)" );
     }
-    if( size > 8 ) {
+    if( size > XLEN ) {
         tcc_error( "unimp: large sized store" );
     }
     // caller takes the responsibility for splitting anything that USING_TWO_WORDS
@@ -1026,7 +1026,6 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
         int loc_reg = s0; // s0
         // add the implicit parameter to the count of total parameters
         int src_reg = ireg( areg[ 0 ]++ ); 
-
         loc -= XLEN;
         func_vc = loc;
 
@@ -1964,7 +1963,7 @@ ST_FUNC void gen_vla_alloc( CType *type, int align )
         emit_ADDI(rr, rr, 15+1); // addi RR, RR, 15+1
     else
 #endif
-        emit_ADDI(rr, rr, 15); // addi RR, RR, 15
+    emit_ADDI(rr, rr, 15); // addi RR, RR, 15
     emit_ANDI(rr,rr,-16); // andi, RR, RR, -16
     emit_SUB(2,2,rr); // sub sp, sp, rr
     vpop();
