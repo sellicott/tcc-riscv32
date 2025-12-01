@@ -675,3 +675,453 @@ int __getf2(long double a, long double b)
 {
     return -f3_cmp(b, a);
 }
+
+#include <stdio.h>
+void __floatundef(void)
+{
+    printf("[lib-arm64] undefined floating point operation called\n");
+}
+
+
+void float_warn(const char *func)
+{
+    printf("[lib-arm64] dubious floating point operation %s\n", func);
+}
+
+// only add single and double floating point ops if we are in riscv32 mode
+// #ifdef TCC_RISCV_ilp32
+
+// generate a canonical single precision NaN value
+static float f1_NaN(void)
+{  
+    float f;
+    uint32_t bin = 0x7fc00000U;
+    // the risc-v canonical NaN has a positive sign bit and the
+    // mantissa MSB set, all other mantissa bits are 0.
+    memcpy(&f, &bin, sizeof(bin));
+    return f;
+}
+
+// generate a single precision infinity value
+// sgn must be 1 or 0
+static float f1_infinity(uint32_t sgn)
+{  
+    float f;
+    // set the sign bit from the input, and all exponent bits set
+    // mantissa bits are 0.
+    uint32_t bin = (sgn << 31) | (255 << 23);
+    memcpy(&f, &bin, sizeof(f));
+    return f;
+}
+
+// generate a single precision zero value
+// sgn must be 1 or 0 
+static float f1_zero(uint32_t sgn)
+{  
+    float f;
+    // set the sign bit from the input, and all bits set to 0.
+    uint32_t bin = (sgn << 31);
+    memcpy(&f, &bin, sizeof(f));
+    return f;
+}
+
+
+// return 1 if either of the floating point values are a NaN, 0 if not.
+// In the case of a NaN, the input parameter f will hold the appropriate NaN
+//
+// from the risc-v manual on floating point, when a NaN is generated, it produces
+// the "canonical NaN" which is a signalling NaN with all other bits as zero.
+//
+// Evaluated by checking "a" first, then "b"
+// using the same function signature as fp3_detect_NaNs for future compatability
+static int f1_detect_NaNs(float *f, 
+                          uint32_t a_sgn, uint8_t a_exp, uint32_t a_mnt,
+                          uint32_t b_sgn, uint8_t b_exp, uint32_t b_mnt)
+{
+    // all NaNs have an exponent of 255 and at least one mantissa bit set
+    if ( (a_exp == 255 && a_mnt) 
+      || (b_exp == 255 && b_mnt)) {
+        *f = f1_NaN();
+        return 1;
+    }
+
+    // no NaNs detected
+    return 0;
+}
+
+// Right shift the single precision floating point mantissa.
+// The mantissa should have three bits of padding for G, R, and S bits.
+// Two of the shifted out bits of the aligned significand are retained as
+// guard (G) and Round (R) bits. So for p bit significands, the effective width
+// of aligned significand must be p + 2 bits. Append a third bit, namely the
+// sticky bit (S), at the right end of the aligned significand.
+// The sticky bit is the logical OR of all shifted out bits.
+static uint32_t f1_sticky_shift(uint32_t sh, uint32_t mnt)
+{
+    // return the shifted output and the sticky bit
+    // obtained by left shifting out all of the bits "above" the ones
+    // that went off the end.
+    return (mnt >> sh) | !!(mnt << (31 - sh));
+}
+
+static void sf_unpack(uint32_t *sgn, uint8_t *exp, uint32_t *mnt, float f)
+{
+    uint32_t x;
+    memcpy(&x, &f, sizeof(f));
+    *sgn = x >> 31;
+    *exp = (x >> 23 & 0xff);
+    *mnt = x & ((1<<23)-1);
+}
+
+static void print_float(float f){
+    uint32_t bin;
+    memcpy(&bin, &f, sizeof(f));
+
+    printf("raw: %llx\n", bin);
+
+    uint32_t sign     = !!(bin & ( 1L<<31));
+    uint8_t  exponent  =  ((bin & (0x7FFL<<23)) >> 23);
+    uint32_t mantissa =   (bin & 0x7fffffL);
+    printf("value: %f\n", f);
+    printf("float: sign: %d, exponent: %d, mantissa: %06x\n",
+            sign, exponent-127, mantissa);
+}
+
+// add two single precision floating point numbers, based on f3_add function
+static float f1_add(float a, float b, int neg)
+{
+    // find the components
+    uint32_t a_sgn;
+    uint8_t  a_exp;
+    uint32_t a_mnt;
+
+    uint32_t b_sgn;
+    uint8_t  b_exp;
+    uint32_t b_mnt;
+
+    uint32_t x_sgn;
+    uint8_t  x_exp;
+    uint32_t x_mnt;
+
+    sf_unpack(&a_sgn, &a_exp, &a_mnt, a);
+    sf_unpack(&b_sgn, &b_exp, &b_mnt, b);
+
+    printf("input: a: %f b: %f\n", a, b);
+
+    // handle NaN inputs
+    // Currently does not propogate input NaNs, generates a canonical NaN
+    if ( (a_exp == 255 && a_mnt) || (b_exp == 255 && b_mnt) )
+        return f1_NaN();
+
+    // flip the sign on b if we are subtracting
+    b_sgn ^= neg;
+
+    // Handle infinities and zeroes:
+    // infinity - infinity = NaN
+    if (a_exp == 255 && b_exp == 255 && a_sgn != b_sgn)
+        return f1_NaN();
+
+    // infinity +- C = infinity
+    if (a_exp == 255)
+        return f1_infinity(a_sgn);
+
+    // C +- infinity = infinity
+    if (b_exp == 255)
+        return f1_infinity(b_sgn);
+
+    // if both inputs are zero, return a zero of the appropriate sign
+    // zeros are encoded as all zero exponents and mantissas
+    if (!(a_exp | b_exp) && !(a_mnt | b_mnt))
+        return f1_zero(a_sgn & b_sgn);
+
+    // implement FP addition algorighm from
+    // https://users.encs.concordia.ca/~asim/COEN_6501/Lecture_Notes/L4_Slides.pdf
+
+    // 1) Compare the exponents of two numbers for and calculate the absolute
+    //    value of difference between the two exponents.
+    //    Take the larger exponent as the tentative exponent of the result.
+    // 2) Shift the significand of the number with the smaller exponent,
+    //    right through a number of bit positions that is equal to the exponent
+    //    difference.
+
+    // before sticky shifting, we need to make room for the gaurd, round, and
+    // sticky bits (G, R, and S). We also need to add back the leading '1'.
+    a_mnt = ((1 << 23) | a_mnt) << 3;
+    b_mnt = ((1 << 23) | b_mnt) << 3;
+
+    // do steps 1 and 2
+    // return the shifted output and the sticky bit
+    // obtained by left shifting out all of the bits "above" the ones
+    // that went off the end.
+    int sh = a_exp - b_exp;
+    printf("norm shift %d\n", sh);
+    if(sh < 0) {
+        sh = -sh;
+        a_mnt = (a_mnt >> sh) | !!(a_mnt << (31 - sh));
+        a_exp = b_exp;
+    }
+    else {
+        b_mnt = (b_mnt >> sh) | !!(b_mnt << (31 - sh));
+        b_exp = a_exp;
+    }
+    // initial output values
+    x_sgn = a_sgn;
+    x_exp = a_exp;
+
+    printf("common exponent: %d\n", x_exp);
+    printf("normed mantissas: a: %06x, b: %06x\n", a_mnt, b_mnt);
+
+    // 3) Add/subtract the two signed-magnitude significands using a p + 3 bit
+    //    adder. Let the result of this is SUM.
+
+    // if the signs are the same, we can do addition
+    if (a_sgn == b_sgn) {
+        x_mnt = a_mnt + b_mnt;
+        // check for cout overflow (1 bit above the leading bit)
+        if (x_mnt >> 27 ) {
+            x_mnt >>= 1;
+            x_exp += 1;
+        }
+    }
+    // otherwise we need to subtract
+    else {
+        x_mnt =  a_mnt -  b_mnt;
+        printf("sub: %06x - %06x = %06x\n", a_mnt, b_mnt, x_mnt);
+        // check for the result's sign changing
+        if (x_mnt >> 31) {
+            x_sgn ^= 1;
+            x_mnt = -x_mnt;
+        }
+        
+        // check for the mantissa's being equal -> generating a zero
+        if (!x_mnt)
+            return f1_zero(0);
+
+        // check for leading zeros and left shift until normalized
+        while ( !(x_mnt >> 26) ) {
+            x_mnt = x_mnt << 1; // right shift so that there is a 1 in the 23rd bit
+            x_exp -= 1;         // adjust exponent accordingly
+            printf("[f1_add] exp: %d, mnt: %06x\n", x_exp, x_mnt);
+        }
+    }
+
+    printf("pre sticky reset: sign: %d, exponent: %d, mantissa: %06x\n",
+            x_sgn, x_exp, x_mnt);
+
+    // Shift down over G and the old R, reset the sticky bit 
+    x_mnt = ( (x_mnt >> 1) | !!(x_mnt >> 3) );
+
+    printf("pre-round: sign: %d, exponent: %d, mantissa: %06x\n",
+            x_sgn, x_exp, x_mnt);
+
+    // round the resulting output
+    // R * (M0 + S)
+    if ( (x_mnt & 0x2) && ((x_mnt & 0x4) || (x_mnt & 0x1)) ) {
+        printf("rounding\n");
+        x_mnt += 0x4;
+        // check for cout overflow (1 bit above the leading bit)
+        if (x_mnt >> 25 ) {
+            x_mnt >>= 1;
+            x_exp += 1;
+        }
+    }
+
+    // get rid of S and R
+    x_mnt >>= 2;
+
+    printf("post-round: sign: %d, exponent: %d, mantissa: %06x\n",
+            x_sgn, x_exp, x_mnt);
+
+
+    uint32_t o_bin =
+              ((uint32_t) (x_sgn & 0x01)     << 31)
+            | ((uint32_t) (x_exp & 0xff)     << 23)
+            | ((uint32_t) (x_mnt & 0x7fffff) <<  0);
+
+    float o_float;
+    memcpy(&o_float, &o_bin, sizeof(o_bin));
+
+    print_float(o_float);
+    printf("output: %f\n\n", o_float);
+
+    return o_float;
+}
+
+// handle single floating point math
+float __addsf3(float a, float b)
+{
+    return f1_add(a, b, 0);
+}
+
+float __subsf3(float a, float b)
+{
+    return f1_add(a, b, 1);
+}
+
+float __mulsf3(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return (float) -1;
+}
+
+float __divsf3(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return (float) -1;
+}
+
+float __adddf3(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return (float) -1;
+}
+
+// handle double floating point math
+double __subdf3(double a, double b)
+{
+    float_warn(__FUNCTION__);
+    return (double) -1;
+}
+
+double __muldf3(double a, double b)
+{
+    float_warn(__FUNCTION__);
+    return (double) -1;
+}
+
+double __divdf3(double a, double b)
+{
+    float_warn(__FUNCTION__);
+    return (double) -1;
+}
+
+
+// single floating point comparisons
+int __ltsf2(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return f3_cmp(a, b);
+}
+
+int __lesf2(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return f3_cmp(a, b);
+}
+
+int __gtsf2(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return -f3_cmp(b, a);
+}
+
+int __gesf2(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return -f3_cmp(b, a);
+}
+
+int __eqsf2(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return !!f3_cmp(a, b);
+}
+
+int __nesf2(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return !!!f3_cmp(a, b);
+}
+
+// double floating point comparisons
+int __ledf2(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return f3_cmp(a, b);
+}
+
+int __ltdf2(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return f3_cmp(a, b);
+}
+
+int __gedf2(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return -f3_cmp(b, a);
+}
+
+int __gtdf2(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return -f3_cmp(b, a);
+}
+
+int __eqdf2(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return !!f3_cmp(a, b);
+}
+
+int __nedf2(float a, float b)
+{
+    float_warn(__FUNCTION__);
+    return !!!f3_cmp(a, b);
+}
+
+// floating point conversion functions
+float __floatdisf(long i)
+{
+    float_warn(__FUNCTION__);
+    return (float) -1;
+}
+
+double __floatdidf(long i)
+{
+    float_warn(__FUNCTION__);
+    return (double) -1;
+}
+
+// floating point extension functions
+// convert float -> double
+double __extendsfdf2(float a)
+{
+    /*
+    memcpy(&in_bin, &a, sizeof(a));
+    uint32_t in_bin;
+    
+    uint32_t sign     = !!(in_bin & 0x80000000);
+    uint32_t mantissa =   (in_bin & 0x007fffff);
+    uint32_t exponent =  ((in_bin & 0x7f800000) >> 23);
+    exponent = (exponent - 127) + 1023;
+
+    uint64_t out_bin =
+          ((uint64_t) sign     << 63)
+        | ((uint64_t) exponent << 52)
+        | ((uint64_t) mantissa << 29);
+
+    double out_double;
+    memcpy(&out_double, &out_bin, sizeof(out_bin));
+    return out_double;
+    */
+
+    // gcc compiled form of the previous C code
+    asm volatile("slli    a1, a0, 1   \n\t"
+        "lui     a3, 524288  \n\t"
+        "slli    a2, a0, 29  \n\t"
+        "and     a3, a3, a0  \n\t"
+        "slli    a0, a0, 9   \n\t"
+        "srli    a0, a0, 12  \n\t"
+        "srli    a1, a1, 24  \n\t"
+        "addi    a1, a1, 896 \n\t"
+        "slli    a1, a1, 20  \n\t"
+        "or      a0, a0, a3  \n\t"
+        "or      a1, a1, a0  \n\t"
+        "mv      a0, a2"
+        : :
+        : "a0", "a1", "a2", "a3");
+}
+
+//#endif 
+
