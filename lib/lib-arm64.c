@@ -24,7 +24,8 @@ void *memcpy(void*,void*,__SIZE_TYPE__);
 #include <string.h>
 #endif
 
-#if !defined __riscv && !defined __APPLE__
+#if 0 
+    //!defined __riscv && !defined __APPLE__
 void __clear_cache(void *beg, void *end)
 {
     __arm64_clear_cache(beg, end);
@@ -787,6 +788,18 @@ static void print_float(float f){
             sign, exponent-127, mantissa);
 }
 
+static void print_binary(uint32_t x, uint8_t len) {
+    char buffer[33] = {'\0'};
+    if (len > 31) len = 31;
+    
+    for (int i = len; i >= 0; --i) {
+        uint32_t mask = (1 << i);
+        int val = x & mask;
+        buffer[len-i] = val ? '1':'0';
+    }
+    printf("%s\n", buffer);
+}
+
 // add two single precision floating point numbers, based on f3_add function
 static float f1_add(float a, float b, int neg)
 {
@@ -803,10 +816,10 @@ static float f1_add(float a, float b, int neg)
     uint8_t  x_exp;
     uint32_t x_mnt;
 
+    printf("input: a: %f b: %f\n", a, b);
+
     sf_unpack(&a_sgn, &a_exp, &a_mnt, a);
     sf_unpack(&b_sgn, &b_exp, &b_mnt, b);
-
-    printf("input: a: %f b: %f\n", a, b);
 
     // handle NaN inputs
     // Currently does not propogate input NaNs, generates a canonical NaN
@@ -876,11 +889,23 @@ static float f1_add(float a, float b, int neg)
 
     // if the signs are the same, we can do addition
     if (a_sgn == b_sgn) {
+        printf("addition\n");
+        printf("a: ");
+        print_binary(a_mnt, 27);
+        printf("b: ");
+        print_binary(b_mnt, 27);
         x_mnt = a_mnt + b_mnt;
+        printf("x: ");
+        print_binary(x_mnt, 27);
+
         // check for cout overflow (1 bit above the leading bit)
         if (x_mnt >> 27 ) {
+            printf("cout overflow 1\n");
             x_mnt >>= 1;
             x_exp += 1;
+
+            printf("x: ");
+            print_binary(x_mnt, 27);
         }
     }
     // otherwise we need to subtract
@@ -905,33 +930,35 @@ static float f1_add(float a, float b, int neg)
         }
     }
 
-    printf("pre sticky reset: sign: %d, exponent: %d, mantissa: %06x\n",
-            x_sgn, x_exp, x_mnt);
-
     // Shift down over G and the old R, reset the sticky bit 
     x_mnt = ( (x_mnt >> 1) | !!(x_mnt >> 3) );
-
-    printf("pre-round: sign: %d, exponent: %d, mantissa: %06x\n",
-            x_sgn, x_exp, x_mnt);
+    printf("shift down, reset sticky bit\n");
+    printf("x: ");
+    print_binary(x_mnt, 26);
 
     // round the resulting output
     // R * (M0 + S)
     if ( (x_mnt & 0x2) && ((x_mnt & 0x4) || (x_mnt & 0x1)) ) {
         printf("rounding\n");
         x_mnt += 0x4;
+
+        printf("x: ");
+        print_binary(x_mnt, 26);
         // check for cout overflow (1 bit above the leading bit)
-        if (x_mnt >> 25 ) {
+        if (x_mnt >> 26 ) {
+            printf("cout overflow 2\n");
             x_mnt >>= 1;
             x_exp += 1;
+
+            printf("x: ");
+            print_binary(x_mnt, 26);
         }
     }
 
     // get rid of S and R
     x_mnt >>= 2;
-
-    printf("post-round: sign: %d, exponent: %d, mantissa: %06x\n",
-            x_sgn, x_exp, x_mnt);
-
+    printf("x: ");
+    print_binary(x_mnt, 23);
 
     uint32_t o_bin =
               ((uint32_t) (x_sgn & 0x01)     << 31)
@@ -945,6 +972,38 @@ static float f1_add(float a, float b, int neg)
     printf("output: %f\n\n", o_float);
 
     return o_float;
+}
+
+// returns 1 if a > b, -1 if b < a, 0 if equal
+static int f1_cmp(float a, float b)
+{
+    // find the components
+    uint32_t a_sgn;
+    uint8_t  a_exp;
+    uint32_t a_mnt;
+
+    uint32_t b_sgn;
+    uint8_t  b_exp;
+    uint32_t b_mnt;
+
+    sf_unpack(&a_sgn, &a_exp, &a_mnt, a);
+    sf_unpack(&b_sgn, &b_exp, &b_mnt, b);
+
+    // if the signs differ, return -1 if a is negative, 1 otherwise
+    if (a_sgn ^ b_sgn)
+        return (a_sgn) ? -1 : 1;
+
+    // if the exponents differ, return -1 if a has the smaller exponent
+    int sh = a_exp - b_exp;
+    if (sh != 0)
+        return (sh < 0) ? -1 : 1;
+
+    // if the mantissas differ, return -1 if a has the smaller mantissa
+    if (a_mnt != b_mnt)
+        return (a_mnt < b_mnt) ? -1 : 1;
+
+    // otherwise they are both the same
+    return 0;
 }
 
 // handle single floating point math
@@ -1000,37 +1059,37 @@ double __divdf3(double a, double b)
 int __ltsf2(float a, float b)
 {
     float_warn(__FUNCTION__);
-    return f3_cmp(a, b);
+    return f1_cmp(a, b);
 }
 
 int __lesf2(float a, float b)
 {
     float_warn(__FUNCTION__);
-    return f3_cmp(a, b);
+    return f1_cmp(a, b);
 }
 
 int __gtsf2(float a, float b)
 {
     float_warn(__FUNCTION__);
-    return -f3_cmp(b, a);
+    return -f1_cmp(b, a);
 }
 
 int __gesf2(float a, float b)
 {
     float_warn(__FUNCTION__);
-    return -f3_cmp(b, a);
+    return -f1_cmp(b, a);
 }
 
 int __eqsf2(float a, float b)
 {
     float_warn(__FUNCTION__);
-    return !!f3_cmp(a, b);
+    return !!f1_cmp(a, b);
 }
 
 int __nesf2(float a, float b)
 {
     float_warn(__FUNCTION__);
-    return !!!f3_cmp(a, b);
+    return !!!f1_cmp(a, b);
 }
 
 // double floating point comparisons
@@ -1087,9 +1146,8 @@ double __floatdidf(long i)
 // convert float -> double
 double __extendsfdf2(float a)
 {
-    /*
-    memcpy(&in_bin, &a, sizeof(a));
     uint32_t in_bin;
+    memcpy(&in_bin, &a, sizeof(a));
     
     uint32_t sign     = !!(in_bin & 0x80000000);
     uint32_t mantissa =   (in_bin & 0x007fffff);
@@ -1104,9 +1162,9 @@ double __extendsfdf2(float a)
     double out_double;
     memcpy(&out_double, &out_bin, sizeof(out_bin));
     return out_double;
-    */
 
     // gcc compiled form of the previous C code
+    /*
     asm volatile("slli    a1, a0, 1   \n\t"
         "lui     a3, 524288  \n\t"
         "slli    a2, a0, 29  \n\t"
@@ -1121,6 +1179,7 @@ double __extendsfdf2(float a)
         "mv      a0, a2"
         : :
         : "a0", "a1", "a2", "a3");
+    */
 }
 
 //#endif 
