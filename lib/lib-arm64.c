@@ -849,7 +849,6 @@ static float f1_add(float a, float b, int neg)
 
     // implement FP addition algorighm from
     // https://users.encs.concordia.ca/~asim/COEN_6501/Lecture_Notes/L4_Slides.pdf
-
     // 1) Compare the exponents of two numbers for and calculate the absolute
     //    value of difference between the two exponents.
     //    Take the larger exponent as the tentative exponent of the result.
@@ -974,7 +973,7 @@ static float f1_add(float a, float b, int neg)
     return o_float;
 }
 
-// returns 1 if a > b, -1 if b < a, 0 if equal
+// returns 1 if a > b, -1 if a < b, 0 if equal
 static int f1_cmp(float a, float b)
 {
     // find the components
@@ -988,6 +987,10 @@ static int f1_cmp(float a, float b)
 
     sf_unpack(&a_sgn, &a_exp, &a_mnt, a);
     sf_unpack(&b_sgn, &b_exp, &b_mnt, b);
+
+    // return 0 if either input is NaN
+    if ( (a_exp == 255 && a_mnt) || (b_exp == 255 && b_mnt) )
+        return -2;
 
     // if the signs differ, return -1 if a is negative, 1 otherwise
     if (a_sgn ^ b_sgn)
@@ -1019,14 +1022,226 @@ float __subsf3(float a, float b)
 
 float __mulsf3(float a, float b)
 {
+    // find the components
+    uint32_t a_sgn;
+    uint8_t  a_exp;
+    uint32_t a_mnt;
+
+    uint32_t b_sgn;
+    uint8_t  b_exp;
+    uint32_t b_mnt;
+
+    uint32_t x_sgn;
+    uint8_t  x_exp;
+    uint32_t x_mnt;
+
+    sf_unpack(&a_sgn, &a_exp, &a_mnt, a);
+    sf_unpack(&b_sgn, &b_exp, &b_mnt, b);
+
+    // handle NaN inputs
+    // Currently does not propogate input NaNs, generates a canonical NaN
+    if ( (a_exp == 255 && a_mnt) || (b_exp == 255 && b_mnt) )
+        return f1_NaN();
+
+    x_sgn = a_sgn ^ b_sgn;
+
+    // Handle infinities and zeroes:
+    // infinity * infinity = infinity 
+    if (a_exp == 255 || b_exp == 255)
+        return f1_infinity(x_sgn);
+
+    // if an inputs are zero, return a zero of the appropriate sign
+    // zeros are encoded as all zero exponents and mantissas
+    if (!(a_exp | b_exp) || !(a_mnt | b_mnt))
+        return f1_zero(x_sgn);
+
+    x_exp = a_exp + b_exp - 127;
+
+    // before multiplying the mantissa's we need to add the leading '1' back
+    a_mnt = (1 << 23) | a_mnt;
+    b_mnt = (1 << 23) | b_mnt;
+    uint64_t x_mult = (uint64_t) a_mnt * b_mnt;
+    printf("mult (high): ");
+    print_binary(x_mult >> 32, 32);
+    printf("mult (low): ");
+    print_binary(x_mult, 32);
+
+    // mask off 2x+1 bits from the result and shift so upper bits fit in x_mnt
+    // leave room for the rounding and sticky bit
+    x_mnt = (uint32_t) ((x_mult << 11) >> 32);
+
+    // set sticky bit
+    x_mnt |= !!(x_mult & (1 << 13) -1);
+
+    printf("x (post mult): ");
+    print_binary(x_mnt, 26);
+
+    // check for cout overflow (1 bit above the leading bit)
+    if (x_mnt >> 26) {
+        printf("cout overflow 1\n");
+        x_mnt >>= 1;
+        x_exp += 1;
+
+        printf("x (post overflow 1): ");
+        print_binary(x_mnt, 26);
+    }
+
+    // round the resulting output
+    // R * (M0 + S)
+    if ( (x_mnt & 0x2) && ((x_mnt & 0x4) || (x_mnt & 0x1)) ) {
+        printf("rounding\n");
+        x_mnt += 0x4;
+
+        printf("x: ");
+        print_binary(x_mnt, 26);
+        // check for cout overflow (1 bit above the leading bit)
+        if (x_mnt >> 26 ) {
+            printf("cout overflow 2\n");
+            x_mnt >>= 1;
+            x_exp += 1;
+
+            printf("x: ");
+            print_binary(x_mnt, 26);
+        }
+    }
+
+    // get rid of S and R
+    x_mnt >>= 2;
+    printf("x (final): ");
+    print_binary(x_mnt, 23);
+
+    uint32_t o_bin =
+              ((uint32_t) (x_sgn & 0x01)     << 31)
+            | ((uint32_t) (x_exp & 0xff)     << 23)
+            | ((uint32_t) (x_mnt & 0x7fffff) <<  0);
+
+    float o_float;
+    memcpy(&o_float, &o_bin, sizeof(o_bin));
+
+    print_float(o_float);
+    printf("output: %f\n\n", o_float);
+
     float_warn(__FUNCTION__);
-    return (float) -1;
+    return (float) o_float;
 }
 
 float __divsf3(float a, float b)
 {
+    // find the components
+    uint32_t a_sgn;
+    uint8_t  a_exp;
+    uint32_t a_mnt;
+
+    uint32_t b_sgn;
+    uint8_t  b_exp;
+    uint32_t b_mnt;
+
+    uint32_t x_sgn;
+    uint8_t  x_exp;
+    uint32_t x_mnt;
+
+    sf_unpack(&a_sgn, &a_exp, &a_mnt, a);
+    sf_unpack(&b_sgn, &b_exp, &b_mnt, b);
+
+    int a_inf  = (a_exp == 255);
+    int a_zero = !(a_exp || a_mnt);
+    int b_inf = (b_exp == 255);
+    int b_zero = !(b_exp || b_mnt);
+
+    // handle NaN inputs
+    // Currently does not propogate input NaNs, generates a canonical NaN
+    if ( (a_exp == 255 && a_mnt) // a = NaN
+      || (b_exp == 255 && b_mnt) // b = NaN
+      || (a_inf && b_inf)        // inf / inf
+      || (a_zero && b_zero))     // 0 / 0
+        return f1_NaN();
+
+    x_sgn = a_sgn ^ b_sgn;
+
+    // Handle infinities and zeroes:
+    // a / infinity = 0 or 0 / b = 0 (b != 0)
+    if (b_inf || a_zero)
+        return f1_zero(x_sgn);
+
+    // infinity / b = infinity (b != infinity) or a / 0 = infinity (a != 0)
+    if (a_inf || b_zero)
+        return f1_infinity(x_sgn);
+
+    // if an inputs are zero, return a zero of the appropriate sign
+    // zeros are encoded as all zero exponents and mantissas
+    if (!(a_exp | b_exp) || !(a_mnt | b_mnt))
+        return f1_zero(x_sgn);
+
+    // subtract exponents in division (add back the removed bias)
+    x_exp = a_exp - b_exp + 127;
+
+    // before multiplying the mantissa's we need to add the leading '1' back
+    a_mnt |= (1 << 23);
+    b_mnt |= (1 << 23);
+    
+    printf("a: ");
+    print_binary(a_mnt, 23);
+    printf("b: ");
+    print_binary(b_mnt, 23);
+
+    uint64_t a_tmp = a_mnt << 1;
+    x_mnt = a_tmp / b_mnt;
+    printf("div: ");
+    print_binary(x_mnt, 32);
+
+    // set sticky bit
+    x_mnt |= !!(x_mnt & (1 << 13) -1);
+
+    printf("x (post mult): ");
+    print_binary(x_mnt, 26);
+
+    // check for cout overflow (1 bit above the leading bit)
+    if (x_mnt >> 26) {
+        printf("cout overflow 1\n");
+        x_mnt >>= 1;
+        x_exp += 1;
+
+        printf("x (post overflow 1): ");
+        print_binary(x_mnt, 26);
+    }
+
+    // round the resulting output
+    // R * (M0 + S)
+    if ( (x_mnt & 0x2) && ((x_mnt & 0x4) || (x_mnt & 0x1)) ) {
+        printf("rounding\n");
+        x_mnt += 0x4;
+
+        printf("x: ");
+        print_binary(x_mnt, 26);
+        // check for cout overflow (1 bit above the leading bit)
+        if (x_mnt >> 26 ) {
+            printf("cout overflow 2\n");
+            x_mnt >>= 1;
+            x_exp += 1;
+
+            printf("x: ");
+            print_binary(x_mnt, 26);
+        }
+    }
+
+    // get rid of S and R
+    x_mnt >>= 2;
+    printf("x (final): ");
+    print_binary(x_mnt, 23);
+
+    uint32_t o_bin =
+              ((uint32_t) (x_sgn & 0x01)     << 31)
+            | ((uint32_t) (x_exp & 0xff)     << 23)
+            | ((uint32_t) (x_mnt & 0x7fffff) <<  0);
+
+    float o_float;
+    memcpy(&o_float, &o_bin, sizeof(o_bin));
+
+    print_float(o_float);
+    printf("output: %f\n\n", o_float);
+
     float_warn(__FUNCTION__);
-    return (float) -1;
+    return (float) o_float;
 }
 
 float __adddf3(float a, float b)
@@ -1056,74 +1271,81 @@ double __divdf3(double a, double b)
 
 
 // single floating point comparisons
+
+// return a value less than zero if a < b (and not NaN)
 int __ltsf2(float a, float b)
 {
     float_warn(__FUNCTION__);
     return f1_cmp(a, b);
 }
 
+// return a value less than zero if a <= b (and not NaN)
 int __lesf2(float a, float b)
 {
     float_warn(__FUNCTION__);
     return f1_cmp(a, b);
 }
 
+// return a value greater than zero if a > b (and not NaN)
 int __gtsf2(float a, float b)
 {
     float_warn(__FUNCTION__);
-    return -f1_cmp(b, a);
+    return f1_cmp(a, b);
 }
 
+// return a value greater than zero if a >= b (and not NaN)
 int __gesf2(float a, float b)
 {
     float_warn(__FUNCTION__);
-    return -f1_cmp(b, a);
+    return f1_cmp(a, b);
 }
 
+// returns zero if a == b, nonzero otherwise (or NaN)
 int __eqsf2(float a, float b)
 {
     float_warn(__FUNCTION__);
     return !!f1_cmp(a, b);
 }
 
+// reuturns non-zero if a != b or either argument is NaN
 int __nesf2(float a, float b)
 {
     float_warn(__FUNCTION__);
-    return !!!f1_cmp(a, b);
+    return !!f1_cmp(a, b);
 }
 
 // double floating point comparisons
-int __ledf2(float a, float b)
+int __ledf2(double a, double b)
 {
     float_warn(__FUNCTION__);
     return f3_cmp(a, b);
 }
 
-int __ltdf2(float a, float b)
+int __ltdf2(double a, double b)
 {
     float_warn(__FUNCTION__);
     return f3_cmp(a, b);
 }
 
-int __gedf2(float a, float b)
+int __gedf2(double a, double b)
 {
     float_warn(__FUNCTION__);
     return -f3_cmp(b, a);
 }
 
-int __gtdf2(float a, float b)
+int __gtdf2(double a, double b)
 {
     float_warn(__FUNCTION__);
     return -f3_cmp(b, a);
 }
 
-int __eqdf2(float a, float b)
+int __eqdf2(double a, double b)
 {
     float_warn(__FUNCTION__);
     return !!f3_cmp(a, b);
 }
 
-int __nedf2(float a, float b)
+int __nedf2(double a, double b)
 {
     float_warn(__FUNCTION__);
     return !!!f3_cmp(a, b);
