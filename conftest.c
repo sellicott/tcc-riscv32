@@ -14,7 +14,10 @@ const char *platform_macros[] = {
     "__arm__",              "TCC_TARGET_ARM",
     "__ARM_EABI__",         "TCC_ARM_EABI",
     "__aarch64__",          "TCC_TARGET_ARM64",
-#ifdef TCC_TARGET_RISCV32
+/* which riscv: the target being built for, or the machine c2str runs on.
+   A c2str built on another host must be given -DTCC_TARGET_RISCV32, or
+   tccdefs_.h takes __riscv for riscv64 and an rv32 tcc gets i386's va_list */
+#if defined TCC_TARGET_RISCV32 || (defined __riscv && __riscv_xlen == 32)
     "__riscv",              "TCC_TARGET_RISCV32",
 #else
     "__riscv",              "TCC_TARGET_RISCV64",

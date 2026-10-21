@@ -272,6 +272,10 @@ static void load_lvalue( int r, SValue *sv )
     if( is_float( sv->type.t ) ) {
         tcc_internal_error( "floating point not implemented" );
     }
+    // likewise a long long is loaded a word, a register, at a time
+    if( stack_type == VT_LLONG ) {
+        size = 4;
+    }
 
     // offset is on the stack
     if( masked_stack_reg == VT_LOCAL || ( stack_reg & VT_SYM ) ) {
@@ -310,9 +314,16 @@ static void load_lvalue( int r, SValue *sv )
         tcc_error( "unimp: load(non-local lval)" );
     }
     // TODO handle floating pont, 64-bit values, and 128-bit values
+    // bytes and halfwords zero-extend when unsigned (plain char is: CHAR_IS_UNSIGNED)
     switch( size ) {
-        case 1: emit_LB( dest_reg, rs1, lvar_offset ); break;
-        case 2: emit_LH( dest_reg, rs1, lvar_offset ); break;
+        case 1:
+            if( sv->type.t & VT_UNSIGNED ) emit_LBU( dest_reg, rs1, lvar_offset );
+            else emit_LB( dest_reg, rs1, lvar_offset );
+            break;
+        case 2:
+            if( sv->type.t & VT_UNSIGNED ) emit_LHU( dest_reg, rs1, lvar_offset );
+            else emit_LH( dest_reg, rs1, lvar_offset );
+            break;
         case 4: emit_LW( dest_reg, rs1, lvar_offset ); break;
         default: tcc_error( "unexpected load size: %d", size );
     }
@@ -471,6 +482,11 @@ ST_FUNC void store( int r, SValue *sv )
     }
     if( stack_type == VT_STRUCT ) {
         tcc_error( "unimp: store(struct)" );
+    }
+    // a long long lives in a register pair, and the generic code stores it a
+    // word at a time (save_reg_upstack, vstore): one integer register is one word
+    if( stack_type == VT_LLONG && !is_freg( r ) ) {
+        size = align = 4;
     }
     if( size > 8 ) {
         tcc_error( "unimp: large sized store" );
@@ -663,14 +679,19 @@ static void reg_pass( CType *type, int *prc, int *fieldofs, int named )
      * fieldofs[0] not used
      * fieldofs[1/2] [3:0] is type, other is offset
      */
-    reg_pass_rec( type, prc, fieldofs, 0 );
-    if( prc[ 0 ] <= 0 || !named ) {
+    // ILP32 is the soft-float ABI: named or variadic, scalar or aggregate, an
+    // argument of up to 8 bytes travels as words in up to two integer
+    // registers, the second word at offset 4.  (The field-wise classification
+    // reg_pass_rec does is rv64's hard-float rule; it made a named long long one
+    // register.)
+    (void)named;
+    {
         int align, size = type_size( type, &align );
         prc[ 0 ] = ( size + 3 ) >> 2;
         assert( size <= 8 ); // We can't handle more than 8 bytes
         prc[ 1 ] = prc[ 2 ] = RC_INT;
         fieldofs[ 1 ] = ( 0 << 4 ) | ( size <= 1 ? VT_BYTE : size <= 2 ? VT_SHORT : VT_INT );
-        fieldofs[ 2 ] = ( 8 << 4 ) | ( size <= 5 ? VT_BYTE : size <= 6 ? VT_SHORT : VT_INT );
+        fieldofs[ 2 ] = ( 4 << 4 ) | ( size <= 5 ? VT_BYTE : size <= 6 ? VT_SHORT : VT_INT );
     }
 }
 
@@ -693,9 +714,20 @@ ST_FUNC void gfunc_call( int nb_args )
     areg[ 0 ] = 0; /* int arg regs */
     areg[ 1 ] = 8; /* float arg regs */
     sa = vtop[ -nb_args ].type.ref->next;
+    // A struct returned by reference arrives as a hidden first argument (the
+    // caller's buffer, tccgen.c unary) that the prototype's parameter list does
+    // not include: it is named, and the list starts at the argument after it.
+    int hidden_sret = 0;
+    {
+        CType *rt = &vtop[ -nb_args ].type.ref->type;
+        int ra;
+        if( ( rt->t & VT_BTYPE ) == VT_STRUCT && type_size( rt, &ra ) > 2 * XLEN )
+            hidden_sret = 1;
+    }
     for( i = 0; i < nb_args; i++ ) {
         int nregs, byref = 0, tempofs;
         int prc[ 3 ], fieldofs[ 3 ];
+        int named = sa != NULL || ( hidden_sret && i == 0 );
         sv = &vtop[ 1 + i - nb_args ];
         sv->type.t &= ~VT_ARRAY; // XXX this should be done in tccgen.c
         size = type_size( &sv->type, &align );
@@ -707,8 +739,9 @@ ST_FUNC void gfunc_call( int nb_args )
             size = align = PTR_SIZE;
             byref = 64 | ( tempofs << 7 );
         }
-        reg_pass( &sv->type, prc, fieldofs, sa != NULL ); // is sa!= 0 means 'last argument' ?
-        if( !sa && align == 2 * XLEN && size <= 2 * XLEN ) {
+        reg_pass( &sv->type, prc, fieldofs, named );
+        // a variadic 2 * XLEN scalar starts on an even register (psABI)
+        if( !named && align == 2 * XLEN && size <= 2 * XLEN ) {
             areg[ 0 ] = ( areg[ 0 ] + 1 ) & ~1;
         }
         nregs = prc[ 0 ]; // Regs required to transfer this arg
@@ -724,7 +757,7 @@ ST_FUNC void gfunc_call( int nb_args )
             if( align < XLEN )
                 align = XLEN;
             stack_adj += ( size + align - 1 ) & -align;
-            if( !sa ) /* one vararg on stack forces the rest on stack */
+            if( !named ) /* one vararg on stack forces the rest on stack */
                 areg[ 0 ] = 8, areg[ 1 ] = 16;
         }
         else {
@@ -746,7 +779,7 @@ ST_FUNC void gfunc_call( int nb_args )
             }
         }
         info[ i ] |= byref;
-        if( sa )
+        if( sa && !( hidden_sret && i == 0 ) )
             sa = sa->next;
     }
     stack_adj = ( stack_adj + 15 ) & -16;
@@ -940,11 +973,12 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
         int loc_reg = s0; // s0
         int src_reg = ireg( areg[ 0 ]++ );
 
+        // over 2 * XLEN the caller passes where to put the result in a0;
+        // keep it for gfunc_return
         loc -= 8;
         func_vc = loc;
 
         emit_SW( loc_reg, src_reg, loc );
-        tcc_internal_error( "I don't think we are handling this case correctly" );
     }
     /* define parameters */
     while( ( sym = sym->next ) != NULL ) {
@@ -1002,8 +1036,9 @@ ST_FUNC void gfunc_prolog( Sym *func_sym )
         const uint32_t s0 = 8;
         for( ; areg[ 0 ] < 8; areg[ 0 ]++ ) {
             num_va_regs++;
-            // ES(0x23, 2, 8, 10 + areg[0], -8 + num_va_regs * 8); // sw aX, loc(s0)
-            emit_SW( s0, ireg( areg[ 0 ] ), -8 + num_va_regs * 8 );
+            // consecutive words up to the first stack argument: s0 sits
+            // num_va_regs words below the incoming sp (gfunc_epilog)
+            emit_SW( s0, ireg( areg[ 0 ] ), ( num_va_regs - 1 ) * PTR_SIZE );
         }
     }
 #ifdef CONFIG_TCC_BCHECK
@@ -1017,9 +1052,9 @@ ST_FUNC int gfunc_sret( CType *vt, int variadic, CType *ret, int *ret_align, int
     int align, size = type_size( vt, &align ), nregs;
     int prc[ 3 ], fieldofs[ 3 ];
     *ret_align = 1;
-    *regsize = 8;
-    if( size > 16 )
-        return 0;
+    *regsize = XLEN;
+    if( size > 2 * XLEN )
+        return 0;  // by reference: the caller's buffer, its address in a0
     reg_pass( vt, prc, fieldofs, 1 );
     nregs = prc[ 0 ];
     if( nregs == 2 && prc[ 1 ] != prc[ 2 ] )
@@ -1243,6 +1278,27 @@ static void gen_opil( int op, int ll )
 {
     int a, b, d;
 
+    // unsigned 32x32 -> 64 multiply (how tccgen expands long long '*'), as
+    // arm-gen.c does UMULL
+    if( op == TOK_UMULL ) {
+        int c;
+        gv2( RC_INT, RC_INT );
+        // the operands are copies (tccgen's gen_opl): their registers stay
+        // live, so both halves of the product go to fresh ones
+        // (get_reg returns no register the value stack still refers to,
+        // the operands and the high word just claimed included)
+        vtop[ -1 ].r2 = get_reg( RC_INT );
+        d = get_reg( RC_INT );
+        c = vtop[ -1 ].r;
+        vtop[ -1 ].r = d;
+        a = ireg( c );
+        b = ireg( vtop[ 0 ].r );
+        emit_MULHU( ireg( vtop[ -1 ].r2 ), a, b );
+        emit_MUL( ireg( vtop[ -1 ].r ), a, b );
+        vtop--;
+        return;
+    }
+
     // handle the case where one of the values is a constant, use an immediate value if we can
     if( ( vtop->r & ( VT_VALMASK | VT_LVAL | VT_SYM ) ) == VT_CONST ) {
         int fc = vtop->c.i;
@@ -1444,8 +1500,8 @@ static int gen_opi_immediate( int op, int fc, int ll )
             emit_SRLI( rd, a, fc );
             break;
         case TOK_SAR:
-            fc = 1024 | ( fc & m );
-            emit_SRA( rd, a, fc );
+            fc &= m;
+            emit_SRAI( rd, a, fc );
             break;
 
 
