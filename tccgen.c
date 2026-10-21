@@ -2148,6 +2148,14 @@ ST_FUNC void gen_opl(int op)
             op1 = TOK_UGE;
         a = 0;
         b = 0;
+#ifdef TCC_TARGET_RISCV32
+        /* no condition flags to test again: keep copies of the high words
+           for the non equal test below */
+        if (op != TOK_NE && op != TOK_EQ) {
+            vpushv(vtop - 1);
+            vpushv(vtop - 1);
+        }
+#endif
         gen_op(op1);
         if (op == TOK_NE) {
             b = gvtst(0, 0);
@@ -2155,8 +2163,12 @@ ST_FUNC void gen_opl(int op)
             a = gvtst(1, 0);
             if (op != TOK_EQ) {
                 /* generate non equal test */
+#ifdef TCC_TARGET_RISCV32
+                gen_op(TOK_NE);
+#else
                 vpushi(0);
                 vset_VT_CMP(TOK_NE);
+#endif
                 b = gvtst(0, 0);
             }
         }
